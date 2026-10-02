@@ -31,3 +31,7 @@ __pycache__/
 /research/audio/local/
 /research/audio/sounds_common.json
 /research/audio/nacht_emitters.json
+/research/lighting/local/
+
+# Agent worktrees
+/.claude/
