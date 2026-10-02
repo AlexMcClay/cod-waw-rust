@@ -415,6 +415,15 @@ fn autopilot(
         return;
     }
     keys.release(KeyCode::Enter);
+    // Optional: cycle the stances (crouch at 6 s, prone at 10 s, up at 14/16 s).
+    if std::env::var_os("UNDEAD_TEST_STANCE").is_some() {
+        let dt = time.delta_secs();
+        for (at, key) in [(6.0, KeyCode::KeyC), (10.0, KeyCode::ControlLeft), (14.0, KeyCode::Space), (16.0, KeyCode::Space)] {
+            if t >= at && t - dt < at {
+                keys.press(key);
+            }
+        }
+    }
     let Ok((pt, mut ctl)) = player.single_mut() else { return };
     let eye = pt.translation;
     let target = zq

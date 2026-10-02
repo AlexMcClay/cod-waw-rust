@@ -18,6 +18,7 @@ built-in sounds.
 Controls
 --------
 WASD move, Shift sprint, Space jump, mouse look
+C crouch, Ctrl or Z prone (Space or Shift stands back up)
 Left mouse fire, right mouse aim, R reload, V or E knife
 1 / 2 / Q / mouse wheel switch weapons
 F interact (buy, open, use the box); hold F at a window to rebuild boards

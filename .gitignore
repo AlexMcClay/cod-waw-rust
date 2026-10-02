@@ -25,3 +25,7 @@ __pycache__/
 /research/t4/oat/dump_common/
 /research/t4/oat/raw/
 /research/t4/gen/OAT/
+
+# Local previews decoded from game files
+/research/hud/local/
+/research/audio/local/

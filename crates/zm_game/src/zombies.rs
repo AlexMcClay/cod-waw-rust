@@ -110,7 +110,7 @@ pub fn spawn_preview(
     };
     let flat = Vec3::new(-ctl.yaw.sin(), 0.0, -ctl.yaw.cos());
     let dist: f32 = std::env::var("UNDEAD_PREVIEW_DIST").ok().and_then(|d| d.parse().ok()).unwrap_or(1.5);
-    let mut pos = p.translation + flat * dist - Vec3::Y * player::EYE;
+    let mut pos = ctl.feet(p) + flat * dist;
     pos.y = ground_y(&world, pos.x, pos.z, pos.y + 0.5);
     let root = commands
         .spawn((
@@ -371,15 +371,15 @@ pub fn spawn_zombie(
     Some(id)
 }
 
-fn update_field(time: Res<Time>, mut world: ResMut<World>, player: Query<&Transform, With<Player>>) {
+fn update_field(time: Res<Time>, mut world: ResMut<World>, player: Query<(&Transform, &player::PlayerCtl), With<Player>>) {
     world.field_timer -= time.delta_secs();
     if world.field_timer > 0.0 && !world.field.is_empty() {
         return;
     }
     world.field_timer = 0.25;
-    let Ok(p) = player.single() else { return };
+    let Ok((p, ctl)) = player.single() else { return };
     if let (Some(graph), Some(mesh)) = (world.graph.clone(), world.mesh.clone()) {
-        let feet = p.translation - Vec3::Y * player::EYE;
+        let feet = ctl.feet(p);
         let here = V3::new(feet.x, feet.y, feet.z);
         let node = graph.nearest(here, |n| mesh.line_clear(V3::new(here.x, here.y + 0.8, here.z), V3::new(n.x, n.y + 0.8, n.z)));
         if let Some(node) = node {
@@ -482,14 +482,14 @@ fn ai(
     mut boards: ResMut<Boards>,
     mut health: ResMut<Health>,
     mut next: ResMut<NextState<GameState>>,
-    player: Query<&Transform, (With<Player>, Without<Zombie>)>,
+    player: Query<(&Transform, &player::PlayerCtl), (With<Player>, Without<Zombie>)>,
     mut zq: Query<(&mut Transform, &mut Zombie), Without<Player>>,
     board_q: Query<(Entity, &Board)>,
     mut sfx: EventWriter<PlaySfx>,
     mut commands: Commands,
 ) {
     let dt = time.delta_secs().min(0.05);
-    let Ok(pt) = player.single() else { return };
+    let Ok((pt, pctl)) = player.single() else { return };
     let ppos = Vec3::new(pt.translation.x, 0.0, pt.translation.z);
     let level = &level.0;
 
@@ -625,7 +625,7 @@ fn ai(
             }
             ZState::Chase if world.mesh.is_some() => {
                 let feet = t.translation;
-                let player_feet = pt.translation - Vec3::Y * player::EYE;
+                let player_feet = pctl.feet(pt);
                 if dist_player < 1.1 && (player_feet.y - feet.y).abs() < 1.5 {
                     face(&mut t, to_player, dt, 10.0);
                     if z.attack_cd <= 0.0 && z.swing <= 0.0 {

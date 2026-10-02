@@ -403,7 +403,7 @@ fn help_toggle(
     t.0 = format!(
         "UNDEAD ROUNDS\n\
          Esc pause menu\n\
-         WASD move, Shift sprint, Space jump\n\
+         WASD move, Shift sprint, Space jump, C crouch, Ctrl/Z prone\n\
          LMB fire, RMB aim, R reload, V/E knife\n\
          1/2/Q/wheel switch weapon\n\
          F interact (hold at windows to rebuild)\n\

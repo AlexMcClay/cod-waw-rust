@@ -13,11 +13,63 @@ use bevy::window::PrimaryWindow;
 use zm_core::geom::V3;
 use zm_core::rules;
 
-pub const EYE: f32 = 1.65;
-pub const RADIUS: f32 = 0.35;
+/// Game units (inches) to metres.
+const U: f32 = 0.0254;
+/// Standing eye height (60 units).
+pub const EYE: f32 = 60.0 * U;
+pub const RADIUS: f32 = 15.0 * U;
+
+// Movement constants of the original game (g_speed, g_gravity, jump_height,
+// player_*SpeedScale), in metres.
+const RUN_SPEED: f32 = 190.0 * U;
+const SPRINT_SCALE: f32 = 1.5;
+const BACK_SCALE: f32 = 0.7;
+const STRAFE_SCALE: f32 = 0.8;
+const ADS_SCALE: f32 = 0.6;
+const GRAVITY: f32 = 800.0 * U;
+const JUMP_HEIGHT: f32 = 39.0 * U;
+const ACCELERATE: f32 = 10.0;
+const AIR_ACCELERATE: f32 = 1.0;
+const FRICTION: f32 = 6.0;
+const STOP_SPEED: f32 = 100.0 * U;
+/// Seconds of sprint before the player is winded.
+const SPRINT_TIME: f32 = 4.0;
 
 #[derive(Component)]
 pub struct Player;
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Stance {
+    #[default]
+    Stand,
+    Crouch,
+    Prone,
+}
+
+impl Stance {
+    pub fn eye(self) -> f32 {
+        match self {
+            Stance::Stand => EYE,
+            Stance::Crouch => 40.0 * U,
+            Stance::Prone => 11.0 * U,
+        }
+    }
+    /// Collision height.
+    pub fn height(self) -> f32 {
+        match self {
+            Stance::Stand => 70.0 * U,
+            Stance::Crouch => 50.0 * U,
+            Stance::Prone => 30.0 * U,
+        }
+    }
+    fn speed_scale(self) -> f32 {
+        match self {
+            Stance::Stand => 1.0,
+            Stance::Crouch => 0.65,
+            Stance::Prone => 0.15,
+        }
+    }
+}
 
 #[derive(Component, Default)]
 pub struct PlayerCtl {
@@ -25,14 +77,32 @@ pub struct PlayerCtl {
     pub pitch: f32,
     pub feet_y: f32,
     pub vel_y: f32,
+    /// Horizontal velocity (x, z).
+    pub vel: Vec2,
     pub on_ground: bool,
     pub bob: f32,
     pub moving: bool,
     pub sprinting: bool,
+    pub stance: Stance,
+    /// Current eye height above the feet (eases between stances).
+    pub eye: f32,
+    /// Sprint stamina left, in seconds.
+    pub sprint_left: f32,
     /// 0 = hip, 1 = fully aimed down sights.
     pub ads: f32,
     /// Extra pitch from recoil, recovers over time.
     pub recoil: f32,
+}
+
+impl PlayerCtl {
+    fn new(feet_y: f32, yaw: f32) -> Self {
+        PlayerCtl { on_ground: true, feet_y, yaw, eye: EYE, sprint_left: SPRINT_TIME, ..default() }
+    }
+
+    /// Position of the feet given the camera transform.
+    pub fn feet(&self, t: &Transform) -> Vec3 {
+        Vec3::new(t.translation.x, self.feet_y, t.translation.z)
+    }
 }
 
 #[derive(Resource)]
@@ -78,7 +148,7 @@ pub fn spawn_player(mut commands: Commands, level: Res<LevelRes>, settings: Res<
         },
         Transform::from_xyz(x, EYE, z),
         Player,
-        PlayerCtl { on_ground: true, ..default() },
+        PlayerCtl::new(0.0, 0.0),
     ));
 }
 
@@ -87,7 +157,7 @@ pub fn reset_player(q: &mut Query<(&mut Transform, &mut PlayerCtl), With<Player>
     if let Ok((mut t, mut c)) = q.single_mut() {
         let (x, z) = level.0.player_start;
         let y = level.0.player_start_y;
-        *c = PlayerCtl { on_ground: true, feet_y: y, yaw: level.0.player_yaw, ..default() };
+        *c = PlayerCtl::new(y, level.0.player_yaw);
         *t = Transform::from_xyz(x, y + EYE, z);
     }
 }
@@ -140,26 +210,84 @@ fn movement(
     let wish = wish.normalize_or_zero();
     let aiming = mouse.pressed(MouseButton::Right);
     c.ads = (c.ads + if aiming { 6.0 } else { -6.0 } * dt).clamp(0.0, 1.0);
-    c.sprinting = keys.pressed(KeyCode::ShiftLeft) && wish.y > 0.5 && !aiming;
-    let speed = if c.sprinting { 6.6 } else { 4.3 } * (1.0 - 0.4 * c.ads);
+
+    // Stance: C toggles crouch, Ctrl toggles prone, jump or sprint stand up
+    // one step at a time. Getting up needs head room.
+    let here = (t.translation.x, t.translation.z);
+    let fits = |s: Stance, c: &PlayerCtl| -> bool {
+        let (x, z) = here;
+        let top = c.feet_y + s.height();
+        let mesh_ok = world.mesh.as_ref().is_none_or(|m| m.raycast(V3::new(x, c.feet_y + 0.3, z), V3::new(0.0, 1.0, 0.0), top - c.feet_y - 0.3).is_none());
+        let solids_ok = !world.player_solids.iter().any(|b| b.min.y < top && b.max.y > c.feet_y + 0.3 && b.push_circle(x, z, RADIUS * 0.5).is_some());
+        mesh_ok && solids_ok
+    };
+    let mut want = c.stance;
+    if keys.just_pressed(KeyCode::KeyC) {
+        want = if c.stance == Stance::Crouch { Stance::Stand } else { Stance::Crouch };
+    }
+    if keys.just_pressed(KeyCode::ControlLeft) || keys.just_pressed(KeyCode::KeyZ) {
+        want = if c.stance == Stance::Prone { Stance::Crouch } else { Stance::Prone };
+    }
+    let up_pressed = keys.just_pressed(KeyCode::Space) || (keys.just_pressed(KeyCode::ShiftLeft) && wish.y > 0.5);
+    if up_pressed && c.stance != Stance::Stand {
+        want = if c.stance == Stance::Prone { Stance::Crouch } else { Stance::Stand };
+    }
+    let standing_up = want != c.stance;
+    if standing_up && (want.height() <= c.stance.height() || fits(want, &c)) && c.on_ground {
+        c.stance = want;
+    }
+
+    // Sprint: standing, moving forward, not aiming, while stamina lasts.
+    let wants_sprint = keys.pressed(KeyCode::ShiftLeft) && wish.y > 0.5 && !aiming && c.stance == Stance::Stand && c.on_ground;
+    if wants_sprint && (c.sprinting || c.sprint_left > 1.0) && c.sprint_left > 0.0 {
+        c.sprinting = true;
+        c.sprint_left -= dt;
+    } else {
+        c.sprinting = false;
+        c.sprint_left = (c.sprint_left + dt).min(SPRINT_TIME);
+    }
 
     let (s, co) = c.yaw.sin_cos();
     let forward = Vec2::new(-s, -co);
     let right = Vec2::new(co, -s);
-    let delta = (forward * wish.y + right * wish.x) * speed * dt;
     c.moving = wish != Vec2::ZERO;
+    let dir_scale = if wish.y < -0.1 { BACK_SCALE } else if wish.y.abs() < 0.1 && wish.x != 0.0 { STRAFE_SCALE } else { 1.0 };
+    let wish_speed = RUN_SPEED * c.stance.speed_scale() * dir_scale * if c.sprinting { SPRINT_SCALE } else { 1.0 } * (1.0 - (1.0 - ADS_SCALE) * c.ads);
+    let wish_dir = (forward * wish.y + right * wish.x).normalize_or_zero();
 
-    let mut x = t.translation.x + delta.x;
-    let mut z = t.translation.z + delta.y;
+    // Quake-style friction and acceleration (the game's movement code is
+    // derived from it): quick but not instant starts and stops.
+    if c.on_ground {
+        let speed = c.vel.length();
+        if speed > 1e-4 {
+            let drop = speed.max(STOP_SPEED) * FRICTION * dt;
+            c.vel *= ((speed - drop).max(0.0)) / speed;
+        }
+    }
+    let accel = if c.on_ground { ACCELERATE } else { AIR_ACCELERATE };
+    let add = wish_speed - c.vel.dot(wish_dir);
+    if add > 0.0 {
+        c.vel += wish_dir * (accel * wish_speed * dt).min(add);
+    }
+
+    let start = Vec2::new(t.translation.x, t.translation.z);
+    let mut x = start.x + c.vel.x * dt;
+    let mut z = start.y + c.vel.y * dt;
+    let height = c.stance.height();
     if let Some(mesh) = &world.mesh {
         // Walls of the real map: spheres above step height, ignoring floors.
-        for h in [0.6f32, 1.1, 1.55] {
+        let heights: &[f32] = match c.stance {
+            Stance::Stand => &[0.6, 1.1, 1.5],
+            Stance::Crouch => &[0.6, 1.0],
+            Stance::Prone => &[0.45],
+        };
+        for &h in heights {
             let (p, _) = mesh.push_sphere(V3::new(x, c.feet_y + h, z), RADIUS, 3, |t| t.n.y.abs() < 0.7);
             x = p.x;
             z = p.z;
         }
     }
-    let (feet, head) = (c.feet_y + 0.3, c.feet_y + 1.7);
+    let (feet, head) = (c.feet_y + 0.3, c.feet_y + height);
     for _ in 0..3 {
         for solid in world.player_solids.iter().filter(|s| s.min.y < head && s.max.y > feet) {
             if let Some((nx, nz)) = solid.push_circle(x, z, RADIUS) {
@@ -168,12 +296,19 @@ fn movement(
             }
         }
     }
+    // Lose the velocity that ran into walls.
+    if dt > 0.0 {
+        let actual = (Vec2::new(x, z) - start) / dt;
+        if actual.length_squared() < c.vel.length_squared() {
+            c.vel = actual;
+        }
+    }
 
-    if c.on_ground && keys.just_pressed(KeyCode::Space) {
-        c.vel_y = 4.6;
+    if c.on_ground && keys.just_pressed(KeyCode::Space) && c.stance == Stance::Stand && !standing_up {
+        c.vel_y = (2.0 * GRAVITY * JUMP_HEIGHT).sqrt();
         c.on_ground = false;
     }
-    c.vel_y -= 13.0 * dt;
+    c.vel_y -= GRAVITY * dt;
     c.feet_y += c.vel_y * dt;
     let ground = match &world.mesh {
         Some(mesh) => mesh.ground(x, z, c.feet_y + 0.55 - c.vel_y.min(0.0) * dt, c.feet_y - 6.0, 0.6),
@@ -193,12 +328,17 @@ fn movement(
         c.vel_y = 0.0;
     }
 
-    if c.moving && c.on_ground {
-        c.bob += dt * if c.sprinting { 13.0 } else { 9.0 };
-    }
-    let bob = (c.bob).sin() * 0.035 * if c.moving { 1.0 } else { 0.0 };
-    t.translation = Vec3::new(x, EYE + c.feet_y + bob, z);
+    // Eye height eases to the stance's.
+    let target_eye = c.stance.eye();
+    let step = 3.0 * dt;
+    c.eye += (target_eye - c.eye).clamp(-step, step);
 
+    let speed_frac = (c.vel.length() / RUN_SPEED).min(1.6);
+    if c.on_ground && speed_frac > 0.05 {
+        c.bob += dt * (6.0 + 5.0 * speed_frac);
+    }
+    let bob = (c.bob).sin() * 0.022 * speed_frac.min(1.0) * if c.on_ground { 1.0 } else { 0.0 };
+    t.translation = Vec3::new(x, c.feet_y + c.eye + bob, z);
 }
 
 fn regen(time: Res<Time>, mut hp: ResMut<Health>) {

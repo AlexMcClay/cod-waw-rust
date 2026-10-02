@@ -89,6 +89,10 @@ fn interact(
     prompt.0.clear();
     let Ok(pt) = player.single() else { return };
     let me = Vec2::new(pt.translation.x, pt.translation.z);
+    let eye = pt.translation.y;
+    // Only things on the player's own floor: the real game's use triggers
+    // are volumes, so a buy one storey up or down is out of reach.
+    let level_with = |y: f32, tolerance: f32| (eye - y).abs() < tolerance;
     let level_ref = &level.0;
 
     // Find the nearest interactable.
@@ -101,14 +105,14 @@ fn interact(
     for (i, w) in level_ref.windows.iter().enumerate() {
         let (x, z) = w.inside_point();
         let d = me.distance(Vec2::new(x, z));
-        if d < 1.6 && boards.0[i] < w.boards {
+        if d < 1.6 && boards.0[i] < w.boards && level_with(w.center.y, 2.0) {
             consider(d, Target::Window(i), &mut best);
         }
     }
     for (i, wb) in level_ref.wall_buys.iter().enumerate() {
         let p = Vec2::new(wb.pos.x + wb.facing.0 * 0.6, wb.pos.z + wb.facing.1 * 0.6);
         let d = me.distance(p);
-        if d < 1.4 {
+        if d < 1.4 && level_with(wb.pos.y, 1.6) {
             consider(d, Target::WallBuy(i), &mut best);
         }
     }
@@ -118,14 +122,15 @@ fn interact(
         }
         let c = door.blocker.center();
         let d = me.distance(Vec2::new(c.x, c.z));
-        if d < 2.3 {
+        let half_height = (door.blocker.max.y - door.blocker.min.y) * 0.5;
+        if d < 2.3 && level_with(c.y, half_height + 1.4) {
             consider(d, Target::Door(i), &mut best);
         }
     }
     {
         let c = level_ref.crate_box.center();
         let d = me.distance(Vec2::new(c.x, c.z));
-        if d < 1.9 {
+        if d < 1.9 && level_with(c.y, 2.0) {
             consider(d, Target::Crate, &mut best);
         }
     }
