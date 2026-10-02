@@ -3,8 +3,25 @@
 //! Triangles are bucketed into a uniform XZ grid. Queries: ray casts (bullets,
 //! line of sight, ground probes) and sphere push-out (player and zombie
 //! movement). World axes as in [`crate::geom`]: Y up, metres.
+//!
+//! Every triangle says what it blocks ([`blocks`]). The plain queries
+//! (`raycast`, `ground`, `push_sphere`, ...) only see [`blocks::SOLID`]
+//! triangles; the `*_mask` queries pick triangles by any set of flags, so a
+//! map can carry collision that only stops the player (player clip) or only
+//! AI (monster clip) next to its solid geometry.
 
 use crate::geom::V3;
+
+/// What a triangle blocks.
+pub mod blocks {
+    /// Ordinary solid geometry: everything (seen by the plain queries).
+    pub const SOLID: u8 = 1;
+    /// Stops the player.
+    pub const PLAYER: u8 = 2;
+    /// Stops AI movement.
+    pub const AI: u8 = 4;
+    pub const ALL: u8 = SOLID | PLAYER | AI;
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Tri {
@@ -13,6 +30,8 @@ pub struct Tri {
     pub c: V3,
     /// Unit normal (counter-clockwise winding).
     pub n: V3,
+    /// [`blocks`] flags ([`blocks::ALL`] unless set otherwise).
+    pub blocks: u8,
 }
 
 impl Tri {
@@ -21,7 +40,13 @@ impl Tri {
         if n.len() < 1e-10 {
             return None;
         }
-        Some(Tri { a, b, c, n: n.normalize() })
+        Some(Tri { a, b, c, n: n.normalize(), blocks: blocks::ALL })
+    }
+
+    /// The same triangle blocking only `flags`.
+    pub fn blocking(mut self, flags: u8) -> Tri {
+        self.blocks = flags;
+        self
     }
 
     fn min(&self) -> V3 {
@@ -169,9 +194,16 @@ impl TriMesh {
         i >= 0 && j >= 0 && (i as usize) < self.w && (j as usize) < self.h
     }
 
-    /// Nearest hit along a unit-length ray, considering only triangles that
-    /// pass `accept`.
+    /// Nearest hit along a unit-length ray, considering only solid triangles
+    /// that pass `accept`.
     pub fn raycast_filtered(&self, o: V3, d: V3, max: f32, accept: impl Fn(&Tri) -> bool) -> Option<Hit> {
+        self.raycast_mask(o, d, max, blocks::SOLID, accept)
+    }
+
+    /// Nearest hit along a unit-length ray, considering only triangles that
+    /// block any of `mask` and pass `accept`.
+    pub fn raycast_mask(&self, o: V3, d: V3, max: f32, mask: u8, accept: impl Fn(&Tri) -> bool) -> Option<Hit> {
+        let accept = |t: &Tri| t.blocks & mask != 0 && accept(t);
         let mut best: Option<Hit> = None;
         let test_cell = |i: i64, j: i64, best: &mut Option<Hit>| {
             if !self.in_grid(i, j) {
@@ -242,13 +274,24 @@ impl TriMesh {
     /// Height of the highest walkable surface (normal.y >= `min_up`) below
     /// `(x, top, z)`, searching down to `bottom`.
     pub fn ground(&self, x: f32, z: f32, top: f32, bottom: f32, min_up: f32) -> Option<f32> {
-        let o = V3::new(x, top, z);
-        self.raycast_filtered(o, V3::new(0.0, -1.0, 0.0), top - bottom, |t| t.n.y.abs() >= min_up).map(|h| top - h.t)
+        self.ground_mask(x, z, top, bottom, min_up, blocks::SOLID)
     }
 
-    /// Pushes a sphere out of every triangle passing `accept`. Returns the
-    /// corrected centre and whether anything was touched.
-    pub fn push_sphere(&self, mut c: V3, r: f32, iterations: usize, accept: impl Fn(&Tri) -> bool) -> (V3, bool) {
+    /// [`TriMesh::ground`] over the triangles blocking any of `mask`.
+    pub fn ground_mask(&self, x: f32, z: f32, top: f32, bottom: f32, min_up: f32, mask: u8) -> Option<f32> {
+        let o = V3::new(x, top, z);
+        self.raycast_mask(o, V3::new(0.0, -1.0, 0.0), top - bottom, mask, |t| t.n.y.abs() >= min_up).map(|h| top - h.t)
+    }
+
+    /// Pushes a sphere out of every solid triangle passing `accept`. Returns
+    /// the corrected centre and whether anything was touched.
+    pub fn push_sphere(&self, c: V3, r: f32, iterations: usize, accept: impl Fn(&Tri) -> bool) -> (V3, bool) {
+        self.push_sphere_mask(c, r, iterations, blocks::SOLID, accept)
+    }
+
+    /// [`TriMesh::push_sphere`] over the triangles blocking any of `mask`.
+    pub fn push_sphere_mask(&self, mut c: V3, r: f32, iterations: usize, mask: u8, accept: impl Fn(&Tri) -> bool) -> (V3, bool) {
+        let accept = |t: &Tri| t.blocks & mask != 0 && accept(t);
         let mut touched = false;
         for _ in 0..iterations {
             let (i0, j0) = self.cell_coord(c.x - r, c.z - r);
@@ -285,6 +328,223 @@ impl TriMesh {
         }
         (c, touched)
     }
+    /// Indices of the triangles in the cells overlapping the XZ square
+    /// `(x ± r, z ± r)` (a triangle can appear more than once).
+    fn near(&self, x: f32, z: f32, r: f32) -> impl Iterator<Item = u32> + '_ {
+        let (i0, j0) = self.cell_coord(x - r, z - r);
+        let (i1, j1) = self.cell_coord(x + r, z + r);
+        let (i0, j0) = (i0.max(0), j0.max(0));
+        let (i1, j1) = (i1.min(self.w as i64 - 1), j1.min(self.h as i64 - 1));
+        (j0..=j1).flat_map(move |j| (i0..=i1).flat_map(move |i| self.cell_tris(i as usize, j as usize).iter().copied()))
+    }
+
+    /// Pushes a vertical cylinder (centre `(x, z)`, radius `r`, from height
+    /// `y0` to `y1`) sideways out of the triangles blocking any of `mask`
+    /// that pass `accept`. Only the part of each triangle between `y0` and
+    /// `y1` counts, so anything lower than `y0` (a step) or above `y1` is
+    /// ignored. Returns the corrected `(x, z)` and whether anything was
+    /// touched.
+    #[allow(clippy::too_many_arguments)]
+    pub fn push_cylinder_mask(&self, mut x: f32, mut z: f32, r: f32, y0: f32, y1: f32, iterations: usize, mask: u8, accept: impl Fn(&Tri) -> bool) -> (f32, f32, bool) {
+        let mut touched = false;
+        let mut seen: Vec<u32> = Vec::new();
+        for _ in 0..iterations {
+            let mut moved = false;
+            seen.clear();
+            seen.extend(self.near(x, z, r));
+            seen.sort_unstable();
+            seen.dedup();
+            for &ti in &seen {
+                let t = &self.tris[ti as usize];
+                if t.blocks & mask == 0 || !accept(t) {
+                    continue;
+                }
+                let poly = clip_to_slab(&[t.a, t.b, t.c], y0, y1);
+                if poly.is_empty() {
+                    continue;
+                }
+                let Some((qx, qz, inside)) = closest_2d(&poly, x, z) else { continue };
+                let (dx, dz) = (x - qx, z - qz);
+                let dist = (dx * dx + dz * dz).sqrt();
+                if !inside && dist >= r - 1e-5 {
+                    continue;
+                }
+                // Push direction: away from the closest point, or along the
+                // triangle's horizontal normal when exactly on it.
+                let (mut ux, mut uz) = if dist > 1e-6 { (dx / dist, dz / dist) } else { (t.n.x, t.n.z) };
+                let ul = (ux * ux + uz * uz).sqrt();
+                if ul < 1e-6 {
+                    continue;
+                }
+                ux /= ul;
+                uz /= ul;
+                if inside {
+                    // Centre inside the footprint: leave through the nearest edge.
+                    x = qx - ux * r;
+                    z = qz - uz * r;
+                } else {
+                    x = qx + ux * r;
+                    z = qz + uz * r;
+                }
+                moved = true;
+                touched = true;
+            }
+            if !moved {
+                break;
+            }
+        }
+        (x, z, touched)
+    }
+
+    /// Where a sphere of radius `r` lowered at `(x, z)` comes to rest on the
+    /// walkable triangles (|normal.y| >= `min_up`) blocking any of `mask`:
+    /// the height of the sphere's bottom, between `bottom` and `top`.
+    /// Triangles the sphere would rest on above `top` are ignored (too high
+    /// to step onto). Unlike a single ray, the result rises smoothly over
+    /// step edges, like a ball rolling up stairs.
+    #[allow(clippy::too_many_arguments)]
+    pub fn support_sphere_mask(&self, x: f32, z: f32, r: f32, top: f32, bottom: f32, min_up: f32, mask: u8) -> Option<f32> {
+        let mut best: Option<f32> = None;
+        let mut seen: Vec<u32> = self.near(x, z, r).collect();
+        seen.sort_unstable();
+        seen.dedup();
+        for ti in seen {
+            let t = &self.tris[ti as usize];
+            if t.blocks & mask == 0 || t.n.y.abs() < min_up {
+                continue;
+            }
+            let lo = t.min();
+            let hi = t.max();
+            if lo.x > x + r || hi.x < x - r || lo.z > z + r || hi.z < z - r || hi.y < bottom || lo.y > top {
+                continue;
+            }
+            let Some(c) = sphere_rest(t, x, z, r) else { continue };
+            let feet = c - r;
+            if feet <= top + 1e-4 && feet >= bottom && best.is_none_or(|b| feet > b) {
+                best = Some(feet);
+            }
+        }
+        best
+    }
+}
+
+/// The part of a convex polygon between heights `y0` and `y1`.
+fn clip_to_slab(poly: &[V3], y0: f32, y1: f32) -> Vec<V3> {
+    let clip = |poly: Vec<V3>, keep: &dyn Fn(f32) -> f32| -> Vec<V3> {
+        // Keeps the vertices with keep(y) >= 0.
+        let mut out = Vec::with_capacity(poly.len() + 2);
+        for i in 0..poly.len() {
+            let a = poly[i];
+            let b = poly[(i + 1) % poly.len()];
+            let (da, db) = (keep(a.y), keep(b.y));
+            if da >= 0.0 {
+                out.push(a);
+            }
+            if (da >= 0.0) != (db >= 0.0) {
+                let s = da / (da - db);
+                out.push(a.add(b.sub(a).scale(s)));
+            }
+        }
+        out
+    };
+    let p = clip(poly.to_vec(), &|y| y - y0);
+    if p.is_empty() {
+        return p;
+    }
+    clip(p, &|y| y1 - y)
+}
+
+/// Closest point of a polygon's XZ projection to `(x, z)`, and whether
+/// `(x, z)` lies inside the projection (only for projections with area).
+fn closest_2d(poly: &[V3], x: f32, z: f32) -> Option<(f32, f32, bool)> {
+    let n = poly.len();
+    if n == 0 {
+        return None;
+    }
+    let mut best = (poly[0].x, poly[0].z, f32::MAX);
+    let mut area = 0.0;
+    let mut sign_pos = true;
+    let mut sign_neg = true;
+    for i in 0..n {
+        let (a, b) = (poly[i], poly[(i + 1) % n]);
+        let (ex, ez) = (b.x - a.x, b.z - a.z);
+        let len2 = ex * ex + ez * ez;
+        let s = if len2 > 1e-12 { (((x - a.x) * ex + (z - a.z) * ez) / len2).clamp(0.0, 1.0) } else { 0.0 };
+        let (qx, qz) = (a.x + ex * s, a.z + ez * s);
+        let d2 = (x - qx) * (x - qx) + (z - qz) * (z - qz);
+        if d2 < best.2 {
+            best = (qx, qz, d2);
+        }
+        let cross = ex * (z - a.z) - ez * (x - a.x);
+        sign_pos &= cross >= 0.0;
+        sign_neg &= cross <= 0.0;
+        area += a.x * b.z - b.x * a.z;
+    }
+    let inside = area.abs() > 1e-6 && (sign_pos || sign_neg);
+    Some((best.0, best.1, inside))
+}
+
+/// Height of the centre of a sphere of radius `r` lowered from above at
+/// `(x, z)` until it touches the triangle, if it touches it at all.
+fn sphere_rest(t: &Tri, x: f32, z: f32, r: f32) -> Option<f32> {
+    let mut best: Option<f32> = None;
+    let mut take = |c: f32| {
+        if best.is_none_or(|b| c > b) {
+            best = Some(c);
+        }
+    };
+    // Face: the contact point is the centre minus r along the (upward) normal.
+    let n = if t.n.y < 0.0 { t.n.scale(-1.0) } else { t.n };
+    if n.y > 1e-4 {
+        let c = (r + n.dot(t.a) - n.x * x - n.z * z) / n.y;
+        let p = V3::new(x, c, z).sub(n.scale(r));
+        if inside_tri(t, p) {
+            take(c);
+        }
+    }
+    // Edges: the centre is at distance r from the segment.
+    for (a, b) in [(t.a, t.b), (t.b, t.c), (t.c, t.a)] {
+        let e = b.sub(a);
+        let l2 = e.dot(e);
+        if l2 < 1e-10 {
+            continue;
+        }
+        let (wx, wz) = (x - a.x, z - a.z);
+        let k = wx * e.x + wz * e.z;
+        let qa = 1.0 - e.y * e.y / l2;
+        if qa < 1e-6 {
+            continue; // vertical edge: its end points cover it
+        }
+        let qb = -2.0 * k * e.y / l2;
+        let qc = wx * wx + wz * wz - k * k / l2 - r * r;
+        let disc = qb * qb - 4.0 * qa * qc;
+        if disc < 0.0 {
+            continue;
+        }
+        let h = (-qb + disc.sqrt()) / (2.0 * qa);
+        let s = (k + h * e.y) / l2;
+        if (0.0..=1.0).contains(&s) {
+            take(a.y + h);
+        }
+    }
+    // Corners.
+    for v in [t.a, t.b, t.c] {
+        let d2 = (x - v.x) * (x - v.x) + (z - v.z) * (z - v.z);
+        if d2 <= r * r {
+            take(v.y + (r * r - d2).sqrt());
+        }
+    }
+    best
+}
+
+/// Whether `p` (on the triangle's plane) lies inside the triangle.
+fn inside_tri(t: &Tri, p: V3) -> bool {
+    let n = t.b.sub(t.a).cross(t.c.sub(t.a));
+    let e = 1e-6 * n.dot(n).sqrt();
+    let s0 = t.b.sub(t.a).cross(p.sub(t.a)).dot(n);
+    let s1 = t.c.sub(t.b).cross(p.sub(t.b)).dot(n);
+    let s2 = t.a.sub(t.c).cross(p.sub(t.c)).dot(n);
+    s0 >= -e && s1 >= -e && s2 >= -e
 }
 
 #[cfg(test)]
@@ -347,5 +607,91 @@ mod tests {
         assert!(close(t.closest_point(V3::new(-1.0, 0.0, -1.0)), V3::new(0.0, 0.0, 0.0)));
         let e = t.closest_point(V3::new(1.0, 0.0, 1.0));
         assert!((e.x - 0.5).abs() < 1e-5 && (e.z - 0.5).abs() < 1e-5);
+    }
+
+    fn quad(tris: &mut Vec<Tri>, a: V3, b: V3, c: V3, d: V3, flags: u8) {
+        tris.push(Tri::new(a, b, c).unwrap().blocking(flags));
+        tris.push(Tri::new(a, c, d).unwrap().blocking(flags));
+    }
+
+    /// A box from `lo` to `hi` (all six faces, outward normals).
+    fn cube(tris: &mut Vec<Tri>, lo: V3, hi: V3, flags: u8) {
+        let v = |x: f32, y: f32, z: f32| V3::new(x, y, z);
+        let (a, b) = (lo, hi);
+        quad(tris, v(a.x, b.y, a.z), v(a.x, b.y, b.z), v(b.x, b.y, b.z), v(b.x, b.y, a.z), flags); // top
+        quad(tris, v(a.x, a.y, a.z), v(b.x, a.y, a.z), v(b.x, a.y, b.z), v(a.x, a.y, b.z), flags); // bottom
+        quad(tris, v(b.x, a.y, a.z), v(b.x, b.y, a.z), v(b.x, b.y, b.z), v(b.x, a.y, b.z), flags); // +x
+        quad(tris, v(a.x, a.y, a.z), v(a.x, a.y, b.z), v(a.x, b.y, b.z), v(a.x, b.y, a.z), flags); // -x
+        quad(tris, v(a.x, a.y, b.z), v(b.x, a.y, b.z), v(b.x, b.y, b.z), v(a.x, b.y, b.z), flags); // +z
+        quad(tris, v(a.x, a.y, a.z), v(a.x, b.y, a.z), v(b.x, b.y, a.z), v(b.x, a.y, a.z), flags); // -z
+    }
+
+    #[test]
+    fn plain_queries_ignore_clip_only_triangles() {
+        let mut tris = Vec::new();
+        quad(&mut tris, V3::new(-5.0, 0.0, -5.0), V3::new(-5.0, 0.0, 5.0), V3::new(5.0, 0.0, 5.0), V3::new(5.0, 0.0, -5.0), blocks::ALL);
+        // Player clip: a slab at 1 m only the player stands on.
+        quad(&mut tris, V3::new(-1.0, 1.0, -1.0), V3::new(-1.0, 1.0, 1.0), V3::new(1.0, 1.0, 1.0), V3::new(1.0, 1.0, -1.0), blocks::PLAYER);
+        let m = TriMesh::new(tris, 2.0);
+        assert!((m.ground(0.0, 0.0, 3.0, -1.0, 0.7).unwrap()).abs() < 1e-5);
+        assert!((m.ground_mask(0.0, 0.0, 3.0, -1.0, 0.7, blocks::PLAYER).unwrap() - 1.0).abs() < 1e-5);
+        assert!((m.ground_mask(0.0, 0.0, 3.0, -1.0, 0.7, blocks::AI).unwrap()).abs() < 1e-5);
+        assert!(m.line_clear(V3::new(0.0, 2.0, 0.0), V3::new(0.0, 0.5, 0.0)));
+        assert!(m.raycast_mask(V3::new(0.0, 2.0, 0.0), V3::new(0.0, -1.0, 0.0), 1.5, blocks::PLAYER, |_| true).is_some());
+    }
+
+    /// Stairs of 0.15 m risers and 0.23 m treads going up along +x.
+    fn stairs() -> TriMesh {
+        let mut tris = Vec::new();
+        quad(&mut tris, V3::new(-5.0, 0.0, -2.0), V3::new(-5.0, 0.0, 2.0), V3::new(0.0, 0.0, 2.0), V3::new(0.0, 0.0, -2.0), blocks::ALL);
+        for i in 0..10 {
+            let x0 = i as f32 * 0.23;
+            cube(&mut tris, V3::new(x0, 0.0, -1.0), V3::new(x0 + 0.23, 0.15 * (i + 1) as f32, 1.0), blocks::ALL);
+        }
+        TriMesh::new(tris, 1.0)
+    }
+
+    #[test]
+    fn sphere_support_rides_up_stairs_smoothly() {
+        let m = stairs();
+        let r = 0.38;
+        let mut feet = 0.0f32;
+        let mut x = -1.0;
+        let mut max_jump = 0.0f32;
+        while x < 2.0 {
+            let g = m.support_sphere_mask(x, 0.0, r, feet + 0.46, feet - 2.0, 0.7, blocks::PLAYER).unwrap();
+            assert!(g >= feet - 1e-4, "went down at {x}: {g} < {feet}");
+            max_jump = max_jump.max(g - feet);
+            feet = g;
+            x += 0.01;
+        }
+        // Flat floor far from the stairs, and the top tread under the centre.
+        assert!(m.support_sphere_mask(-2.0, 0.0, r, 0.46, -1.0, 0.7, blocks::PLAYER).unwrap().abs() < 1e-5);
+        assert!((feet - 1.5).abs() < 0.01, "{feet}");
+        // A ray would jump 0.15 m at every riser; the sphere never jumps
+        // more than a few centimetres per centimetre travelled.
+        assert!(max_jump < 0.06, "{max_jump}");
+        // Too high to step onto: a 1 m block is ignored, the floor is found.
+        let mut tris = Vec::new();
+        quad(&mut tris, V3::new(-5.0, 0.0, -5.0), V3::new(-5.0, 0.0, 5.0), V3::new(5.0, 0.0, 5.0), V3::new(5.0, 0.0, -5.0), blocks::ALL);
+        cube(&mut tris, V3::new(0.0, 0.0, -1.0), V3::new(1.0, 1.0, 1.0), blocks::ALL);
+        let m = TriMesh::new(tris, 1.0);
+        assert!(m.support_sphere_mask(-0.2, 0.0, r, 0.46, -1.0, 0.7, blocks::PLAYER).unwrap().abs() < 1e-5);
+    }
+
+    #[test]
+    fn cylinder_push_ignores_what_lies_below_the_step() {
+        let mut tris = Vec::new();
+        // A wall at x = 3 and a 0.2 m kerb from x = 1.
+        quad(&mut tris, V3::new(3.0, 0.0, -5.0), V3::new(3.0, 3.0, -5.0), V3::new(3.0, 3.0, 5.0), V3::new(3.0, 0.0, 5.0), blocks::ALL);
+        cube(&mut tris, V3::new(1.0, 0.0, -1.0), V3::new(2.0, 0.2, 1.0), blocks::PLAYER);
+        let m = TriMesh::new(tris, 2.0);
+        let (x, z, hit) = m.push_cylinder_mask(2.8, 0.0, 0.4, 0.45, 1.8, 3, blocks::PLAYER, |t| t.n.y.abs() < 0.7);
+        assert!(hit && (x - 2.6).abs() < 1e-4 && z.abs() < 1e-4, "{x} {z}");
+        let (x, _, hit) = m.push_cylinder_mask(0.9, 0.0, 0.4, 0.45, 1.8, 3, blocks::PLAYER, |t| t.n.y.abs() < 0.7);
+        assert!(!hit && (x - 0.9).abs() < 1e-6);
+        // From the floor the kerb is in the way when the band starts low.
+        let (x, _, hit) = m.push_cylinder_mask(0.9, 0.0, 0.4, 0.05, 1.8, 3, blocks::PLAYER, |t| t.n.y.abs() < 0.7);
+        assert!(hit && (x - 0.6).abs() < 1e-4, "{x}");
     }
 }

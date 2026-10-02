@@ -277,6 +277,7 @@ fn poll_load(
     mut mats: ResMut<Mats>,
     mut zone_sounds: ResMut<crate::audio::ZoneSounds>,
     mut world_mats: ResMut<Assets<world_material::WawWorldMaterial>>,
+    mut defs: ResMut<crate::Defs>,
 ) {
     if let Some(e) = &error.0 {
         if let Ok(mut t) = status.single_mut() {
@@ -314,8 +315,9 @@ fn poll_load(
     info!("Nacht nav graph: {} nodes, {} links", nav.nodes.len(), nav.edges.iter().map(Vec::len).sum::<usize>() / 2);
 
     let NachtScene {
-        images: imgs, lightmap_pages, irradiance, fog, film, lights, materials: mdefs, world, submodels, models, static_models, sky_model, sky_scale, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, fx, ..
+        images: imgs, lightmap_pages, irradiance, fog, film, lights, materials: mdefs, world, submodels, models, static_models, sky_model, sky_scale, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, weapon_stats, flesh_penetration, fx, ..
     } = scene;
+    crate::audio::apply_zone_weapon_stats(&mut defs.0, &weapon_stats, flesh_penetration);
     commands.insert_resource(crate::fx::PendingFx(fx));
     let image_handles: HashMap<String, Handle<Image>> = imgs.into_iter().map(|(k, v)| (k, images.add(v))).collect();
     let mat_handles: Vec<Handle<StandardMaterial>> = mdefs

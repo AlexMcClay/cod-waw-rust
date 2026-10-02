@@ -285,6 +285,16 @@ Per alias order: aliasName, subtitle, secondaryAliasName, chainAliasName strings
 * type 2/3: `u.streamSnd` = `StreamedSound` (16 B embedded): `StreamFileName filename {0x0 u32 hash; 0x4 char* dir; 0x8 char* name}` + `0xC PrimedSound* primeSnd` (12 B: name, u8* buffer in **LARGE** block alloc 2048, u32 size). File path in IWDs: `sound/` + (`dir/` if dir non-empty) + `name`, case-insensitive, `\` → `/` (e.g. `SFX\Weapon\MG` + `hmg_overheat.wav`).
 * Counts: 1,720 lists, 5,105 aliases (4,913 loaded, 190 streamed, 2 primed); 1,249 distinct LoadedSounds. `sounds.json` has everything.
 
+### 8.1 clipMap_t (type 11): the map's collision (VERIFIED, `crates/waw_assets/src/t4/clipmap.rs`)
+
+Layout in `T4_LAYOUTS.txt` (`clipMap_t` 332 B, `cbrush_t` 80, `cbrushside_t` 12, `cplane_s` 20, `cLeaf_t` 44, `cLeafBrushNode_s` 20, `CollisionPartition` 20, `CollisionAabbTree` 32, `cmodel_t` 72, `dmaterial_t` 72). Findings on Nacht:
+* **Brushes** are an axial box (`mins`/`maxs`, with `axialMaterialNum[min/max][xyz]`) plus `numsides` extra sides. `sides` points into the `brushsides` array (resolve the back-reference to a file position, index = (pos - array) / 12); each side's `plane` points into `planes`. Polygonise by clipping each plane's quad by all the others. 2,715 brushes, 0–20 extra sides.
+* `contents` per brush (`CONTENTS_*` as in CoD4: SOLID 0x1, GLASS 0x10, CLIPSHOT 0x2000, MISSILECLIP 0x80, PLAYERCLIP 0x10000, MONSTERCLIP 0x20000, AI_NOSIGHT 0x1000, MANTLE 0x1000000, DETAIL 0x8000000...). Nacht: 1,920 solid, 574 player clip without SOLID (541 in the static world; `clip`, `clip_player`, `clip_nosight_*`, `clip_metal`), 135 monster-clip-only (`clip_ai`, 122 in the world), 9 sky, 17 shot/missile clip, 60 non-colliding (`traverse`, `portal`, `mount`).
+* **Brush models**: `cmodels[n].leaf.leafBrushNode` roots a `cLeafBrushNode_s` tree (`leafBrushCount > 0`: leaf with `brushes[]`; `0`: split with `childOffset[2]` relative to the node). Submodel brushes are in the entity's local space (window boards are one 4-unit-thick brush each). World = brushes no submodel owns: 2,549.
+* **Terrain/patches**: `verts` + `triIndices`, grouped in `partitions` (`firstTri`, `triCount`) under `aabbTrees` (leaf when `childCount == 0`, `u` = partition index; `materialIndex` → `dmaterial_t.contentFlags`). World terrain = the trees under every `cLeaf_t`'s `firstCollAabbIndex/collAabbCount` (model 0's own leaf has none): 19,482 of 19,500 triangles.
+* Against the render geometry: ~97% of the opaque static render area lies on solid brushes or terrain, ~98% on any collision; the rest is unreachable (floors under clip brushes), cloth and trims. Stairs are solid step brushes (Nacht's help-room stairs: 9-unit treads, 6-unit risers); there is no player-clip ramp over them, only a 10-unit clip wedge along one side.
+* Tools: `examples/clipinfo.rs` (summary, brushes/entities in a box, `brush N` faces), `examples/clipcover.rs` (render vs collision coverage).
+
 ## 9. Walking all assets sequentially — algorithm (VERIFIED)
 
 ```
