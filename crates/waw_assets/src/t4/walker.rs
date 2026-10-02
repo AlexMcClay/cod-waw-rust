@@ -1775,14 +1775,17 @@ impl<'a> Walker<'a> {
         let h = self.read(16)?;
         self.push(VIRTUAL);
         let name = self.xstring(h.u32(0))?.unwrap_or_default();
+        let (columns, rows) = (h.i32(4).max(0) as usize, h.i32(8).max(0) as usize);
+        let mut cells = Vec::new();
         if h.u32(0xc) != 0 {
             self.alloc(4);
-            let n = (h.i32(4).max(0) * h.i32(8).max(0)) as usize;
+            let n = columns * rows;
             let ptrs = self.read(4 * n)?;
             for i in 0..n {
-                self.xstring(ptrs.u32(4 * i))?;
+                cells.push(self.xstring(ptrs.u32(4 * i))?.unwrap_or_default());
             }
         }
+        self.out.string_tables.push(super::StringTable { name: name.clone(), columns, rows, cells });
         self.pop();
         Ok((AssetRef::Other(AssetType::StringTable), name))
     }

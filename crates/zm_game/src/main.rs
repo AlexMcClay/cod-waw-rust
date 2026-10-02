@@ -123,26 +123,46 @@ pub struct Score {
     pub points: u32,
     pub kills: u32,
     pub headshots: u32,
+    /// Points ever earned from zombies (`score_total`, starting points
+    /// included): drives the power-up drop trigger. Repairs don't count.
+    pub total: u32,
 }
 
 impl Default for Score {
     fn default() -> Self {
-        Score { points: rules::POINTS_START, kills: 0, headshots: 0 }
+        Score { points: rules::POINTS_START, kills: 0, headshots: 0, total: rules::POINTS_START }
     }
 }
 
 #[derive(Resource, Default)]
 pub struct Round(pub RoundState);
 
+/// The loaded map's zombie rules (from its scripts); sessions on it start
+/// with these.
+#[derive(Resource, Clone)]
+pub struct MapRules(pub rules::ZombieRules);
+
 #[derive(Resource, Default)]
 pub struct ActivePowerups {
     pub insta_kill: f32,
     pub double_points: f32,
+    /// Double Points picked up while one ran: on the World at War maps
+    /// each one doubles the points again (x4, x8...) until the timer ends.
+    pub double_stacks: u32,
 }
 
 impl ActivePowerups {
     pub fn double(&self) -> bool {
         self.double_points > 0.0
+    }
+
+    /// `zombie_point_scalar`.
+    pub fn point_scalar(&self) -> u32 {
+        if self.double() {
+            1 << self.double_stacks.clamp(1, 8)
+        } else {
+            1
+        }
     }
 }
 
@@ -182,8 +202,20 @@ pub fn try_spend(score: &mut Score, ev: &mut EventWriter<PointsEvent>, cost: u32
     true
 }
 
+/// Points from zombies (hits, kills): scaled by Double Points and counted
+/// towards the power-up drop trigger.
 pub fn earn(score: &mut Score, ev: &mut EventWriter<PointsEvent>, pu: &ActivePowerups, base: u32) {
-    let p = rules::scaled(base, pu.double());
+    let p = base * pu.point_scalar();
+    score.points += p;
+    score.total += p;
+    ev.write(PointsEvent(p as i32));
+}
+
+/// Points added as they are (board repairs: `add_to_player_score`).
+pub fn earn_flat(score: &mut Score, ev: &mut EventWriter<PointsEvent>, p: u32) {
+    if p == 0 {
+        return;
+    }
     score.points += p;
     ev.write(PointsEvent(p as i32));
 }

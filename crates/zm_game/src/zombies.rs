@@ -31,8 +31,12 @@ pub struct Zombie {
     pub window: usize,
     pub timer: f32,
     pub attack_cd: f32,
-    /// >0 while an attack swing is in progress.
+    /// >0 while an attack swing is in progress (time left in its anim).
     pub swing: f32,
+    /// The melee or board-tearing anim being played (index into the
+    /// rules' `attacks` / `tears`) and the time into it.
+    pub act: usize,
+    pub act_t: f32,
     pub groan_cd: f32,
     pub anim: f32,
     pub scale: f32,
@@ -161,16 +165,24 @@ fn animate_rigs(
         let opts: Vec<usize> = names.iter().filter_map(|n| models.clip(n)).collect();
         (!opts.is_empty()).then(|| opts[v % opts.len()])
     };
+    let rules = rules::ZombieRules::nacht();
     for (entity, z, mut rig) in &mut zq {
         let v = rig.variant;
+        // Tearing and attacking play the anim whose notetracks the AI is
+        // timing, in step with it.
+        let timed = |list: &[rules::TimedAnim]| list.get(z.act % list.len().max(1)).and_then(|a| models.clip(a.name));
+        let mut sync = None;
         let (want, rate) = match z.state {
             ZState::Dying => (find(&["ai_zombie_death_v1", "ai_zombie_death_v2"], v), 1.3),
             ZState::Climbing => (find(&["ai_zombie_traverse_v1", "ai_zombie_traverse_v2"], v), 2.0),
-            ZState::AtWindow if z.swing > 0.0 => (find(&["ai_zombie_attack_v1"], v), 2.2),
-            ZState::AtWindow => {
-                (find(&["ai_zombie_door_tear_low", "ai_zombie_door_tear_left", "ai_zombie_door_tear_right", "ai_zombie_door_tear_high"], v), 1.7)
+            _ if z.swing > 0.0 => {
+                sync = Some(z.act_t.max(0.0));
+                (timed(rules.attacks), 1.0)
             }
-            _ if z.swing > 0.0 || z.attack_cd > 0.5 => (find(&["ai_zombie_attack_forward_v1", "ai_zombie_attack_v1"], v), 2.2),
+            ZState::AtWindow => {
+                sync = Some(z.act_t.max(0.0));
+                (timed(rules.tears), 1.0)
+            }
             _ => {
                 let names: &[&str] = match z.gait {
                     Gait::Walk => &["ai_zombie_walk_v1", "ai_zombie_walk_v2", "ai_zombie_walk_v3", "ai_zombie_walk_v4"],
@@ -191,7 +203,12 @@ fn animate_rigs(
         }
         let clip = &models.clips[want];
         let before = if rig.time == 0.0 { -1.0 } else { clip.frame_at(rig.time) / clip.numframes.max(1.0) };
-        rig.time += dt * rate;
+        // Timed anims follow the AI's clock (restarting for the next board
+        // or swing); the others just play.
+        match sync {
+            Some(t) => rig.time = t,
+            None => rig.time += dt * rate,
+        }
         let frame = clip.frame_at(rig.time);
         // `sndnt#alias` notetracks crossed this frame play on the zombie.
         let now = frame / clip.numframes.max(1.0);
@@ -292,7 +309,7 @@ pub fn spawn_zombie(
     mats: &Mats,
     level: &LevelRes,
     world: &World,
-    round: u32,
+    spec: rules::SpawnSpec,
     models: Option<&crate::nacht::ZombieModels>,
 ) -> Option<Entity> {
     let level = &level.0;
@@ -329,7 +346,8 @@ pub fn spawn_zombie(
         (wi, Vec3::new(q.x, ground_y(world, q.x, q.z, p.y + 1.0), q.z))
     };
 
-    let gait = rules::pick_gait(round, fastrand::f32());
+    // The round's health and the gait rolled from `zombie_move_speed`.
+    let gait = spec.gait;
     let scale = 0.92 + fastrand::f32() * 0.16;
     let skin = mats.skin[fastrand::usize(..mats.skin.len())].clone();
     let cloth = mats.cloth[fastrand::usize(..mats.cloth.len())].clone();
@@ -341,14 +359,17 @@ pub fn spawn_zombie(
             Transform::from_translation(pos).with_scale(Vec3::splat(scale)),
             Visibility::default(),
             Zombie {
-                hp: rules::zombie_health(round),
+                hp: spec.health,
                 state: ZState::Approach,
                 gait,
-                speed: gait.speed() * (0.9 + fastrand::f32() * 0.2),
+                // The gait's anims run at slightly different speeds.
+                speed: spec.speed * (0.9 + fastrand::f32() * 0.2),
                 window: wi,
                 timer: 0.0,
                 attack_cd: 0.0,
                 swing: 0.0,
+                act: 0,
+                act_t: 0.0,
                 groan_cd: 1.0 + fastrand::f32() * 4.0,
                 anim: fastrand::f32() * 10.0,
                 scale,
@@ -530,10 +551,11 @@ fn ai(
     mut zq: Query<(&mut Transform, &mut Zombie), Without<Player>>,
     board_q: Query<(Entity, &Board)>,
     mut sfx: EventWriter<PlaySfx>,
-    (mut alias, zs): (EventWriter<PlayAlias>, Res<crate::audio::ZoneSounds>),
+    (mut alias, zs, round): (EventWriter<PlayAlias>, Res<crate::audio::ZoneSounds>, Res<Round>),
     mut commands: Commands,
 ) {
     let dt = time.delta_secs().min(0.05);
+    let rules = &round.0.rules;
     let Ok((pt, pctl)) = player.single() else { return };
     let ppos = Vec3::new(pt.translation.x, 0.0, pt.translation.z);
     let level = &level.0;
@@ -561,16 +583,20 @@ fn ai(
         let inside = Vec3::new(ix, 0.0, iz);
         let floor_in = if world.mesh.is_some() { ground_y(&world, ix, iz, w.center.y) } else { 0.0 };
 
-        // Swing resolution (shared by window and chase attacks).
+        // A melee anim in progress: every `fire` notetrack is a `melee()`
+        // that hits the player if still within reach.
         if z.swing > 0.0 {
+            let anim = rules.attacks[z.act % rules.attacks.len()];
+            let before = z.act_t;
+            z.act_t += dt;
             z.swing -= dt;
-            if z.swing <= 0.0 {
-                let reach = if z.state == ZState::Chase { 1.45 } else { 2.0 };
-                if dist_player < reach {
+            let reach = if z.state == ZState::Chase { rules.melee_range } else { rules.melee_range + 0.4 };
+            for &hit in anim.events {
+                if hit > before && hit <= z.act_t && dist_player < reach {
                     if zs.aliases.is_empty() {
                         sfx.write(PlaySfx::at(Sfx::ZombieAttack, 0.8));
                     }
-                    if player::damage_player(&mut health, rules::ZOMBIE_HIT_DAMAGE, &mut alias) {
+                    if player::damage_player(&mut health, rules.zombie_hit_damage, &mut alias) {
                         next.set(GameState::GameOver);
                     }
                 }
@@ -582,7 +608,9 @@ fn ai(
                 let d = outside - pos;
                 if d.length() < 0.3 {
                     z.state = ZState::AtWindow;
-                    z.timer = 0.6;
+                    // A moment to turn to the window, then the first pull.
+                    z.act = fastrand::usize(..rules.tears.len().max(1));
+                    z.act_t = -0.25;
                 } else if world.mesh.is_some() {
                     let feet = t.translation;
                     let goal = Vec3::new(outside.x, feet.y, outside.z);
@@ -626,14 +654,27 @@ fn ai(
             }
             ZState::AtWindow => {
                 face(&mut t, inside - pos, dt, 8.0);
-                // Hit the player through the window if they stand close.
-                if inside.distance(ppos) < 1.2 && z.attack_cd <= 0.0 && z.swing <= 0.0 {
-                    z.swing = 0.4;
-                    z.attack_cd = 1.3;
+                // Nacht's zombies ignore the player until they are in
+                // (Verrückt's hit through the window).
+                if rules.attack_through_windows && inside.distance(ppos) < 1.2 && z.swing <= 0.0 {
+                    start_attack(&mut z, rules);
                 }
-                z.timer -= dt;
-                if z.timer <= 0.0 {
-                    let n = boards.0[z.window];
+                // One board per tear anim, pulled off on its `board`
+                // notetrack; in through the window once none are left.
+                let tear = rules.tears[z.act % rules.tears.len()];
+                let before = z.act_t;
+                if z.swing <= 0.0 {
+                    z.act_t += dt;
+                }
+                let pulled = tear.events.iter().any(|&b| b > before && b <= z.act_t);
+                let n = boards.0[z.window];
+                if (n == 0 && before <= 0.0 && z.act_t > 0.0) || (z.act_t >= tear.len && n == 0) {
+                    z.state = ZState::Climbing;
+                    z.timer = 0.0;
+                } else if z.act_t >= tear.len {
+                    z.act = fastrand::usize(..rules.tears.len());
+                    z.act_t = 0.0;
+                } else if pulled {
                     if n > 0 {
                         boards.0[z.window] = n - 1;
                         for (e, b) in &board_q {
@@ -643,15 +684,6 @@ fn ai(
                         }
                         let vol = (1.0 - dist_player / 25.0).clamp(0.15, 1.0);
                         alias.write(PlayAlias::at("break_boards", crate::v3(w.center)).or(Sfx::BoardTear).volume(if zs.aliases.is_empty() { vol } else { 1.0 }));
-                        z.timer = match z.gait {
-                            Gait::Walk => 1.3,
-                            Gait::Run => 1.0,
-                            Gait::Sprint => 0.8,
-                        };
-                        z.swing = 0.0;
-                    } else {
-                        z.state = ZState::Climbing;
-                        z.timer = 0.0;
                     }
                 }
             }
@@ -674,12 +706,13 @@ fn ai(
             ZState::Chase if world.mesh.is_some() => {
                 let feet = t.translation;
                 let player_feet = pctl.feet(pt);
-                if dist_player < 1.1 && (player_feet.y - feet.y).abs() < 1.5 {
+                let level_with = (player_feet.y - feet.y).abs() < 1.5;
+                // Melee from 64 units; the swings repeat while in reach.
+                if dist_player < rules.melee_range && level_with && z.swing <= 0.0 {
+                    start_attack(&mut z, rules);
+                }
+                if dist_player < 1.1 && level_with {
                     face(&mut t, to_player, dt, 10.0);
-                    if z.attack_cd <= 0.0 && z.swing <= 0.0 {
-                        z.swing = 0.35;
-                        z.attack_cd = 1.0;
-                    }
                 } else if let Some(target) = graph_step(&world, &mut z, feet, player_feet, &world.field, dt) {
                     let d = Vec3::new(target.x - feet.x, 0.0, target.z - feet.z);
                     if d.length() > 0.01 {
@@ -709,12 +742,11 @@ fn ai(
                 } else {
                     None
                 };
+                if dist_player < rules.melee_range && z.swing <= 0.0 {
+                    start_attack(&mut z, rules);
+                }
                 if dist_player < 1.1 {
                     face(&mut t, to_player, dt, 10.0);
-                    if z.attack_cd <= 0.0 && z.swing <= 0.0 {
-                        z.swing = 0.35;
-                        z.attack_cd = 1.0;
-                    }
                 } else if let Some(target) = target {
                     let d = target - pos;
                     if d.length() > 0.01 {
@@ -738,6 +770,16 @@ fn ai(
         }
         z.anim += dt * z.speed * if matches!(z.state, ZState::AtWindow) { 0.4 } else { 2.2 };
     }
+}
+
+/// Starts a melee anim, picked at random like `pick_zombie_melee_anim`.
+fn start_attack(z: &mut Zombie, rules: &rules::ZombieRules) {
+    if rules.attacks.is_empty() {
+        return;
+    }
+    z.act = fastrand::usize(..rules.attacks.len());
+    z.act_t = 0.0;
+    z.swing = rules.attacks[z.act].len;
 }
 
 /// Push zombies apart so they crowd instead of stacking.
@@ -832,8 +874,4 @@ pub fn kill_all<F: bevy::ecs::query::QueryFilter>(zq: &mut Query<(Entity, &mut T
         }
     }
     out
-}
-
-pub fn round_of(r: &Round) -> u32 {
-    r.0.round.max(1)
 }

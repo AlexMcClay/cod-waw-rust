@@ -598,6 +598,7 @@ fn fire(
             any_head |= loc.is_head();
             let dmg = def.bullet_damage(d, loc) * remaining;
             let at = origin + dir * d;
+            let lethal = z.hp <= dmg;
             let mut dead = zombies::apply_damage(&mut z, dmg, insta);
             if !dead && def.is_projectile() {
                 // The zombie damage script adds `round * RandomInt(100, 500)`
@@ -605,7 +606,8 @@ fn fire(
                 dead = zombies::apply_damage(&mut z, round_no as f32 * fastrand::u32(0..100) as f32, false);
             }
             if dead {
-                let kind = if def.is_projectile() { KillKind::Explosive } else if loc.is_head() { KillKind::Head } else { KillKind::Body };
+                // Kill bonus by hit location: head 100, neck 70, torso 60, limbs 50.
+                let kind = if def.is_projectile() { KillKind::Explosive } else { KillKind::from_hit(loc) };
                 if loc.is_head() {
                     score.headshots += 1;
                 }
@@ -613,7 +615,7 @@ fn fire(
                     // The head pops.
                     alias.write(PlayAlias::at("zombie_head_gib", at).or(Sfx::Headshot).volume(0.8));
                 }
-                earn(&mut score, &mut points, &pu, rules::kill_points(kind));
+                earn(&mut score, &mut points, &pu, rules::kill_points_with(kind, insta, lethal));
                 killed.write(ZombieKilled { pos: at, drop_allowed: true });
                 spawn_burst(&mut commands, &mats, at, &mats.blood, 10, 2.5);
             } else {
@@ -733,8 +735,9 @@ fn knife(
     if let Some((_, pos, mut z)) = target {
         let hit_point = pos + Vec3::Y * 1.2;
         alias.write(PlayAlias::at("melee_hit", hit_point));
+        let lethal = z.hp <= melee_damage;
         if zombies::apply_damage(&mut z, melee_damage, pu.insta_kill > 0.0) {
-            earn(&mut score, &mut points, &pu, rules::kill_points(KillKind::Melee));
+            earn(&mut score, &mut points, &pu, rules::kill_points_with(KillKind::Melee, pu.insta_kill > 0.0, lethal));
             killed.write(ZombieKilled { pos, drop_allowed: true });
             spawn_burst(&mut commands, &mats, hit_point, &mats.blood, 10, 2.5);
         } else {

@@ -5,7 +5,7 @@ use crate::audio::{PlayAlias, Sfx, ZoneSounds};
 use crate::player::Player;
 use crate::weapons::{Gun, Loadout};
 use crate::world::{spawn_board, CrateDisplay, CrateLid, Debris, Mats};
-use crate::{earn, try_spend, v3, ActivePowerups, Boards, Defs, GameState, LevelRes, PointsEvent, Score, World};
+use crate::{earn_flat, try_spend, v3, ActivePowerups, Boards, Defs, GameState, LevelRes, PointsEvent, Round, Score, World};
 use bevy::prelude::*;
 use zm_core::rules;
 use zm_core::weapons;
@@ -81,8 +81,9 @@ fn interact(
     ),
     player: Query<&Transform, With<Player>>,
     debris: Query<(Entity, &Debris)>,
-    (mut alias, mut points, zs): (EventWriter<PlayAlias>, EventWriter<PointsEvent>, Res<ZoneSounds>),
-    mut repair_timer: Local<f32>,
+    (mut alias, mut points, zs, mut round): (EventWriter<PlayAlias>, EventWriter<PointsEvent>, Res<ZoneSounds>, ResMut<Round>),
+    // Time held on a window (None when not holding use there).
+    mut repair_timer: Local<Option<f32>>,
     names: Option<Res<crate::nacht::WeaponNames>>,
     mut commands: Commands,
     mats: Res<Mats>,
@@ -139,7 +140,7 @@ fn interact(
     let press = keys.just_pressed(KeyCode::KeyF);
     let hold = keys.pressed(KeyCode::KeyF);
     let Some((_, target)) = best else {
-        *repair_timer = 0.0;
+        *repair_timer = None;
         return;
     };
 
@@ -147,14 +148,21 @@ fn interact(
         Target::Window(i) => {
             prompt.0 = "Press & hold F to Rebuild Barrier".into();
             if hold {
-                *repair_timer += time.delta_secs();
-                if *repair_timer >= 0.7 {
-                    *repair_timer = 0.0;
+                // `blocker_trigger_think`: the first board 0.4 s after
+                // pressing use, then one a second while it is held.
+                let r = &round.0.rules;
+                let t = repair_timer.get_or_insert(r.repair_interval - r.repair_first_delay);
+                *t += time.delta_secs();
+                if *t >= r.repair_interval {
+                    *t -= r.repair_interval;
                     let n = boards.0[i];
                     if n < level_ref.windows[i].boards {
                         boards.0[i] = n + 1;
                         spawn_board(&mut commands, level_ref, &mats, i, n);
-                        earn(&mut score, &mut points, &pu, rules::POINTS_BOARD);
+                        // 10 points (20 under Double Points), until the
+                        // round's cap: min(50 x round, 500).
+                        let p = round.0.repair_points(pu.double());
+                        earn_flat(&mut score, &mut points, p);
                         // The board floats up, then slams into place.
                         let at = crate::v3(level_ref.windows[i].center);
                         alias.write(PlayAlias::at("repair_boards", at).or(Sfx::BoardRepair));
@@ -163,7 +171,7 @@ fn interact(
                     }
                 }
             } else {
-                *repair_timer = 0.0;
+                *repair_timer = None;
             }
         }
         Target::WallBuy(i) => {

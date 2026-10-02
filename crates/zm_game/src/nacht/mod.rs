@@ -314,6 +314,7 @@ fn poll_load(
     let nav = level::build_nav(&scene, &level, &scene.collision);
     info!("Nacht nav graph: {} nodes, {} links", nav.nodes.len(), nav.edges.iter().map(Vec::len).sum::<usize>() / 2);
 
+    commands.insert_resource(crate::MapRules(scene.rules.clone()));
     let NachtScene {
         images: imgs, lightmap_pages, irradiance, fog, film, lights, materials: mdefs, world, submodels, models, static_models, sky_model, sky_scale, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, weapon_stats, flesh_penetration, ..
     } = scene;
