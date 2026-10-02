@@ -281,7 +281,7 @@ impl<'a> Walker<'a> {
 
     fn asset_idx(&mut self, ty: AssetType, ptr: u32, loc: Option<(usize, u32)>) -> R<Option<u32>> {
         Ok(match self.asset(ty, ptr, loc)? {
-            Some(AssetRef::Image(i) | AssetRef::Material(i) | AssetRef::XModel(i) | AssetRef::Sound(i) | AssetRef::LoadedSound(i) | AssetRef::Weapon(i)) => Some(i),
+            Some(AssetRef::Image(i) | AssetRef::Material(i) | AssetRef::XModel(i) | AssetRef::Sound(i) | AssetRef::LoadedSound(i) | AssetRef::Weapon(i) | AssetRef::Fx(i)) => Some(i),
             _ => None,
         })
     }
@@ -306,6 +306,8 @@ impl<'a> Walker<'a> {
             GfxWorld => self.gfxworld()?,
             LightDef => self.light_def()?,
             Font => self.font()?,
+            MenuList => self.menu_list()?,
+            Menu => self.menu()?,
             SndDriverGlobals => self.snd_driver_globals()?,
             Localize => self.localize()?,
             Weapon => self.weapon()?,
@@ -772,7 +774,16 @@ impl<'a> Walker<'a> {
         self.pop();
         let idx = self.out.materials.len() as u32;
         let state_entry: Vec<u8> = (0..59).map(|i| h.u8(0x20 + i)).collect();
-        self.out.materials.push(MaterialInfo { name: name.clone(), techset, textures, sort_key: h.u8(5), state_bits, state_entry });
+        self.out.materials.push(MaterialInfo {
+            name: name.clone(),
+            techset,
+            textures,
+            sort_key: h.u8(5),
+            state_bits,
+            state_entry,
+            atlas: (h.u8(6), h.u8(7)),
+            surface_type_bits: h.u32(0x10),
+        });
         Ok((AssetRef::Material(idx), name))
     }
 
@@ -1588,8 +1599,9 @@ impl<'a> Walker<'a> {
             }
         }
         self.xstring(h.u32(0xdc))?;
-        self.asset(T::Fx, h.u32(0x17c), None)?;
-        self.asset(T::Fx, h.u32(0x180), None)?;
+        w.fx.impact_type = h.i32(0x150);
+        w.fx.view_flash = self.fx_ref(h.u32(0x17c), None)?;
+        w.fx.world_flash = self.fx_ref(h.u32(0x180), None)?;
         for (i, field) in SOUNDS.iter().enumerate().take(59) {
             if let Some(s) = self.snd_alias_custom(h, 0x184 + 4 * i)? {
                 w.sounds.push((field, s));
@@ -1607,9 +1619,10 @@ impl<'a> Walker<'a> {
         for o in [0x274, 0x278, 0x27c] {
             self.xstring(h.u32(o))?;
         }
-        for o in [0x28c, 0x290, 0x294, 0x298] {
-            self.asset(T::Fx, h.u32(o), None)?;
-        }
+        w.fx.view_shell_eject = self.fx_ref(h.u32(0x28c), None)?;
+        w.fx.world_shell_eject = self.fx_ref(h.u32(0x290), None)?;
+        w.fx.view_last_shot_eject = self.fx_ref(h.u32(0x294), None)?;
+        w.fx.world_last_shot_eject = self.fx_ref(h.u32(0x298), None)?;
         self.asset(T::Material, h.u32(0x29c), None)?;
         self.asset(T::Material, h.u32(0x2a0), None)?;
         for i in 0..16 {
@@ -1631,15 +1644,15 @@ impl<'a> Walker<'a> {
         }
         self.xstring(h.u32(0x638))?;
         w.projectile_model = self.asset_idx(T::XModel, h.u32(0x680), None)?;
-        self.asset(T::Fx, h.u32(0x688), None)?;
-        self.asset(T::Fx, h.u32(0x690), None)?;
+        w.fx.proj_explosion = self.fx_ref(h.u32(0x688), None)?;
+        w.fx.proj_dud = self.fx_ref(h.u32(0x690), None)?;
         for (o, field) in [(0x694, "projExplosionSound"), (0x698, "projDudSound"), (0x69c, "mortarShellSound"), (0x6a0, "tankShellSound")] {
             if let Some(s) = self.snd_alias_custom(h, o)? {
                 w.sounds.push((field, s));
             }
         }
-        self.asset(T::Fx, h.u32(0x7bc), None)?;
-        self.asset(T::Fx, h.u32(0x7d8), None)?;
+        w.fx.proj_trail = self.fx_ref(h.u32(0x7bc), None)?;
+        w.fx.proj_ignition = self.fx_ref(h.u32(0x7d8), None)?;
         if let Some(s) = self.snd_alias_custom(h, 0x7dc)? {
             w.sounds.push(("projIgnitionSound", s));
         }
@@ -1675,34 +1688,46 @@ impl<'a> Walker<'a> {
     }
 
     /// One `FxElemVisuals` (4 bytes) whose meaning depends on the element type.
-    fn fx_visual(&mut self, v: Rec<'a>, elem_type: u8) -> R<()> {
-        match elem_type {
-            0..=5 => {
-                self.asset(AssetType::Material, v.u32(0), v.loc(0))?;
-            }
-            6 => {
-                self.asset(AssetType::XModel, v.u32(0), v.loc(0))?;
-            }
-            9 | 11 => {
-                self.xstring(v.u32(0))?;
-            }
-            _ => {}
-        }
-        Ok(())
+    fn fx_visual(&mut self, v: Rec<'a>, elem_type: u8) -> R<Option<fx::Visual>> {
+        Ok(match elem_type {
+            0..=5 => self.asset_idx(AssetType::Material, v.u32(0), v.loc(0))?.map(fx::Visual::Material),
+            6 => self.asset_idx(AssetType::XModel, v.u32(0), v.loc(0))?.map(fx::Visual::Model),
+            11 => self.xstring(v.u32(0))?.map(fx::Visual::Effect),
+            9 => self.xstring(v.u32(0))?.map(fx::Visual::Sound),
+            _ => None,
+        })
     }
 
     fn fx(&mut self) -> R<(AssetRef, String)> {
         let h = self.read(36)?;
         self.push(VIRTUAL);
         let name = self.xstring(h.u32(0))?.unwrap_or_default();
+        let mut def = fx::Effect {
+            name: name.clone(),
+            flags: h.i32(4),
+            total_size: h.i32(8),
+            msec_looping_life: h.i32(0xc),
+            looping: h.i32(0x10).max(0) as usize,
+            oneshot: h.i32(0x14).max(0) as usize,
+            emission: h.i32(0x18).max(0) as usize,
+            priority: h.u8(0x1c),
+            elems: Vec::new(),
+        };
         if h.u32(0x20) != 0 {
             self.alloc(4);
             let n = (h.i32(0x10) + h.i32(0x14) + h.i32(0x18)).max(0) as usize;
             let arr = self.read(256 * n)?;
             for i in 0..n {
                 let e = arr.elem(i, 256);
-                self.inline(e.u32(0xb8), 4, 96 * (e.u8(0xb6) as usize + 1))?;
-                self.inline(e.u32(0xbc), 4, 48 * (e.u8(0xb7) as usize + 1))?;
+                let mut el = fx::elem_from_bytes(e.d);
+                let nv = e.u8(0xb6) as usize + 1;
+                if let Some(p) = self.inline(e.u32(0xb8), 4, 96 * nv)? {
+                    el.vel = fx::vel_samples(&self.z[p..p + 96 * nv], nv);
+                }
+                let ns = e.u8(0xb7) as usize + 1;
+                if let Some(p) = self.inline(e.u32(0xbc), 4, 48 * ns)? {
+                    el.vis = fx::vis_samples(&self.z[p..p + 48 * ns], ns);
+                }
                 let ty = e.u8(0xb4);
                 let vc = e.u8(0xb5) as usize;
                 if ty == 10 {
@@ -1711,8 +1736,9 @@ impl<'a> Walker<'a> {
                         let marks = self.read(8 * vc)?;
                         for k in 0..vc {
                             let m = marks.elem(k, 8);
-                            self.asset(AssetType::Material, m.u32(0), m.loc(0))?;
-                            self.asset(AssetType::Material, m.u32(4), m.loc(4))?;
+                            let a = self.asset_idx(AssetType::Material, m.u32(0), m.loc(0))?;
+                            let b = self.asset_idx(AssetType::Material, m.u32(4), m.loc(4))?;
+                            el.visuals.push(fx::Visual::Mark([a, b]));
                         }
                     }
                 } else if vc > 1 {
@@ -1720,42 +1746,72 @@ impl<'a> Walker<'a> {
                         self.alloc(4);
                         let vis = self.read(4 * vc)?;
                         for k in 0..vc {
-                            self.fx_visual(vis.elem(k, 4), ty)?;
+                            if let Some(v) = self.fx_visual(vis.elem(k, 4), ty)? {
+                                el.visuals.push(v);
+                            }
                         }
                     }
-                } else {
-                    self.fx_visual(e.sub(0xc0, 4), ty)?;
+                } else if let Some(v) = self.fx_visual(e.sub(0xc0, 4), ty)? {
+                    el.visuals.push(v);
                 }
-                for o in [0xdc, 0xe0, 0xe4] {
-                    self.xstring(e.u32(o))?;
-                }
+                el.effect_on_impact = self.xstring(e.u32(0xdc))?;
+                el.effect_on_death = self.xstring(e.u32(0xe0))?;
+                el.effect_emitted = self.xstring(e.u32(0xe4))?;
                 if e.u32(0xf8) != 0 {
                     self.alloc(4);
                     let t = self.read(28)?;
-                    self.inline(t.u32(0x10), 4, 20 * t.i32(0xc).max(0) as usize)?;
-                    self.inline(t.u32(0x18), 2, 2 * t.i32(0x14).max(0) as usize)?;
+                    let nv = t.i32(0xc).max(0) as usize;
+                    let ni = t.i32(0x14).max(0) as usize;
+                    let mut trail = fx::Trail { scroll_time_msec: t.i32(0), repeat_dist: t.i32(4), split_dist: t.i32(8), ..Default::default() };
+                    if let Some(p) = self.inline(t.u32(0x10), 4, 20 * nv)? {
+                        trail.verts = fx::trail_verts(&self.z[p..p + 20 * nv], nv);
+                    }
+                    if let Some(p) = self.inline(t.u32(0x18), 2, 2 * ni)? {
+                        trail.inds = (0..ni).map(|k| u16::from_le_bytes([self.z[p + 2 * k], self.z[p + 2 * k + 1]])).collect();
+                    }
+                    el.trail = Some(trail);
                 }
+                def.elems.push(el);
             }
         }
         self.pop();
-        Ok((AssetRef::Other(AssetType::Fx), name))
+        let idx = self.out.fx.len() as u32;
+        self.out.fx.push(def);
+        Ok((AssetRef::Fx(idx), name))
+    }
+
+    /// An effect pointer's effect name.
+    fn fx_ref(&mut self, ptr: u32, loc: Option<(usize, u32)>) -> R<Option<String>> {
+        Ok(match self.asset(AssetType::Fx, ptr, loc)? {
+            Some(AssetRef::Fx(i)) => self.out.fx.get(i as usize).map(|f| f.name.trim_start_matches(',').to_string()),
+            _ => None,
+        })
     }
 
     fn impact_fx(&mut self) -> R<(AssetRef, String)> {
         let h = self.read(8)?;
         self.push(VIRTUAL);
         let name = self.xstring(h.u32(0))?.unwrap_or_default();
+        let mut table = fx::ImpactTable { name: name.clone(), entries: Vec::new() };
         if h.u32(4) != 0 {
             self.alloc(4);
             let arr = self.read(140 * 16)?;
             for i in 0..16 {
                 let e = arr.elem(i, 140);
+                let mut entry = fx::ImpactEntry::default();
                 for k in 0..35 {
-                    self.asset(AssetType::Fx, e.u32(4 * k), e.loc(4 * k))?;
+                    let f = self.fx_ref(e.u32(4 * k), e.loc(4 * k))?;
+                    if k < 31 {
+                        entry.nonflesh.push(f);
+                    } else {
+                        entry.flesh.push(f);
+                    }
                 }
+                table.entries.push(entry);
             }
         }
         self.pop();
+        self.out.impact_fx.push(table);
         Ok((AssetRef::Other(AssetType::ImpactFx), name))
     }
 
@@ -1775,15 +1831,147 @@ impl<'a> Walker<'a> {
         let h = self.read(16)?;
         self.push(VIRTUAL);
         let name = self.xstring(h.u32(0))?.unwrap_or_default();
+        let (columns, rows) = (h.i32(4).max(0) as usize, h.i32(8).max(0) as usize);
+        let mut cells = Vec::new();
         if h.u32(0xc) != 0 {
             self.alloc(4);
-            let n = (h.i32(4).max(0) * h.i32(8).max(0)) as usize;
+            let n = columns * rows;
             let ptrs = self.read(4 * n)?;
             for i in 0..n {
-                self.xstring(ptrs.u32(4 * i))?;
+                cells.push(self.xstring(ptrs.u32(4 * i))?.unwrap_or_default());
+            }
+        }
+        self.out.string_tables.push(super::StringTable { name: name.clone(), columns, rows, cells });
+        self.pop();
+        Ok((AssetRef::Other(AssetType::StringTable), name))
+    }
+    // ------------------------------------------------------------------ menus
+    // Menus are only walked past (common.ff keeps its impact table and many
+    // effects behind them).
+
+    /// `windowDef_t` fields inside an already-read struct.
+    fn menu_window(&mut self, w: Rec<'a>) -> R<String> {
+        let name = self.xstring(w.u32(0))?.unwrap_or_default();
+        self.xstring(w.u32(0x34))?;
+        self.asset(AssetType::Material, w.u32(0x98), w.loc(0x98))?;
+        Ok(name)
+    }
+
+    /// A chain of `ItemKeyHandler`s.
+    fn menu_key_handler(&mut self, mut ptr: u32) -> R<()> {
+        while ptr != 0 {
+            self.alloc(4);
+            let k = self.read(12)?;
+            self.xstring(k.u32(4))?;
+            ptr = k.u32(8);
+        }
+        Ok(())
+    }
+
+    /// A `statement_s` inside an already-read struct.
+    fn menu_statement(&mut self, st: Rec<'a>) -> R<()> {
+        let n = st.i32(0).max(0) as usize;
+        if st.u32(4) == 0 {
+            return Ok(());
+        }
+        self.alloc(4);
+        let ptrs = self.read(4 * n)?;
+        for i in 0..n {
+            if ptrs.u32(4 * i) == 0 {
+                continue;
+            }
+            self.alloc(4);
+            let e = self.read(12)?;
+            // Operand (type 1) holding a string (dataType 2).
+            if e.i32(0) == 1 && e.i32(4) == 2 {
+                self.xstring(e.u32(8))?;
+            }
+        }
+        Ok(())
+    }
+
+    fn menu_item(&mut self) -> R<()> {
+        let it = self.read(376)?;
+        self.menu_window(it)?;
+        for o in [0xe0, 0xec, 0xf0, 0xf4, 0xf8, 0xfc, 0x100, 0x104, 0x108, 0x10c, 0x110, 0x114] {
+            self.xstring(it.u32(o))?;
+        }
+        self.menu_key_handler(it.u32(0x118))?;
+        self.xstring(it.u32(0x11c))?;
+        self.asset(AssetType::Sound, it.u32(0x124), it.loc(0x124))?;
+        let data = it.u32(0x130);
+        match it.i32(0xb4) {
+            6 if data != 0 => {
+                self.alloc(4);
+                let lb = self.read(364)?;
+                self.xstring(lb.u32(0x120))?;
+                for o in [0x160, 0x164, 0x168] {
+                    self.asset(AssetType::Material, lb.u32(o), lb.loc(o))?;
+                }
+            }
+            0 | 4 | 9 | 10 | 11 | 14 | 16 | 17 | 18 if data != 0 => {
+                self.alloc(4);
+                self.read(32)?;
+            }
+            12 if data != 0 => {
+                self.alloc(4);
+                let m = self.read(392)?;
+                for i in 0..64 {
+                    self.xstring(m.u32(4 * i))?;
+                }
+            }
+            13 => {
+                self.xstring(data)?;
+            }
+            _ => {}
+        }
+        for i in 0..8 {
+            self.menu_statement(it.sub(0x138 + 8 * i, 8))?;
+        }
+        Ok(())
+    }
+
+    fn menu(&mut self) -> R<(AssetRef, String)> {
+        let h = self.read(288)?;
+        self.push(VIRTUAL);
+        let name = self.menu_window(h)?;
+        for o in [0x9c, 0xc4, 0xc8, 0xcc, 0xd0] {
+            self.xstring(h.u32(o))?;
+        }
+        self.menu_key_handler(h.u32(0xd4))?;
+        self.menu_statement(h.sub(0xd8, 8))?;
+        self.xstring(h.u32(0xe0))?;
+        self.xstring(h.u32(0xe4))?;
+        self.menu_statement(h.sub(0x10c, 8))?;
+        self.menu_statement(h.sub(0x114, 8))?;
+        if h.u32(0x11c) != 0 {
+            let n = h.i32(0xa4).max(0) as usize;
+            self.alloc(4);
+            let ptrs = self.read(4 * n)?;
+            for i in 0..n {
+                if ptrs.u32(4 * i) != 0 {
+                    self.alloc(4);
+                    self.menu_item()?;
+                }
             }
         }
         self.pop();
-        Ok((AssetRef::Other(AssetType::StringTable), name))
+        Ok((AssetRef::Other(AssetType::Menu), name))
+    }
+
+    fn menu_list(&mut self) -> R<(AssetRef, String)> {
+        let h = self.read(12)?;
+        self.push(VIRTUAL);
+        let name = self.xstring(h.u32(0))?.unwrap_or_default();
+        if h.u32(8) != 0 {
+            let n = h.i32(4).max(0) as usize;
+            self.alloc(4);
+            let ptrs = self.read(4 * n)?;
+            for i in 0..n {
+                self.asset(AssetType::Menu, ptrs.u32(4 * i), ptrs.loc(4 * i))?;
+            }
+        }
+        self.pop();
+        Ok((AssetRef::Other(AssetType::MenuList), name))
     }
 }

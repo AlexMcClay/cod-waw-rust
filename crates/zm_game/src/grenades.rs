@@ -469,6 +469,7 @@ struct ExplodeParams<'w, 's> {
     alias: EventWriter<'w, PlayAlias>,
     next: ResMut<'w, NextState<GameState>>,
     zs: Res<'w, ZoneSounds>,
+    fx: EventWriter<'w, crate::fx::FxEvent>,
 }
 
 /// Radius damage, sounds and visuals of an explosion at `at`.
@@ -542,7 +543,12 @@ fn explode(at: Vec3, def: &GrenadeDef, b: &mut ExplodeParams, commands: &mut Com
     }
     g.flash = g.flash.max(0.5 * k * k);
 
-    // Fireball, light, smoke and debris.
+    // The game's explosion effect (by the surface underneath); the
+    // stand-in fireball, light, smoke and debris otherwise.
+    b.fx.write(crate::fx::FxEvent::Explosion { weapon: GRENADE_ID, pos: at });
+    if crate::fx::live() {
+        return;
+    }
     commands.spawn((
         Mesh3d(mats.sphere.clone()),
         MeshMaterial3d(mats.glow_gold.clone()),

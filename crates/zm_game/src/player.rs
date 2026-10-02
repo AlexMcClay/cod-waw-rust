@@ -122,11 +122,13 @@ pub struct Health {
     pub since_hit: f32,
     /// Flash intensity for the damage overlay.
     pub flash: f32,
+    /// The game's health/regen state (`_gameskill`).
+    pub state: rules::PlayerHealth,
 }
 
 impl Default for Health {
     fn default() -> Self {
-        Health { hp: rules::PLAYER_MAX_HEALTH, since_hit: 99.0, flash: 0.0 }
+        Health { hp: rules::PLAYER_MAX_HEALTH, since_hit: 99.0, flash: 0.0, state: rules::PlayerHealth::new(rules::PLAYER_MAX_HEALTH) }
     }
 }
 
@@ -564,22 +566,34 @@ fn breathing(time: Res<Time>, hp: Res<Health>, mut alias: EventWriter<PlayAlias>
     }
 }
 
-fn regen(time: Res<Time>, mut hp: ResMut<Health>) {
+/// World at War's single-player regeneration (Regular): nothing for 2.4 s
+/// after a hit, then straight back to full; when badly hurt (20% or less)
+/// it waits 5 s and then fills in half a second.
+fn regen(time: Res<Time>, mut hp: ResMut<Health>, round: Res<crate::Round>) {
     let dt = time.delta_secs();
     hp.since_hit += dt;
     hp.flash = (hp.flash - dt * 1.5).max(0.0);
-    if hp.since_hit > rules::REGEN_DELAY {
-        hp.hp = (hp.hp + rules::REGEN_PER_SEC * dt).min(rules::PLAYER_MAX_HEALTH);
-    }
+    let h = &mut *hp;
+    h.state.hp = h.hp;
+    h.state.tick(&round.0.rules, dt);
+    h.hp = h.state.hp;
 }
 
-/// Damage the player. Returns true if this hit downed them.
+/// Damage the player. Returns true if this hit downed them: alone in
+/// zombie mode any hit at least as big as the remaining health ends the
+/// game. A big hit makes the player briefly invulnerable.
 pub fn damage_player(hp: &mut Health, amount: f32, alias: &mut EventWriter<PlayAlias>) -> bool {
-    hp.hp -= amount;
+    let rules = rules::ZombieRules::nacht();
+    hp.state.hp = hp.hp;
+    if hp.state.invulnerable > 0.0 {
+        return false;
+    }
+    let downed = hp.state.hit(&rules, amount);
+    hp.hp = hp.state.hp;
     hp.since_hit = 0.0;
     hp.flash = 1.0;
     alias.write(PlayAlias::local("player_pain_small").or(Sfx::PlayerHurt));
-    hp.hp <= 0.0
+    downed
 }
 
 /// `-`/`=` adjust mouse sensitivity, `[`/`]` brightness (also in Options).

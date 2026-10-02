@@ -337,7 +337,11 @@ pub struct NachtScene {
     pub view_rig: Option<SceneViewRig>,
     /// First-person gun model per weapon id (bind pose, grip at the origin).
     pub view_models: HashMap<String, Vec<SceneMesh>>,
+    /// Round, zombie and points rules from the map's scripts.
+    pub rules: zm_core::rules::ZombieRules,
     pub load_secs: f32,
+    /// Effects the map and its weapons use.
+    pub fx: crate::fx::data::FxData,
 }
 
 /// Which zones' assets a material/model index refers to.
@@ -1235,6 +1239,13 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     if let Some(c) = &common {
         zones.push(c);
     }
+    // The round/zombie rules: patch.ff's scripts override the map's.
+    let rules = {
+        let patch = read("patch").ok();
+        let mut script_zones: Vec<&ZoneData> = patch.iter().collect();
+        script_zones.push(&nacht);
+        zombie_rules("nazi_zombie_prototype", &script_zones, common.as_ref())
+    };
     let world = nacht.world.as_ref().ok_or("map has no world geometry")?;
     let text = nacht.map_ents.as_deref().ok_or("map has no entities")?;
     let entities = mapents::parse(text);
@@ -1527,6 +1538,9 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     aliases.extend(map.ambient.iter().map(|a| a.alias.clone()));
     aliases.sort();
     aliases.dedup();
+    let weapon_zone_names: Vec<(&str, &str)> = wanted.weapon_ids.iter().map(|&id| (id, zone_weapon_name(id))).collect();
+    let fx = crate::fx::data::extract(&zones, iwd, bc, &weapon_zone_names);
+    aliases.extend(fx.sound_aliases.iter().cloned());
     let sounds = collect_sounds(&zones, iwd, &aliases);
     let localized = |key: &str| zones.iter().find_map(|z| z.localized(key).or_else(|| z.localized(key.trim_start_matches('&'))).map(str::to_string));
     let weapon_world_models: HashMap<String, String> = wanted
@@ -1538,7 +1552,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
             Some((id.to_string(), name))
         })
         .collect();
-    for name in weapon_world_models.values() {
+    for name in weapon_world_models.values().chain(fx.models.iter()) {
         if !models.contains_key(name) {
             if let Some(m) = b.model(name) {
                 models.insert(name.clone(), m);
@@ -1607,8 +1621,47 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         zombie_anims,
         view_rig,
         view_models,
+        rules,
         load_secs: t0.elapsed().as_secs_f32(),
+        fx,
     })
+}
+
+/// The map's zombie rules from its own data: the `set_zombie_var` calls of
+/// the zombie mode script its level script runs (and of the power-up
+/// script), with `mp/zombiemode.csv` overrides, and the power-ups it
+/// includes. `script_zones` are searched in order (patch first).
+fn zombie_rules(map: &str, script_zones: &[&ZoneData], common: Option<&ZoneData>) -> zm_core::rules::ZombieRules {
+    use zm_core::rules::{self, ZombieRules};
+    let raw = |name: &str| script_zones.iter().find_map(|z| z.rawfile(name));
+    let mut out = ZombieRules::nacht();
+    let Some(level) = raw(&format!("maps/{map}.gsc")) else {
+        warn!("No level script for {map}: default zombie rules");
+        return out;
+    };
+    let mode = rules::zombiemode_script_name(&level).unwrap_or_else(|| "maps/_zombiemode.gsc".into());
+    let mut text = raw(&mode).unwrap_or_default();
+    text.push_str(&raw("maps/_zombiemode_powerups.gsc").unwrap_or_default());
+    let calls = rules::parse_zombie_vars(&text);
+    let table = common.and_then(|c| c.string_table("mp/zombiemode.csv"));
+    let vars = rules::resolve_zombie_vars(&calls, &|k: &str| table.and_then(|t| t.lookup(0, k, 1)).map(str::to_string));
+    out.apply_vars(&vars);
+    let powerups = rules::included_powerups(&level);
+    if !powerups.is_empty() {
+        out.powerups = powerups;
+    }
+    info!(
+        "Zombie rules for {map}: {} vars from {mode} (+ zombiemode.csv: {}), health {} +{} then x{}, spawn delay {}, max ai {}, power-ups {:?}",
+        vars.len(),
+        table.is_some(),
+        out.health_start,
+        out.health_increase,
+        1.0 + out.health_increase_percent,
+        out.spawn_delay_start,
+        out.max_ai,
+        out.powerups
+    );
+    out
 }
 
 #[cfg(test)]
