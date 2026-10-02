@@ -23,6 +23,7 @@ World at War (PC, v1.6). Nothing here is needed to build or run the game.
 | `t4/gen/` | Scripts that built OAT's ZoneCodeGenerator, and its generated T4 loader code (`out/`, `out2/`). |
 | `t4/oat/*.txt` | OAT `Unlinker` asset list and dump logs, used as ground truth for comparisons. |
 | `hud/WAW_ZOMBIE_HUD.md` | The zombie HUD: who draws each element (script hudelem or engine menu ownerdraw), positions in 640x480, images, colours and timings, and the `Font_s` format and text rendering. Scripts: `survey_zones.py`, `dump_menus.py`, `dump_strings.py`, `decode_font.py`, `dump_weapon_hud.py`, `dump_hud_images.py`, `render_hud_mock.py`. Their output goes to `hud/local/`, which is git-ignored. |
+| `gameplay/ZOMBIE_MECHANICS.md` | Zombie health, round sizes, spawn timing, speeds, attacks, player health/regen, points, power-up drops and boards, from the patch.ff/Nacht/common.ff scripts and `mp/zombiemode.csv` (file:line, VERIFIED/ASSUMED), with the wiki as a cross-check. Implemented in `zm_core::rules`. |
 | `extraction/extract_zombies.py` | The first extractor: it dumps rawfiles from the zombie `.ff` files and copies zombie content out of the IWDs. |
 | `screenshots/` | Milestones of the Bevy port, from the prototype bunker to real Nacht, skinned zombies and the viewmodel fix. |
 | `data/` | **Local only.** Textures and lightmaps decoded while testing the IWI decoder. |

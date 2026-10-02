@@ -5,7 +5,7 @@ use crate::player::Player;
 use crate::weapons::Loadout;
 use crate::world::{spawn_board, Board, Mats};
 use crate::zombies::{self, Zombie};
-use crate::{earn, ActivePowerups, Banner, Boards, Defs, Dynamic, GameState, LevelRes, PointsEvent, Round, Score, ZombieKilled};
+use crate::{earn_flat, ActivePowerups, Banner, Boards, Defs, Dynamic, GameState, LevelRes, PointsEvent, Round, Score, ZombieKilled};
 use bevy::pbr::NotShadowCaster;
 use bevy::prelude::*;
 use zm_core::rules::{self, Powerup};
@@ -21,7 +21,8 @@ struct PowerupLoop(Powerup);
 #[derive(Component)]
 pub struct Drop {
     pub kind: Powerup,
-    pub ttl: f32,
+    /// Seconds since it dropped.
+    pub age: f32,
     pub base_y: f32,
 }
 
@@ -42,7 +43,6 @@ fn on_killed(
     mut score: ResMut<Score>,
     player: Query<&Transform, With<Player>>,
     (mut sfx, mut alias, zs): (EventWriter<PlaySfx>, EventWriter<PlayAlias>, Res<ZoneSounds>),
-    nacht: Option<Res<crate::nacht::NachtActive>>,
     mut commands: Commands,
     mats: Res<Mats>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -56,10 +56,13 @@ fn on_killed(
             let vol = (1.0 - ev.pos.distance(ppos) / 25.0).clamp(0.1, 0.9);
             sfx.write(PlaySfx::at(Sfx::ZombieDeath, vol));
         }
-        if ev.drop_allowed && round.0.should_drop(fastrand::f32()) {
-            // Nacht has no carpenter.
-            let pool: Vec<Powerup> = Powerup::ALL.into_iter().filter(|k| nacht.is_none() || *k != Powerup::Carpenter).collect();
-            let kind = pool[fastrand::usize(..pool.len())];
+        // `watch_for_drop` (score trigger) and `powerup_drop` (every death,
+        // nuked ones included): the map's own power-ups in a shuffled
+        // cycle, at most 4 a round.
+        let r = &mut round.0;
+        r.drops.on_score(&r.rules, score.total);
+        let roll = fastrand::u32(0..100);
+        if let Some(kind) = r.drops.on_death(&r.rules, roll, ev.drop_allowed, &mut |n| fastrand::usize(..n)) {
             let at = Vec3::new(ev.pos.x, 0.0, ev.pos.z);
             let drop = spawn_drop(&mut commands, &mats, &mut meshes, kind, at);
             commands.entity(drop).insert(AliasLoop { alias: "spawn_powerup_loop".into(), volume: 1.0 });
@@ -77,11 +80,12 @@ fn spawn_drop(commands: &mut Commands, mats: &Mats, meshes: &mut Assets<Mesh>, k
         Powerup::Nuke => (meshes.add(Capsule3d::new(0.14, 0.35)), mats.glow_green.clone(), Vec3::ONE),
         Powerup::Carpenter => (mats.cube.clone(), mats.glow_blue.clone(), Vec3::new(0.15, 0.55, 0.15)),
     };
-    let y = 0.9;
+    // Spawned 40 units above the zombie's origin.
+    let y = rules::ZombieRules::nacht().powerup_height;
     let mut e = commands.spawn((
             Transform::from_translation(at + Vec3::Y * y),
             Visibility::default(),
-            Drop { kind, ttl: rules::POWERUP_TTL, base_y: y },
+            Drop { kind, age: 0.0, base_y: y },
             Dynamic,
         ));
     e.with_children(|p| {
@@ -102,22 +106,19 @@ fn spawn_drop(commands: &mut Commands, mats: &Mats, meshes: &mut Assets<Mesh>, k
     e.id()
 }
 
-fn animate_drops(time: Res<Time>, mut commands: Commands, mut q: Query<(Entity, &mut Transform, &mut Visibility, &mut Drop)>) {
+fn animate_drops(time: Res<Time>, round: Res<Round>, mut commands: Commands, mut q: Query<(Entity, &mut Transform, &mut Visibility, &mut Drop)>) {
     let dt = time.delta_secs();
     let t = time.elapsed_secs();
     for (e, mut tr, mut vis, mut d) in &mut q {
-        d.ttl -= dt;
-        if d.ttl <= 0.0 {
+        d.age += dt;
+        // 15 s on the ground, then blinking faster and faster for 11.5 s.
+        let Some(shown) = round.0.rules.powerup_visible(d.age) else {
             commands.entity(e).try_despawn();
             continue;
-        }
+        };
         tr.rotation = Quat::from_rotation_y(t * 2.0);
         tr.translation.y = d.base_y + (t * 3.0).sin() * 0.1;
-        *vis = if d.ttl < 6.0 && (d.ttl * if d.ttl < 3.0 { 10.0 } else { 5.0 }).sin() < 0.0 {
-            Visibility::Hidden
-        } else {
-            Visibility::Inherited
-        };
+        *vis = if shown { Visibility::Inherited } else { Visibility::Hidden };
     }
 }
 
@@ -132,12 +133,14 @@ fn pickup(
     board_q: Query<&Board>,
     (mut alias, mut points, mut banner, mut killed): (EventWriter<PlayAlias>, EventWriter<PointsEvent>, EventWriter<Banner>, EventWriter<ZombieKilled>),
     loops: Query<&PowerupLoop>,
-    mut grabbed: EventWriter<PowerupGrabbed>,
+    (mut grabbed, round): (EventWriter<PowerupGrabbed>, Res<Round>),
 ) {
     let Ok(pt) = player.single() else { return };
+    let rules = &round.0.rules;
     let me = Vec2::new(pt.translation.x, pt.translation.z);
     for (e, t, d) in &drops {
-        if me.distance(Vec2::new(t.translation.x, t.translation.z)) > 1.3 {
+        // 64 units from the feet to the model floating 40 units up.
+        if me.distance(Vec2::new(t.translation.x, t.translation.z)) > rules.powerup_grab_flat() {
             continue;
         }
         commands.entity(e).try_despawn();
@@ -155,12 +158,16 @@ fn pickup(
                 alias.write(PlayAlias::local("full_ammo").volume(0.7).or(Sfx::MaxAmmo));
             }
             Powerup::InstaKill => {
-                pu.insta_kill = rules::POWERUP_DURATION;
+                // A second one restarts the 30 s.
+                pu.insta_kill = rules.powerup_time;
                 start_loop(Powerup::InstaKill, "insta_kill_loop");
                 alias.write(PlayAlias::local("").or(Sfx::InstaKill));
             }
             Powerup::DoublePoints => {
-                pu.double_points = rules::POWERUP_DURATION;
+                // World at War: grabbing another while one runs doubles
+                // the scalar again (x4) and restarts the 30 s.
+                pu.double_stacks = if pu.double() && rules.double_points_stack { pu.double_stacks + 1 } else { 1 };
+                pu.double_points = rules.powerup_time;
                 start_loop(Powerup::DoublePoints, "double_point_loop");
                 alias.write(PlayAlias::local("").or(Sfx::DoublePoints));
             }
@@ -170,13 +177,16 @@ fn pickup(
                 dead.sort_by(|a, b| a.distance(pt.translation).total_cmp(&b.distance(pt.translation)));
                 // Heads pop one after another, closest first.
                 let mut when = 0.0;
+                // Nuked zombies still roll for power-ups (their death runs
+                // the same drop check) but give no kill points.
                 for pos in dead {
-                    killed.write(ZombieKilled { pos, drop_allowed: false });
+                    killed.write(ZombieKilled { pos, drop_allowed: true });
                     when += 0.1 + fastrand::f32() * 0.6;
                     alias.write(PlayAlias::at("nuked", pos + Vec3::Y).after(when));
                     alias.write(PlayAlias::at("zombie_head_gib", pos + Vec3::Y * 1.6).after(when));
                 }
-                earn(&mut score, &mut points, &pu, rules::POINTS_NUKE);
+                // Nacht's nuke gives no points; later maps give 400.
+                earn_flat(&mut score, &mut points, rules.nuke_points);
             }
             Powerup::Carpenter => {
                 for (wi, n) in boards.0.iter_mut().enumerate() {
@@ -189,7 +199,8 @@ fn pickup(
                     }
                     *n = full;
                 }
-                earn(&mut score, &mut points, &pu, rules::POINTS_CARPENTER);
+                // Not affected by Double Points in World at War.
+                earn_flat(&mut score, &mut points, rules::POINTS_CARPENTER);
                 alias.write(PlayAlias::local("").or(Sfx::Carpenter));
             }
         }
@@ -207,6 +218,9 @@ fn tick_timers(time: Res<Time>, mut pu: ResMut<ActivePowerups>, loops: Query<(En
     }
     pu.insta_kill = (pu.insta_kill - dt).max(0.0);
     pu.double_points = (pu.double_points - dt).max(0.0);
+    if pu.double_points <= 0.0 {
+        pu.double_stacks = 0;
+    }
     // The loop stops and the "worn off" sound plays.
     for (kind, sound) in ended {
         for (e, l) in &loops {

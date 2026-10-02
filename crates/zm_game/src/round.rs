@@ -9,7 +9,7 @@ use crate::world::{self, Mats};
 use crate::zombies;
 use crate::menu::{CurrentMap, MapKind};
 use crate::nacht::{self, NachtActive, NachtAssets, NachtError};
-use crate::{ActivePowerups, Banner, Boards, Defs, Dynamic, GameState, LevelRes, Round, Score, SessionEntity, World};
+use crate::{ActivePowerups, Banner, Boards, Defs, Dynamic, GameState, LevelRes, MapRules, Round, Score, SessionEntity, World};
 use zm_core::level::Level;
 use bevy::prelude::*;
 use zm_core::rules::RoundEvent;
@@ -71,8 +71,9 @@ fn tick(
 ) {
     match round.0.tick(time.delta_secs()) {
         RoundEvent::Spawn => {
-            let r = zombies::round_of(&round);
-            if zombies::spawn_zombie(&mut commands, &mats, &level, &world, r, models.as_deref()).is_none() {
+            // This round's health and a speed roll (`set_run_speed`).
+            let spec = round.0.spawn_spec(fastrand::f32());
+            if zombies::spawn_zombie(&mut commands, &mats, &level, &world, spec, models.as_deref()).is_none() {
                 // No open window (shouldn't happen) - give the zombie back.
                 round.0.to_spawn += 1;
                 round.0.alive -= 1;
@@ -225,9 +226,16 @@ fn start_session(
     mut ambient: ResMut<AmbientLight>,
     mut clear: ResMut<ClearColor>,
     mut cams: Query<(&mut crate::postfx::WawPost, &mut DistanceFog), With<Player>>,
+    (map_rules, mut round): (Option<Res<MapRules>>, ResMut<Round>),
 ) {
     *boards = Boards(level.0.windows.iter().map(|w| w.boards).collect());
     *world = World::new(&level.0);
+    // The map's own round rules (the bunker uses Nacht's).
+    let rules = match (&active, &map_rules) {
+        (Some(_), Some(r)) => r.0.clone(),
+        _ => zm_core::rules::ZombieRules::nacht(),
+    };
+    round.0 = zm_core::rules::RoundState::with_rules(rules);
     match (active, nacht_assets) {
         (Some(_), Some(n)) => {
             // The map's own fog and vision set replace Bevy's fog.

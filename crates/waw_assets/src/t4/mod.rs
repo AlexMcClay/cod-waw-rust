@@ -584,6 +584,26 @@ pub struct Glyph {
     pub uv: [f32; 4],
 }
 
+/// A string table asset: `rows` x `columns` cells, row-major.
+#[derive(Debug, Clone, Default)]
+pub struct StringTable {
+    pub name: String,
+    pub columns: usize,
+    pub rows: usize,
+    pub cells: Vec<String>,
+}
+
+impl StringTable {
+    pub fn cell(&self, row: usize, column: usize) -> Option<&str> {
+        (column < self.columns).then(|| self.cells.get(row * self.columns + column)).flatten().map(String::as_str)
+    }
+
+    /// `TableLookup( table, key_column, key, value_column )`.
+    pub fn lookup(&self, key_column: usize, key: &str, value_column: usize) -> Option<&str> {
+        (0..self.rows).find(|&r| self.cell(r, key_column) == Some(key)).and_then(|r| self.cell(r, value_column))
+    }
+}
+
 /// Everything the walk extracted from one zone.
 #[derive(Debug, Default)]
 pub struct ZoneData {
@@ -600,6 +620,8 @@ pub struct ZoneData {
     pub fonts: Vec<FontInfo>,
     /// Raw files (scripts, vision sets...): (name, file position, length).
     pub rawfiles: Vec<(String, usize, usize)>,
+    /// String tables (`.csv` assets such as `mp/zombiemode.csv`).
+    pub string_tables: Vec<StringTable>,
     /// The map's primary lights (`ComWorld`), indexed by
     /// `WorldSurface::primary_light`.
     pub primary_lights: Vec<PrimaryLight>,
@@ -668,8 +690,40 @@ impl ZoneData {
 
     /// A raw file's text (scripts, `.vision` files).
     pub fn rawfile(&self, name: &str) -> Option<String> {
-        let (_, p, len) = self.rawfiles.iter().find(|(n, ..)| n.eq_ignore_ascii_case(name))?;
-        self.data.get(*p..p + len).map(|b| String::from_utf8_lossy(b).into_owned())
+        match self.rawfiles.iter().find(|(n, ..)| n.eq_ignore_ascii_case(name)) {
+            Some((_, p, len)) => self.data.get(*p..p + len).map(|b| String::from_utf8_lossy(b).into_owned()),
+            // The walk can stop early (e.g. at a menu); raw files are
+            // stored inline, so find one past that point by its name.
+            None if !self.complete() => self.scan_rawfile(name),
+            None => None,
+        }
+    }
+
+    /// Finds an inline raw file in the zone stream: a `RawFile` header
+    /// (name and buffer pointers both -1 = "follows", then the length),
+    /// the name, then the bytes.
+    pub fn scan_rawfile(&self, name: &str) -> Option<String> {
+        let mut needle = name.as_bytes().to_vec();
+        needle.push(0);
+        let d = &self.data;
+        let u32_at = |o: usize| d.get(o..o + 4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]));
+        let mut from = 0;
+        while let Some(i) = d[from..].windows(needle.len()).position(|w| w == needle.as_slice()).map(|i| i + from) {
+            from = i + 1;
+            if i < 12 || u32_at(i - 12) != Some(u32::MAX) || u32_at(i - 4) != Some(u32::MAX) {
+                continue;
+            }
+            let len = u32_at(i - 8)? as usize;
+            let start = i + needle.len();
+            if let Some(b) = d.get(start..start + len) {
+                return Some(String::from_utf8_lossy(b).into_owned());
+            }
+        }
+        None
+    }
+
+    pub fn string_table(&self, name: &str) -> Option<&StringTable> {
+        self.string_tables.iter().find(|t| t.name.eq_ignore_ascii_case(name))
     }
 
     pub fn font(&self, name: &str) -> Option<&FontInfo> {
