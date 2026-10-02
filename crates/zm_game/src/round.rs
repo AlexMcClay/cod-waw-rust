@@ -246,18 +246,7 @@ fn start_session(
             world.mesh = Some(n.collision.clone());
             world.graph = Some(n.nav.clone());
             // Routes from the field outside to every window.
-            let mesh = n.collision.clone();
-            world.window_fields = (0..level.0.windows.len())
-                .map(|wi| {
-                    let o = zombies::outside_of(&level.0, wi);
-                    let g = zombies::ground_y(&world, o.x, o.z, o.y);
-                    let here = zm_core::geom::V3::new(o.x, g, o.z);
-                    let node = n.nav.nearest(here, |p| {
-                        mesh.line_clear(zm_core::geom::V3::new(here.x, here.y + 0.8, here.z), zm_core::geom::V3::new(p.x, p.y + 0.8, p.z))
-                    });
-                    node.map(|nd| n.nav.field(nd, &[])).unwrap_or_default()
-                })
-                .collect();
+            world.window_fields = (0..level.0.windows.len()).map(|wi| zombies::window_field(&world, &level.0, wi)).collect();
         }
         _ => {
             for (mut post, mut fog) in &mut cams {
