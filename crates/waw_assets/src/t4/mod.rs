@@ -15,6 +15,7 @@
 //! demand by [`decode`].
 
 pub mod anim;
+pub mod clipmap;
 pub mod decode;
 mod walker;
 
@@ -450,6 +451,8 @@ pub struct ZoneData {
     pub fonts: Vec<FontInfo>,
     pub xanims: Vec<XAnimInfo>,
     pub world: Option<WorldInfo>,
+    /// The map's collision (brushes, terrain, brush models).
+    pub clipmap: Option<clipmap::ClipMapInfo>,
     pub map_ents: Option<String>,
     pub localize: Vec<(String, String)>,
     /// Back-references that could not be resolved (0 for a correct walk).

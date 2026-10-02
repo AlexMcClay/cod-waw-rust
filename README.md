@@ -81,7 +81,9 @@ Tests: `cargo test --workspace`. With an install, `UNDEAD_WAW=<install> cargo te
 known vertex/asset counts).
 
 Developer smoke test: `UNDEAD_START=nacht UNDEAD_CAPTURE=shot` starts a game directly, lets a bot play,
-saves screenshots (`UNDEAD_CAPTURE_AT=4,9,30`) and exits.
+saves screenshots (`UNDEAD_CAPTURE_AT=4,9,30`) and exits. `UNDEAD_TEST_WALK="prone 180 1060 1 -150 1060"` walks
+the player along a path (game units: start x y z, then waypoints) and logs feet/eye heights per frame;
+`UNDEAD_TEST_DT=0.0166667` fixes the frame step so such runs don't depend on machine load.
 
 ## License and credits
 
