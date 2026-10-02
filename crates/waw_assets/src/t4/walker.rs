@@ -1455,6 +1455,7 @@ impl<'a> Walker<'a> {
         let h = self.read(2476)?;
         self.push(VIRTUAL);
         let mut w = WeaponInfo { name: self.xstring(h.u32(0))?.unwrap_or_default(), ..Default::default() };
+        w.stats = weapondef::stats(h.d);
         w.display_name = self.xstring(h.u32(4))?.unwrap_or_default();
         self.xstring(h.u32(8))?;
         for i in 0..16 {
