@@ -389,6 +389,9 @@ pub struct LightGridInfo {
 pub struct GridEntry {
     pub colors_index: u16,
     pub primary_light: u8,
+    /// The point may be blocked from places it lights (it is near
+    /// geometry): the game traces to it and drops it when it is.
+    pub needs_trace: bool,
 }
 
 /// The 56 surface cells of a 4x4x4 cube in storage order (x fastest, then
@@ -466,7 +469,7 @@ impl LightGridInfo {
             return None;
         }
         let b = data.get(self.entries + 4 * i..self.entries + 4 * i + 4)?;
-        Some(GridEntry { colors_index: u16::from_le_bytes([b[0], b[1]]), primary_light: b[2] })
+        Some(GridEntry { colors_index: u16::from_le_bytes([b[0], b[1]]), primary_light: b[2], needs_trace: b[3] != 0 })
     }
 
     /// The 56 colours (0..1, gamma) of an entry's block, as a 4x4x4 cube

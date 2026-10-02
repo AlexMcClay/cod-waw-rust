@@ -309,7 +309,7 @@ fn main() {
         })
         .add_systems(Update, (cursor_grab, debug_capture, collision_map))
         .add_systems(Update, log_state)
-        .add_systems(PreUpdate, autopilot.after(bevy::input::InputSystem).run_if(autopilot_enabled))
+        .add_systems(PreUpdate, (watch_for_user, autopilot.run_if(autopilot_enabled)).chain().after(bevy::input::InputSystem))
         .run();
 }
 
@@ -402,9 +402,42 @@ fn collision_map(world: Res<World>, player: Query<(&Transform, &player::PlayerCt
     info!("collision map written: origin ({x0:.2}, {z0:.2}) {px} m/px, floor {floor:.2}");
 }
 
+/// Set once the player touches the keyboard or mouse during a test run
+/// (`UNDEAD_CAPTURE` and the `UNDEAD_TEST_*` hooks): from then on the bot
+/// and the test hooks stand down and the game plays normally.
+static USER_TOOK_OVER: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn user_took_over() -> bool {
+    USER_TOOK_OVER.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 pub fn autopilot_enabled() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *ON.get_or_init(|| std::env::var_os("UNDEAD_CAPTURE").is_some())
+    *ON.get_or_init(|| std::env::var_os("UNDEAD_CAPTURE").is_some()) && !user_took_over()
+}
+
+/// Hands a test run to the player on their first key press, click or mouse
+/// movement while the window has focus.
+fn watch_for_user(
+    keys: Res<ButtonInput<KeyCode>>,
+    mouse: Res<ButtonInput<MouseButton>>,
+    motion: Res<bevy::input::mouse::AccumulatedMouseMotion>,
+    mut windows: Query<&mut Window, With<PrimaryWindow>>,
+) {
+    if user_took_over() || std::env::var_os("UNDEAD_CAPTURE").is_none() && std::env::var_os("UNDEAD_TEST_WALK").is_none() {
+        return;
+    }
+    let Ok(mut w) = windows.single_mut() else { return };
+    if !w.focused {
+        return;
+    }
+    let touched = keys.get_just_pressed().next().is_some() || mouse.get_just_pressed().next().is_some() || motion.delta.length() > 4.0;
+    if touched {
+        USER_TOOK_OVER.store(true, std::sync::atomic::Ordering::Relaxed);
+        w.cursor_options.grab_mode = CursorGrabMode::Locked;
+        w.cursor_options.visible = false;
+        info!("[autopilot] the player took over: test hooks off");
+    }
 }
 
 pub fn cursor_locked(windows: &Query<&Window, With<PrimaryWindow>>) -> bool {
@@ -440,7 +473,7 @@ fn debug_capture(
             commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path));
             *taken += 1;
         }
-    } else if t > at.last().copied().unwrap_or(0.0) + 2.0 {
+    } else if t > at.last().copied().unwrap_or(0.0) + 2.0 && !user_took_over() {
         exit.write(AppExit::Success);
     }
 }

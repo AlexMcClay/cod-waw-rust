@@ -1739,6 +1739,34 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
+    fn light_grid_stats() {
+        let root = std::env::var("UNDEAD_WAW").expect("set UNDEAD_WAW");
+        let ff = std::fs::read(std::path::Path::new(&root).join("zone/english/nazi_zombie_prototype.ff")).unwrap();
+        let zd = t4::walk(waw_assets::zone::decompress(&ff).unwrap());
+        let w = zd.world.as_ref().unwrap();
+        let g = w.light_grid.as_ref().unwrap();
+        let (mut n, mut nt, mut dark, mut dark_t, mut sum, mut sum_t) = (0, 0, 0, 0, 0.0f64, 0.0f64);
+        for x in g.mins[0]..=g.maxs[0] {
+            for y in g.mins[1]..=g.maxs[1] {
+                for z in g.mins[2]..=g.maxs[2] {
+                    let Some(e) = g.entry_index(&zd.data, [x as i64, y as i64, z as i64]).and_then(|i| g.entry(&zd.data, i)) else { continue };
+                    let Some(c) = g.cube(&zd.data, e) else { continue };
+                    let mut m = 0.0f64;
+                    let mut k = 0;
+                    for a in 0..4 { for b in 0..4 { for d in 0..4 { let v = c[a][b][d]; if v != [0.0; 3] { m += (v[0] + v[1] + v[2]) as f64 / 3.0; k += 1; } } } }
+                    let m = m / k.max(1) as f64;
+                    n += 1;
+                    sum += m;
+                    if m < 0.02 { dark += 1; }
+                    if e.needs_trace { nt += 1; sum_t += m; if m < 0.02 { dark_t += 1; } }
+                }
+            }
+        }
+        println!("entries {n}, needs_trace {nt}; mean {:.3} (trace {:.3}); near-black {dark} (of which trace {dark_t})", sum / n as f64, sum_t / nt.max(1) as f64);
+    }
+
+    #[test]
     fn coordinate_conversion() {
         // Game +X forward stays +X; game +Y (left) becomes -Z; +Z up becomes +Y.
         assert_eq!(to_bevy([100.0, 0.0, 0.0]), Vec3::new(2.54, 0.0, 0.0));

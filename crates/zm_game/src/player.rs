@@ -480,7 +480,7 @@ impl TestWalk {
     }
 
     fn active(&self) -> bool {
-        self.started && !self.done
+        self.started && !self.done && !crate::user_took_over()
     }
 
     /// Direction towards the next waypoint (zero when the path is done).
