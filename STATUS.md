@@ -33,6 +33,18 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
   xWMA sounds decoded with Windows' WMA decoder.
 - HUD laid out like WaW's: chalk tallies, red score bar with popups, weapon name, clip icons, reserve,
   Reload warning, use hints, power-up text, nuke flash, low-health overlay, all with the game's fonts.
+- Lighting from the map's own data: lightmap pages and primary lights in a custom world shader, the
+  light grid (with its primary light baked in) as an irradiance volume for models, sky-box model, fog
+  from the art script and the film grade from the vision file. Nothing is Nacht-specific.
+- Weapons use the zone's own WeaponDef stats (damage/range falloff, hit-location multipliers, fire
+  rate, clip/reserve, reload timing, spread, ADS, penetration); grenades; the PPSh.
+- Player collides with the map's clipMap brushes; prone speed fixed; stairs climb like ramps.
+- Zombie/round rules read from Nacht's own scripts (`_zombiemode_prototype.gsc` in patch.ff plus
+  `mp/zombiemode.csv`): health curve, counts, spawn delay, gaits, attack damage, regen, points by hit
+  location, power-up drop rules (see `research/gameplay/ZOMBIE_MECHANICS.md`).
+- Particle effects from the game's FX assets: muzzle flashes, shell ejects, impacts by surface type,
+  blood, grenade explosions, power-up/box/board effects and all 103 placed ambient effects
+  (see `research/vfx/WAW_FX.md`).
 - `build_release.bat` → `undead_rounds\dist\UndeadRounds\UndeadRounds.exe`.
 
 ## Open
@@ -42,14 +54,8 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
 
 ## Next (queued)
 
-- **Lighting to match the real Nacht** (reference screenshot from the user):
-  - cold, desaturated moonlit look; dark interior; hard moonlight with bar shadows through the windows;
-  - pale grey exponential fog outside;
-  - visible sky (the skybox model's materials are currently skipped as "sky");
-  - values from `maps/createart/nazi_zombie_prototype_art.gsc`: fog start 165, half-plane 835,
-    half-height 200, base height 75, colour (0.5, 0.5, 0.5); vision set "zombie"; glow/bloom
-    cutoff 0.5, intensity 2;
-  - the lightmap bake should weigh the primary (sun shadow) page more and the indirect page less;
-    point lights dimmer and neutral.
-- Grenades (the HUD has the slot), muzzle flash effects (currently a glowing sphere).
+- Zombie pathfinding rewrite (in progress): Chase zombies can oscillate between two path nodes.
+- Wire the weapon's ADS time/zoom and move-speed scale into the player; Ray Gun self-damage.
+- Not yet from the rules: crawlers from explosive gibs, burning damage, the stuck-zombie cleanup.
+- FX gaps: trails drawn as sprites, no particle collision, IWI format 9 textures (light beams).
 - Perks/power (Verrückt and later maps), co-op.
