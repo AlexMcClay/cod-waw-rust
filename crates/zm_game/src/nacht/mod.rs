@@ -339,7 +339,9 @@ fn poll_load(
                 unlit: m.unlit,
                 double_sided: m.two_sided,
                 cull_mode: if m.two_sided { None } else { Some(bevy::render::render_resource::Face::Back) },
-                depth_bias: if m.blend == Blend::Blend { 2.0 } else { 0.0 },
+                // Constant offset only (Bevy has no slope bias here): a few
+                // depth-buffer steps per decal layer.
+                depth_bias: 4.0 * m.depth_bias.max(if m.blend == Blend::Blend { 2.0 } else { 0.0 }),
                 ..default()
             })
         })
@@ -373,14 +375,14 @@ fn poll_load(
     // Lit world surfaces use the game's shader, one material per (material,
     // primary light) pair.
     let pages: Vec<Option<(Handle<Image>, Handle<Image>)>> = lightmap_pages.into_iter().map(|p| p.map(|(sec, pri)| (images.add(sec), images.add(pri)))).collect();
-    let mut lit_cache: HashMap<(usize, u8, u8), Handle<world_material::WawWorldMaterial>> = HashMap::new();
+    let mut lit_cache: HashMap<(usize, u8, u8, bool), Handle<world_material::WawWorldMaterial>> = HashMap::new();
     let world: Vec<_> = world
         .into_iter()
         .map(|s| {
             let m = &mdefs[s.material];
             let mat = match pages.get(s.lightmap as usize).cloned().flatten() {
                 Some((sec, pri)) if m.lightmapped && !m.unlit => {
-                    let h = lit_cache.entry((s.material, s.primary_light, s.lightmap)).or_insert_with(|| {
+                    let h = lit_cache.entry((s.material, s.primary_light, s.lightmap, s.decal)).or_insert_with(|| {
                         use world_material::*;
                         let color = m.color.as_ref().and_then(|c| image_handles.get(c).cloned());
                         let normal = m.normal.as_ref().and_then(|c| image_handles.get(c).cloned());
@@ -418,6 +420,9 @@ fn poll_load(
                                 Blend::Blend | Blend::Add => AlphaMode::Blend,
                             },
                             two_sided: m.two_sided,
+                            // Decal layers by sort key; anything else in the
+                            // world's decal range gets the smallest offset.
+                            depth_bias: m.depth_bias.max(if s.decal { 2.0 } else { 0.0 }) as u8,
                         })
                     });
                     WorldMat::Lit(h.clone())

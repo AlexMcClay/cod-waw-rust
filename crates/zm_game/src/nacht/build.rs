@@ -61,6 +61,21 @@ pub struct SceneMaterial {
     /// Lit shaders tint by vertex colour; layered ones use it as a blend
     /// weight instead.
     pub vertex_tint: bool,
+    /// Depth offset for decal layers (0 for ordinary surfaces): see
+    /// [`decal_bias`].
+    pub depth_bias: f32,
+}
+
+/// Depth offset for a material's sort key. The engine draws its decal sort
+/// layers (bottom, static, middle, top, impacts: keys 9..=47) after the
+/// surfaces they lie on with a polygon offset; without one, coplanar
+/// layers (chalk on a door, blood on a wall) z-fight and flicker.
+pub fn decal_bias(sort_key: u8) -> f32 {
+    if (9..=47).contains(&sort_key) {
+        2.0 + (sort_key - 9) as f32 * 0.5
+    } else {
+        0.0
+    }
 }
 
 /// A lit world surface group: one material lit by one primary light.
@@ -70,6 +85,8 @@ pub struct SceneWorldMesh {
     pub primary_light: u8,
     /// Which lightmap the surfaces use.
     pub lightmap: u8,
+    /// Decal surfaces (the world's decal range), drawn over others.
+    pub decal: bool,
 }
 
 /// A primary light in Bevy space (metres).
@@ -460,6 +477,11 @@ impl<'a> Builder<'a> {
         if blend == Blend::Opaque && (foliage || state.is_some_and(|s| s.alpha_test())) {
             blend = Blend::Mask;
         }
+        // Techsets whose name says nothing about blending (e.g. `wc_unlit`
+        // for the "HELP" chalk) blend by their render state.
+        if blend == Blend::Opaque && state.is_some_and(|s| s.alpha_blend()) {
+            blend = Blend::Blend;
+        }
         let two_sided = state.is_some_and(|s| s.two_sided()) || blend != Blend::Opaque;
         let color_name = info.color_map().map(|i| self.zones[zi].image_name(i).to_string());
         let color = color_name.and_then(|n| self.image(&n));
@@ -469,7 +491,8 @@ impl<'a> Builder<'a> {
         // colour rather than tinting.
         let vertex_tint = !t.split('_').any(|part| part.len() >= 2 && part.as_bytes()[1] == b'1' && part.as_bytes()[0].is_ascii_lowercase());
         let m = self.materials.len();
-        self.materials.push(SceneMaterial { color, blend, unlit, lightmapped, two_sided, normal, vertex_tint });
+        let depth_bias = decal_bias(info.sort_key);
+        self.materials.push(SceneMaterial { color, blend, unlit, lightmapped, two_sided, normal, vertex_tint, depth_bias });
         self.mat_index.insert(key, m);
         Some(m)
     }
@@ -1265,22 +1288,23 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     let mut b = Builder { zones: zones.clone(), iwd, bc, materials: Vec::new(), mat_index: HashMap::new(), images: HashMap::new() };
 
     // Static world, grouped by material.
-    let mut groups: HashMap<(usize, u8, u8), Vec<usize>> = HashMap::new();
+    let mut groups: HashMap<(usize, u8, u8, bool), Vec<usize>> = HashMap::new();
     let mut collide: Vec<usize> = Vec::new();
     for i in 0..world.static_surface_count.min(world.surfaces.len() as u32) as usize {
         let s = &world.surfaces[i];
         let Some(m) = s.material.and_then(|m| b.material(0, m)) else { continue };
-        groups.entry((m, s.primary_light, s.lightmap)).or_default().push(i);
         let mat = &b.materials[m];
+        let decal = world.decal_range.contains(&(i as u32)) || mat.blend == Blend::Blend;
+        groups.entry((m, s.primary_light, s.lightmap, decal)).or_default().push(i);
         if mat.blend != Blend::Blend && !world.decal_range.contains(&(i as u32)) && !mat.unlit {
             collide.push(i);
         }
     }
     let mut world_meshes = Vec::new();
-    for ((m, light, lmap), surfs) in &groups {
+    for ((m, light, lmap, decal), surfs) in &groups {
         let lit = b.materials[*m].lightmapped;
         if let Some(mesh) = world_mesh(&nacht, world, surfs, lit) {
-            world_meshes.push(SceneWorldMesh { mesh, material: *m, primary_light: *light, lightmap: *lmap });
+            world_meshes.push(SceneWorldMesh { mesh, material: *m, primary_light: *light, lightmap: *lmap, decal: *decal });
         }
     }
 

@@ -33,7 +33,7 @@ pub struct WorldParams {
 }
 
 #[derive(Asset, TypePath, AsBindGroup, Clone)]
-#[bind_group_data(bool)]
+#[bind_group_data(WorldKey)]
 pub struct WawWorldMaterial {
     #[uniform(0)]
     pub params: WorldParams,
@@ -51,6 +51,16 @@ pub struct WawWorldMaterial {
     pub lightmap_primary: Handle<Image>,
     pub alpha: AlphaMode,
     pub two_sided: bool,
+    /// Depth offset of a decal surface lying on other geometry, so it
+    /// doesn't z-fight (flicker) with the surface under it (0 = none).
+    pub depth_bias: u8,
+}
+
+/// Pipeline key: culling and the decal depth offset.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct WorldKey {
+    two_sided: bool,
+    depth_bias: u8,
 }
 
 impl Material for WawWorldMaterial {
@@ -68,17 +78,23 @@ impl Material for WawWorldMaterial {
         _layout: &bevy::render::mesh::MeshVertexBufferLayoutRef,
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
-        if key.bind_group_data {
+        if key.bind_group_data.two_sided {
             descriptor.primitive.cull_mode = None;
+        }
+        if key.bind_group_data.depth_bias > 0 {
+            // Reverse Z: positive bias pulls towards the camera.
+            if let Some(ds) = descriptor.depth_stencil.as_mut() {
+                ds.bias.constant = 2 * key.bind_group_data.depth_bias as i32;
+                ds.bias.slope_scale = 0.75 * key.bind_group_data.depth_bias as f32;
+            }
         }
         Ok(())
     }
 }
 
-impl From<&WawWorldMaterial> for bool {
-    /// Pipeline key: two-sided surfaces skip back-face culling.
-    fn from(m: &WawWorldMaterial) -> bool {
-        m.two_sided
+impl From<&WawWorldMaterial> for WorldKey {
+    fn from(m: &WawWorldMaterial) -> WorldKey {
+        WorldKey { two_sided: m.two_sided, depth_bias: m.depth_bias }
     }
 }
 
