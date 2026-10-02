@@ -385,7 +385,10 @@ fn classify(techset: &str) -> (Blend, bool, bool) {
 
 pub fn skip_material(techset: &str, name: &str) -> bool {
     let t = techset.trim_start_matches(',');
-    (t.contains("sky") && !t.starts_with("mc_sky")) || t.contains("tools") || t.contains("shadowcaster") || t.contains("water") || name.contains("caulk") || name.contains("clip")
+    // Tool textures by name: `caulk`, `clip`, `clip_player`, ... (not any
+    // name containing "clip": the MG42's drum is `mtl_drumclip_mg42`).
+    let base = name.rsplit('/').next().unwrap_or(name);
+    (t.contains("sky") && !t.starts_with("mc_sky")) || t.contains("tools") || t.contains("shadowcaster") || t.contains("water") || base.starts_with("caulk") || base.starts_with("clip")
 }
 
 fn sampler(repeat: bool, mips: bool) -> ImageSampler {
@@ -1594,11 +1597,12 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     for &id in &wanted.weapon_ids {
         let rig = view_rig.as_ref();
         info!(
-            "weapon {id} ({}): rig gun {}, anims {}, view model {}, sounds {}, world model {}",
+            "weapon {id} ({}): rig gun {}, anims {}, view model {} ({}), sounds {}, world model {}",
             zone_weapon_name(id),
             rig.is_some_and(|r| r.guns.contains_key(id)),
             rig.and_then(|r| r.anims.get(id)).map_or(0, Vec::len),
             view_models.contains_key(id),
+            zones.iter().find_map(|zd| zd.weapon(zone_weapon_name(id)).and_then(|w| w.view_model).map(|m| zd.xmodels[m as usize].name.clone())).unwrap_or_default(),
             weapon_sounds.get(id).map_or(0, |s| s.fields.len() + s.notetracks.len()),
             weapon_world_models.get(id).map_or("-", String::as_str),
         );
@@ -1695,6 +1699,8 @@ mod tests {
         assert_eq!(classify("mc_sky_noncubemap_add").0, Blend::Add);
         assert_eq!(classify("mc_sky_noncubemap").0, Blend::Blend);
         assert!(skip_material("wc_tools", "wc/caulk_shadow"));
+        assert!(skip_material("wc_l_sm_r0c0", "wc/clip_player"));
+        assert!(!skip_material("mc_cooktorrance_sm", "mc/mtl_drumclip_mg42"));
     }
 
 
