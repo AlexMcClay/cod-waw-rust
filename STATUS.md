@@ -51,7 +51,9 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
   `UNDEAD_TEST_ZOMBIE_SPEED=walk|run|sprint`.
 - Player aim time, zoom, move speed and sprint length come from the held weapon.
 - Scoped weapons show their scope overlay (`adsOverlayShader`) instead of the gun when fully aimed.
-- Effect lights go through a pool of 8 (hundreds of particle lights crowded the light-grid volume
+- Models sample the light grid in their own shader (model_material.rs): Bevy's IrradianceVolume
+  dropped screen tiles for a map-sized volume (black, flickering blocks). Effect lights go through a
+  pool of 8 (hundreds of particle lights crowded the light-grid volume
   out of Bevy's clusters: black, flickering blocks on models). Decal sort layers get a depth offset.
 - Test runs (`UNDEAD_CAPTURE`, `UNDEAD_TEST_*`) hand control to the player on their first input;
   `UNDEAD_TEST_ADS=1` holds aim.

@@ -45,7 +45,7 @@ pub struct Mats {
     pub chalk_by_weapon: HashMap<String, Handle<StandardMaterial>>,
     pub chalk_quad: Handle<Mesh>,
     /// Real brush submodels (window boards...) when a map from the install is loaded.
-    pub submodels: HashMap<usize, Vec<(Handle<Mesh>, Handle<StandardMaterial>)>>,
+    pub submodels: HashMap<usize, Vec<(Handle<Mesh>, Handle<crate::nacht::model_material::ModelMaterial>)>>,
 }
 
 /// Texture tile size in metres for world-space UVs.

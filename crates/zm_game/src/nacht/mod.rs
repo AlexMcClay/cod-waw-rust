@@ -4,7 +4,9 @@
 
 pub mod build;
 pub mod level;
+pub mod model_material;
 pub mod world_material;
+use model_material::ModelMaterial;
 
 use crate::menu::{CurrentMap, LoadingStatus, MapKind};
 use crate::waw::Waw;
@@ -39,7 +41,7 @@ pub struct NachtActive;
 /// A model's surfaces as uploaded meshes and materials.
 #[derive(Clone)]
 pub struct ModelParts {
-    pub parts: Vec<(Handle<Mesh>, Handle<StandardMaterial>)>,
+    pub parts: Vec<(Handle<Mesh>, Handle<ModelMaterial>)>,
 }
 
 /// Everything uploaded from the scene, kept for the rest of the run so
@@ -47,7 +49,7 @@ pub struct ModelParts {
 #[derive(Resource)]
 pub struct NachtAssets {
     pub world: Vec<(Handle<Mesh>, WorldMat)>,
-    pub submodels: HashMap<usize, Vec<(Handle<Mesh>, Handle<StandardMaterial>)>>,
+    pub submodels: HashMap<usize, Vec<(Handle<Mesh>, Handle<ModelMaterial>)>>,
     pub models: HashMap<String, ModelParts>,
     pub static_models: Vec<(String, Transform)>,
     pub sky_model: Option<String>,
@@ -59,8 +61,6 @@ pub struct NachtAssets {
     /// Brush submodels already used by gameplay (boards, doors) by number.
     pub gameplay_submodels: Vec<usize>,
     pub chest: Option<build::SceneChest>,
-    /// The light grid as an irradiance volume for models.
-    pub irradiance: Option<(Handle<Image>, Transform)>,
     /// Fog and film grade from the map's own data.
     pub fog: Option<waw_assets::look::Fog>,
     pub film: Option<waw_assets::look::Film>,
@@ -74,7 +74,7 @@ pub enum WorldMat {
     /// The game's lit world shader (lightmap + primary light).
     Lit(Handle<world_material::WawWorldMaterial>),
     /// Unlit or otherwise plain surfaces.
-    Plain(Handle<StandardMaterial>),
+    Plain(Handle<ModelMaterial>),
 }
 
 /// A model skinned to its own skeleton, uploaded.
@@ -83,7 +83,7 @@ pub struct PartAssets {
     /// (bone name, parent index, bind pose relative to the parent)
     pub bones: Vec<(String, Option<usize>, Transform)>,
     pub inverse_bindposes: Handle<SkinnedMeshInverseBindposes>,
-    pub meshes: Vec<(Handle<Mesh>, Handle<StandardMaterial>)>,
+    pub meshes: Vec<(Handle<Mesh>, Handle<ModelMaterial>)>,
 }
 
 /// A skinned zombie model ready to instantiate.
@@ -167,7 +167,7 @@ pub fn pose_mapped(
 
 /// First-person gun models by weapon id, once the install has been read.
 #[derive(Resource, Default)]
-pub struct ViewModels(pub HashMap<String, Vec<(Handle<Mesh>, Handle<StandardMaterial>)>>);
+pub struct ViewModels(pub HashMap<String, Vec<(Handle<Mesh>, Handle<ModelMaterial>)>>);
 
 /// The real zombie models and their animations, once the install has been read.
 #[derive(Resource, Default)]
@@ -215,6 +215,7 @@ impl Plugin for NachtPlugin {
             .init_resource::<ViewRig>()
             .init_resource::<NachtError>()
             .add_plugins(world_material::WorldMaterialPlugin)
+            .add_plugins(model_material::ModelMaterialPlugin)
             .add_systems(Startup, start_load)
             .add_systems(OnEnter(GameState::Loading), start_load)
             .add_systems(Update, poll_load)
@@ -269,7 +270,7 @@ fn poll_load(
     (mut meshes, mut images, mut materials, mut audio, mut bindposes): (
         ResMut<Assets<Mesh>>,
         ResMut<Assets<Image>>,
-        ResMut<Assets<StandardMaterial>>,
+        ResMut<Assets<ModelMaterial>>,
         ResMut<Assets<AudioSource>>,
         ResMut<Assets<SkinnedMeshInverseBindposes>>,
     ),
@@ -321,11 +322,15 @@ fn poll_load(
     crate::audio::apply_zone_weapon_stats(&mut defs.0, &weapon_stats, flesh_penetration);
     commands.insert_resource(crate::fx::PendingFx(fx));
     let image_handles: HashMap<String, Handle<Image>> = imgs.into_iter().map(|(k, v)| (k, images.add(v))).collect();
-    let mat_handles: Vec<Handle<StandardMaterial>> = mdefs
+    // The light grid (with each point's primary light added, as the game
+    // lights models); the world has both in its own shader.
+    let grid: Option<(Handle<Image>, Transform)> = irradiance.map(|(img, t)| (images.add(img), t));
+    let mat_handles: Vec<Handle<ModelMaterial>> = mdefs
         .iter()
         .map(|m| {
             let tex = m.color.as_ref().and_then(|c| image_handles.get(c).cloned());
-            materials.add(StandardMaterial {
+            materials.add(ModelMaterial {
+                base: StandardMaterial {
                 base_color: if tex.is_some() { Color::WHITE } else { Color::srgb(0.5, 0.5, 0.5) },
                 base_color_texture: tex,
                 perceptual_roughness: 0.92,
@@ -343,6 +348,8 @@ fn poll_load(
                 // depth-buffer steps per decal layer.
                 depth_bias: 4.0 * m.depth_bias.max(if m.blend == Blend::Blend { 2.0 } else { 0.0 }),
                 ..default()
+                },
+                extension: model_material::GridLight::new(grid.clone(), 1.2 * 2f32.powf(REAL_MAP_EV)),
             })
         })
         .collect();
@@ -486,7 +493,6 @@ fn poll_load(
         scene_entities: entities,
         gameplay_submodels,
         chest,
-        irradiance: irradiance.map(|(img, t)| (images.add(img), t)),
         fog,
         film,
         weapon_world_models,
@@ -556,21 +562,6 @@ pub fn spawn_scene(
             let t = Transform::from_translation(to_bevy(e.origin())).with_rotation(angles_to_quat(e.angles()));
             spawn_model(&mut commands, parts, t, SessionEntity);
         }
-    }
-    // Models: the light grid's baked light with each point's primary light
-    // added (as the game lights models). The world has both in its own
-    // shader. Scaled to the real maps' fixed camera exposure.
-    if let Some((voxels, t)) = &assets.irradiance {
-        commands.spawn((
-            bevy::pbr::LightProbe,
-            bevy::pbr::irradiance_volume::IrradianceVolume {
-                voxels: voxels.clone(),
-                intensity: 1.2 * 2f32.powf(REAL_MAP_EV),
-                affects_lightmapped_meshes: false,
-            },
-            *t,
-            SessionEntity,
-        ));
     }
     if let Some(parts) = assets.sky_model.as_ref().and_then(|n| assets.models.get(n)) {
         let e = spawn_model(&mut commands, parts, Transform::from_scale(Vec3::splat(assets.sky_scale)), (SessionEntity, SkyBox, NotShadowCaster));
