@@ -45,8 +45,9 @@ pub struct FxMaterial {
     pub blend: Blend,
     /// `(rows, columns)` of the texture atlas.
     pub atlas: (u8, u8),
-    /// "zfeather" techsets fade where they meet the scene.
-    pub soft: bool,
+    /// "zfeather" techsets fade where they meet the scene, over this many
+    /// metres (the material's `featherParms`; 0 = hard).
+    pub feather: f32,
 }
 
 /// What an element draws, resolved across zones.
@@ -411,9 +412,13 @@ impl Gather<'_> {
             return None;
         }
         let blend = Blend::from_techset(techset);
-        let soft = techset.contains("zfeather");
+        let feather = if techset.contains("zfeather") {
+            zones[mz].material_constant(m, "featherParms").map(|f| f[1]).filter(|d| *d > 0.0).unwrap_or(8.0) * crate::nacht::build::INCH
+        } else {
+            0.0
+        };
         let i = self.out.materials.len();
-        self.out.materials.push(FxMaterial { name: name.clone(), image, blend, atlas: m.atlas, soft });
+        self.out.materials.push(FxMaterial { name: name.clone(), image, blend, atlas: m.atlas, feather });
         self.mat_index.insert(name, i);
         Some(i)
     }

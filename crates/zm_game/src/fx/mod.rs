@@ -46,6 +46,30 @@ const LIT_AMBIENT: f32 = 0.35;
 /// the two are matched at `d` = a quarter of the radius (0.3..1.5 m; inverse
 /// square is brighter nearer, dimmer further). Real maps use a fixed
 /// exposure ([`crate::nacht::REAL_MAP_EV`]).
+/// Most effect lights lit at once. Every fire or lamp particle carries its
+/// own light; Bevy assigns each point light to screen tiles, and hundreds of
+/// them crowded the light-grid volume out of tiles (models went black in
+/// screen-aligned blocks, flickering as the camera moved). The game applies
+/// only a few dynamic lights too. The strongest ones near the camera win.
+const MAX_FX_LIGHTS: usize = 8;
+
+/// Light requests from this frame's particles and the pool that shows them.
+#[derive(Resource, Default)]
+struct FxLights {
+    pool: Vec<Entity>,
+    requests: Vec<LightRequest>,
+}
+
+struct LightRequest {
+    pos: Vec3,
+    color: LinearRgba,
+    intensity: f32,
+    range: f32,
+}
+
+#[derive(Component)]
+struct FxLight;
+
 pub fn light_intensity(c: f32, r: f32) -> f32 {
     let d = (r * 0.25).clamp(0.3, 1.5).min(r * 0.9);
     let falloff = (1.0 - d / r.max(1e-3)).max(0.0);
@@ -243,7 +267,6 @@ struct Particle {
     visual: u16,
     atlas0: u16,
     started: bool,
-    light: Option<Entity>,
     model: Option<Entity>,
     /// A runner's effect, moved along with it.
     child: Option<Entity>,
@@ -289,6 +312,7 @@ impl Plugin for FxPlugin {
             .add_event::<FxEvent>()
             .init_resource::<BatchPool>()
             .init_resource::<Decals>()
+            .init_resource::<FxLights>()
             .init_resource::<PlacedSpawned>()
             .add_systems(Update, (upload_library, update_live, hooks::muzzle_sphere))
             .add_systems(OnEnter(GameState::Loading), |mut p: ResMut<PlacedSpawned>| p.0 = false)
@@ -303,7 +327,8 @@ impl Plugin for FxPlugin {
             )
             .add_systems(
                 PostUpdate,
-                simulate
+                (simulate, apply_fx_lights)
+                    .chain()
                     .after(TransformSystem::TransformPropagate)
                     .before(VisibilitySystems::CheckVisibility)
                     .run_if(resource_exists::<FxLibrary>),
@@ -311,13 +336,13 @@ impl Plugin for FxPlugin {
     }
 }
 
-fn material_for(blend: Blend, image: Option<Handle<Image>>, soft: bool) -> FxParticleMaterial {
+fn material_for(blend: Blend, image: Option<Handle<Image>>, feather: f32) -> FxParticleMaterial {
     let (mode, alpha) = match blend {
         Blend::Add | Blend::Screen => (0.0, AlphaMode::Premultiplied),
         Blend::Blend => (1.0, AlphaMode::Premultiplied),
         Blend::Multiply => (2.0, AlphaMode::Multiply),
     };
-    FxParticleMaterial { params: FxParams { mode: Vec4::new(mode, if soft { 0.15 } else { 0.0 }, 0.0, 0.0) }, color: image, alpha }
+    FxParticleMaterial { params: FxParams { mode: Vec4::new(mode, feather, 0.0, 0.0) }, color: image, alpha }
 }
 
 /// Turns the loaded effect data into GPU textures and materials.
@@ -336,7 +361,7 @@ fn upload_library(
         .iter()
         .map(|m| {
             let tex = m.image.as_ref().and_then(|i| handles.get(i).cloned());
-            let h = mats.add(material_for(m.blend, tex, m.soft));
+            let h = mats.add(material_for(m.blend, tex, m.feather));
             (h, (m.atlas.0 as u32, m.atlas.1 as u32))
         })
         .collect();
@@ -750,13 +775,14 @@ fn simulate(
     camera: Query<&GlobalTransform, (With<crate::player::Player>, Without<FxBatch>)>,
     globals: Query<&GlobalTransform, Without<FxBatch>>,
     mut batches: Query<(&mut Transform, &mut GlobalTransform, &mut Visibility, &mut Aabb), With<FxBatch>>,
-    mut lights: Query<(&mut PointLight, &mut Transform), (Without<FxBatch>, Without<FxModel>)>,
+    mut fx_lights: ResMut<FxLights>,
     mut models: Query<&mut Transform, (With<FxModel>, Without<FxBatch>)>,
     mut alias: EventWriter<crate::audio::PlayAlias>,
     nacht: Option<Res<crate::nacht::NachtAssets>>,
     world: Option<Res<crate::World>>,
 ) {
     let dt = time.delta_secs().min(0.1);
+    fx_lights.requests.clear();
     let Ok(cam) = camera.single() else { return };
     let mesh = world.as_ref().and_then(|w| w.mesh.clone());
     let cam_pos = cam.translation();
@@ -865,7 +891,6 @@ fn simulate(
                 visual: if nv > 1 { rng.usize(..nv) as u16 } else { 0 },
                 atlas0: atlas0 as u16,
                 started: false,
-                light: None,
                 model: None,
                 child: None,
             });
@@ -965,9 +990,6 @@ fn simulate(
                 child_frames.push((c, Frame { origin: pos, axes: orient }));
             }
             if f >= 1.0 {
-                if let Some(l) = p.light.take() {
-                    commands.entity(l).try_despawn();
-                }
                 if let Some(m) = p.model.take() {
                     commands.entity(m).try_despawn();
                 }
@@ -992,23 +1014,7 @@ fn simulate(
                     let intensity = light_intensity(c.max_element(), range);
                     let m = c.max_element().max(1e-4);
                     let col = LinearRgba::rgb(c.x / m, c.y / m, c.z / m);
-                    let tr = Transform::from_translation(to_bevy(pos));
-                    match p.light.and_then(|l| lights.get_mut(l).ok()) {
-                        Some((mut pl, mut lt)) => {
-                            pl.intensity = intensity;
-                            pl.range = range;
-                            pl.color = col.into();
-                            *lt = tr;
-                        }
-                        None if p.light.is_none() => {
-                            p.light = Some(
-                                commands
-                                    .spawn((PointLight { color: col.into(), intensity, range, shadows_enabled: false, ..default() }, tr, Dynamic))
-                                    .id(),
-                            );
-                        }
-                        None => {}
-                    }
+                    fx_lights.requests.push(LightRequest { pos: to_bevy(pos), color: col, intensity, range });
                 }
                 et::MODEL => {
                     let Some(Visual::Model(name)) = visual else {
@@ -1205,4 +1211,40 @@ pub fn live() -> bool {
 
 fn update_live(lib: Option<Res<FxLibrary>>, nacht: Option<Res<crate::nacht::NachtActive>>) {
     LIVE.store(lib.is_some() && nacht.is_some(), std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Shows the strongest of this frame's effect lights (by brightness and
+/// nearness to the camera) through a fixed pool of point lights; the rest
+/// are hidden so they stay out of Bevy's light clusters.
+fn apply_fx_lights(
+    mut commands: Commands,
+    mut fx: ResMut<FxLights>,
+    camera: Query<&GlobalTransform, (With<crate::player::Player>, Without<FxLight>)>,
+    mut lights: Query<(&mut PointLight, &mut Transform, &mut GlobalTransform, &mut Visibility), With<FxLight>>,
+) {
+    let cam = camera.single().map(|c| c.translation()).unwrap_or(Vec3::ZERO);
+    let FxLights { pool, requests } = &mut *fx;
+    pool.retain(|e| lights.contains(*e));
+    while pool.len() < MAX_FX_LIGHTS {
+        pool.push(commands.spawn((PointLight { intensity: 0.0, shadows_enabled: false, ..default() }, Transform::default(), Visibility::Hidden, FxLight, Dynamic)).id());
+    }
+    let score = |r: &LightRequest| {
+        let d = (r.pos.distance(cam) - r.range).max(0.0);
+        r.intensity / (1.0 + d * d)
+    };
+    requests.sort_by(|a, b| score(b).total_cmp(&score(a)));
+    for (i, e) in pool.iter().enumerate() {
+        let Ok((mut pl, mut t, mut gt, mut vis)) = lights.get_mut(*e) else { continue };
+        match requests.get(i) {
+            Some(r) => {
+                pl.color = r.color.into();
+                pl.intensity = r.intensity;
+                pl.range = r.range;
+                *t = Transform::from_translation(r.pos);
+                *gt = GlobalTransform::from(*t);
+                *vis = Visibility::Visible;
+            }
+            None => *vis = Visibility::Hidden,
+        }
+    }
 }

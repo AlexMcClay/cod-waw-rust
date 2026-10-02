@@ -157,6 +157,9 @@ pub struct MaterialInfo {
     pub atlas: (u8, u8),
     /// One bit per surface type (see [`fx::SURFACE_TYPES`]).
     pub surface_type_bits: u32,
+    /// File position and count of the constant table (`MaterialConstantDef`,
+    /// 32 bytes: name hash, 12-char name, vec4).
+    pub constants: Option<(usize, usize)>,
 }
 
 impl MaterialInfo {
@@ -718,6 +721,22 @@ impl ZoneData {
         let o = p + 8 * idx as usize;
         let b = self.data.get(o..o + 4)?;
         Some(RenderState(u32::from_le_bytes([b[0], b[1], b[2], b[3]])))
+    }
+
+    /// A material constant by name (e.g. `featherParms`), as the material
+    /// stores it.
+    pub fn material_constant(&self, m: &MaterialInfo, name: &str) -> Option<[f32; 4]> {
+        let (p, n) = m.constants?;
+        (0..n).find_map(|i| {
+            let o = p + 32 * i;
+            let raw = self.data.get(o + 4..o + 16)?;
+            let end = raw.iter().position(|&b| b == 0).unwrap_or(12);
+            if !raw[..end].eq_ignore_ascii_case(name.as_bytes()) {
+                return None;
+            }
+            let v = self.data.get(o + 16..o + 32)?;
+            Some([0, 4, 8, 12].map(|k| f32::from_le_bytes([v[k], v[k + 1], v[k + 2], v[k + 3]])))
+        })
     }
 
     /// A raw file's text (scripts, `.vision` files).

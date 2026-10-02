@@ -768,7 +768,8 @@ impl<'a> Walker<'a> {
             }
             v => self.tex_tables.get(&decode_ptr(v).1).cloned().unwrap_or_default(),
         };
-        self.reusable(h.u32(0x68), 16, 32 * h.u8(0x5c) as usize)?;
+        let constant_count = h.u8(0x5c) as usize;
+        let constants = self.reusable(h.u32(0x68), 16, 32 * constant_count)?.map(|p| (p, constant_count));
         let state_count = h.u8(0x5d) as usize;
         let state_bits = self.reusable(h.u32(0x6c), 4, 8 * state_count)?.map(|p| (p, state_count));
         self.pop();
@@ -783,6 +784,7 @@ impl<'a> Walker<'a> {
             state_entry,
             atlas: (h.u8(6), h.u8(7)),
             surface_type_bits: h.u32(0x10),
+            constants,
         });
         Ok((AssetRef::Material(idx), name))
     }
