@@ -744,9 +744,11 @@ fn simulate(
     mut models: Query<&mut Transform, (With<FxModel>, Without<FxBatch>)>,
     mut alias: EventWriter<crate::audio::PlayAlias>,
     nacht: Option<Res<crate::nacht::NachtAssets>>,
+    world: Option<Res<crate::World>>,
 ) {
     let dt = time.delta_secs().min(0.1);
     let Ok(cam) = camera.single() else { return };
+    let mesh = world.as_ref().and_then(|w| w.mesh.clone());
     let cam_pos = cam.translation();
     let cam_right = cam.right().as_vec3();
     let cam_up = cam.up().as_vec3();
@@ -907,21 +909,43 @@ fn simulate(
                         }
                     }
                     (et::DECAL, Some(Visual::Decal(m))) => {
-                        let (y, z) = (dir_to_bevy(orient.y_axis), dir_to_bevy(orient.z_axis));
-                        let (s, c) = lk0.rotation.sin_cos();
-                        let (ry, rz) = (y * c + z * s, -y * s + z * c);
+                        // A decal marks the world where it lands: the game
+                        // projects it onto geometry within its size around
+                        // the effect. Blood from a zombie in the open has
+                        // nothing to land on (it used to hang in the air).
                         let half = Vec2::new(lk0.size[0], lk0.size[1]) * INCH;
-                        let center = to_bevy(pos) + dir_to_bevy(orient.x_axis) * 0.004;
-                        let corners = [
-                            center - ry * half.x - rz * half.y,
-                            center + ry * half.x - rz * half.y,
-                            center + ry * half.x + rz * half.y,
-                            center - ry * half.x + rz * half.y,
-                        ];
-                        let uv = atlas_uv(&e.atlas, lib.materials[*m].1, p.atlas0 as u32, 0.0, 0.0);
-                        decals.list.push(Decal { material: *m, corners, uv, color: lk0.color, age: 0.0 });
-                        if decals.list.len() > MAX_DECALS {
-                            decals.list.remove(0);
+                        let x = dir_to_bevy(orient.x_axis).normalize_or_zero();
+                        let o = to_bevy(pos);
+                        let reach = half.max_element().max(2.0 * INCH) + 0.02;
+                        let v = |a: Vec3| zm_core::geom::V3::new(a.x, a.y, a.z);
+                        let surface = mesh.as_ref().and_then(|mesh| {
+                            [-x, x].into_iter().find_map(|d| {
+                                let start = o - d * 0.02;
+                                mesh.raycast(v(start), v(d), reach).map(|h| {
+                                    let n = Vec3::new(h.normal.x, h.normal.y, h.normal.z);
+                                    (start + d * h.t, if n.dot(d) > 0.0 { -n } else { n })
+                                })
+                            })
+                        });
+                        if let Some((at, n)) = surface {
+                            // The effect's own axes, laid flat on the surface.
+                            let y0 = dir_to_bevy(orient.y_axis);
+                            let y = (y0 - n * y0.dot(n)).try_normalize().unwrap_or_else(|| n.any_orthonormal_vector());
+                            let z = n.cross(y);
+                            let (s, c) = lk0.rotation.sin_cos();
+                            let (ry, rz) = (y * c + z * s, -y * s + z * c);
+                            let center = at + n * 0.004;
+                            let corners = [
+                                center - ry * half.x - rz * half.y,
+                                center + ry * half.x - rz * half.y,
+                                center + ry * half.x + rz * half.y,
+                                center - ry * half.x + rz * half.y,
+                            ];
+                            let uv = atlas_uv(&e.atlas, lib.materials[*m].1, p.atlas0 as u32, 0.0, 0.0);
+                            decals.list.push(Decal { material: *m, corners, uv, color: lk0.color, age: 0.0 });
+                            if decals.list.len() > MAX_DECALS {
+                                decals.list.remove(0);
+                            }
                         }
                     }
                     _ => {}

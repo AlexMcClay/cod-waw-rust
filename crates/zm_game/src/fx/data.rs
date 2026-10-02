@@ -444,6 +444,12 @@ impl Gather<'_> {
                     }
                     t4fx::Visual::Model(m) => {
                         let n = self.zones[zi].xmodels[*m as usize].name.trim_start_matches(',').to_string();
+                        if n.starts_with("fx_decal_") {
+                            // Splats the engine sticks onto the character
+                            // that was hit (fx_decal_character_blood, 20 s);
+                            // as a free model it hung in the air.
+                            continue;
+                        }
                         self.models.insert(n.clone());
                         visuals.push(Visual::Model(n));
                     }
