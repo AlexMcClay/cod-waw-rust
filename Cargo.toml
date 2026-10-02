@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = ["crates/zm_core", "crates/waw_assets", "crates/zm_game"]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "GPL-3.0-only"
+
+# Fast-ish debug builds: optimise dependencies (Bevy) but not our own code.
+[profile.dev]
+opt-level = 1
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+opt-level = 3
+codegen-units = 16
+lto = "thin"
+strip = true

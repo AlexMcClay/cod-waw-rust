@@ -1,0 +1,8 @@
+[package]
+name = "zm_core"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+description = "Engine-independent rules, level data, navigation and asset decoders for Undead Rounds"
+
+[dependencies]

@@ -1,0 +1,9 @@
+[package]
+name = "waw_assets"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+description = "Reads assets from a user's own Call of Duty: World at War install (IWD archives, fastfile zones, IWI images)"
+
+[dependencies]
+flate2 = "1"

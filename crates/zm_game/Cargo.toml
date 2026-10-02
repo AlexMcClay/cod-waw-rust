@@ -1,0 +1,16 @@
+[package]
+name = "zm_game"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+description = "Undead Rounds - a round-based zombie survival game built with Bevy"
+
+[[bin]]
+name = "undead_rounds"
+path = "src/main.rs"
+
+[dependencies]
+zm_core = { path = "../zm_core" }
+waw_assets = { path = "../waw_assets" }
+bevy = { version = "0.16", features = ["wav"] }
+fastrand = "2"

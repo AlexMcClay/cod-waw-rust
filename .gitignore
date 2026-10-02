@@ -1,0 +1,27 @@
+# Build output
+/target
+/dist
+
+# Python
+__pycache__/
+*.pyc
+
+# --- research/: keep notes, scripts and reports; never commit game content ---
+# Everything below is derived from the user's own World at War install
+# (Activision content). It stays on disk for local work but out of git.
+/research/data/
+/research/t4/zone.bin
+/research/t4/*.obj
+/research/t4/*.mtl
+/research/t4/xanim_out/*.obj
+/research/t4/*_info.json
+/research/t4/world_*.json
+/research/t4/sounds.json
+/research/t4/nacht_mapents.txt
+# OpenAssetTools: binaries, its asset dumps, and the full source clone
+/research/t4/oat/*.exe
+/research/t4/oat/*.zip
+/research/t4/oat/dump/
+/research/t4/oat/dump_common/
+/research/t4/oat/raw/
+/research/t4/gen/OAT/
