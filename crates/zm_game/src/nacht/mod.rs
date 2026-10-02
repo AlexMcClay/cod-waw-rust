@@ -118,7 +118,7 @@ pub fn spawn_part(commands: &mut Commands, part: &PartAssets, joints: &mut Vec<J
             continue;
         }
         let parent_e = parent.and_then(|p| mine.get(p).copied()).unwrap_or(root);
-        let e = commands.spawn((*local, ChildOf(parent_e))).id();
+        let e = commands.spawn((*local, ChildOf(parent_e), Name::new(name.clone()))).id();
         joints.push((name.clone(), e, *local));
         mine.push(e);
     }
@@ -316,9 +316,10 @@ fn poll_load(
 
     commands.insert_resource(crate::MapRules(scene.rules.clone()));
     let NachtScene {
-        images: imgs, lightmap_pages, irradiance, fog, film, lights, materials: mdefs, world, submodels, models, static_models, sky_model, sky_scale, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, weapon_stats, flesh_penetration, ..
+        images: imgs, lightmap_pages, irradiance, fog, film, lights, materials: mdefs, world, submodels, models, static_models, sky_model, sky_scale, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, weapon_stats, flesh_penetration, fx, ..
     } = scene;
     crate::audio::apply_zone_weapon_stats(&mut defs.0, &weapon_stats, flesh_penetration);
+    commands.insert_resource(crate::fx::PendingFx(fx));
     let image_handles: HashMap<String, Handle<Image>> = imgs.into_iter().map(|(k, v)| (k, images.add(v))).collect();
     let mat_handles: Vec<Handle<StandardMaterial>> = mdefs
         .iter()

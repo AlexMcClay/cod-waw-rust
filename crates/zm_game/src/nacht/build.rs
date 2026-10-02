@@ -340,6 +340,8 @@ pub struct NachtScene {
     /// Round, zombie and points rules from the map's scripts.
     pub rules: zm_core::rules::ZombieRules,
     pub load_secs: f32,
+    /// Effects the map and its weapons use.
+    pub fx: crate::fx::data::FxData,
 }
 
 /// Which zones' assets a material/model index refers to.
@@ -1536,6 +1538,9 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     aliases.extend(map.ambient.iter().map(|a| a.alias.clone()));
     aliases.sort();
     aliases.dedup();
+    let weapon_zone_names: Vec<(&str, &str)> = wanted.weapon_ids.iter().map(|&id| (id, zone_weapon_name(id))).collect();
+    let fx = crate::fx::data::extract(&zones, iwd, bc, &weapon_zone_names);
+    aliases.extend(fx.sound_aliases.iter().cloned());
     let sounds = collect_sounds(&zones, iwd, &aliases);
     let localized = |key: &str| zones.iter().find_map(|z| z.localized(key).or_else(|| z.localized(key.trim_start_matches('&'))).map(str::to_string));
     let weapon_world_models: HashMap<String, String> = wanted
@@ -1547,7 +1552,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
             Some((id.to_string(), name))
         })
         .collect();
-    for name in weapon_world_models.values() {
+    for name in weapon_world_models.values().chain(fx.models.iter()) {
         if !models.contains_key(name) {
             if let Some(m) = b.model(name) {
                 models.insert(name.clone(), m);
@@ -1618,6 +1623,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         view_models,
         rules,
         load_secs: t0.elapsed().as_secs_f32(),
+        fx,
     })
 }
 

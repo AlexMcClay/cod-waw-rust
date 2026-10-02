@@ -495,7 +495,7 @@ fn fire(
     mut player: Query<(&Transform, &mut PlayerCtl), With<Player>>,
     mut zq: Query<(Entity, &Transform, &mut Zombie), Without<Player>>,
     (mut sfx, mut points, mut killed): (EventWriter<PlaySfx>, EventWriter<PointsEvent>, EventWriter<ZombieKilled>),
-    (zs, mut alias): (Res<ZoneSounds>, EventWriter<PlayAlias>),
+    (zs, mut alias, mut fx): (Res<ZoneSounds>, EventWriter<PlayAlias>, EventWriter<crate::fx::FxEvent>),
     mut commands: Commands,
     mats: Res<Mats>,
 ) {
@@ -552,6 +552,7 @@ fn fire(
     gun.since_shot = Some(0.0);
     gun.kick = 1.0;
     gun.flash = 0.05;
+    fx.write(crate::fx::FxEvent::MuzzleFlash { weapon: def.id });
     ctl.recoil += def.kick * 0.012 * (1.0 - 0.5 * ctl.ads);
     // The last round may have its own sound (the Garand's ping).
     match zs.weapon_field(def.id, "fireLastSoundPlayer").filter(|_| left == 0) {
@@ -622,6 +623,7 @@ fn fire(
                 earn(&mut score, &mut points, &pu, rules::POINTS_HIT);
                 spawn_burst(&mut commands, &mats, at, &mats.blood, 4, 1.5);
             }
+            fx.write(crate::fx::FxEvent::FleshImpact { weapon: def.id, pos: at, dir, head: loc.is_head(), fatal: dead });
             remaining -= if def.flesh_penetration > 0.0 { flesh_thickness(loc) / def.flesh_penetration } else { 1.0 };
             if def.is_projectile() || remaining <= 0.0 {
                 end_t = d;
@@ -633,6 +635,7 @@ fn fire(
         tracers.0.push((muzzle, end, if def.kind == Kind::Wonder { 0.12 } else { 0.035 }, color));
         if end_t >= wall_t && end_t < max {
             spawn_burst(&mut commands, &mats, end - dir * 0.05, &mats.spark, 3, 2.0);
+            fx.write(crate::fx::FxEvent::BulletImpact { weapon: def.id, pos: end, dir });
         }
 
         // The explosion where a projectile lands (Ray Gun): from the inner
@@ -641,6 +644,7 @@ fn fire(
         if def.splash_radius > 0.0 {
             let at = end - dir * 0.05;
             spawn_burst(&mut commands, &mats, at, &mats.glow_green, 14, 4.0);
+            fx.write(crate::fx::FxEvent::Explosion { weapon: def.id, pos: at });
             for (_, t, mut z) in zq.iter_mut() {
                 if !z.alive() {
                     continue;
@@ -697,7 +701,7 @@ fn knife(
     player: Query<&Transform, With<Player>>,
     mut zq: Query<(&Transform, &mut Zombie), Without<Player>>,
     (mut points, mut killed): (EventWriter<PointsEvent>, EventWriter<ZombieKilled>),
-    (zs, defs, loadout, mut alias): (Res<ZoneSounds>, Res<Defs>, Option<Res<Loadout>>, EventWriter<PlayAlias>),
+    (zs, defs, loadout, mut alias, mut fx): (Res<ZoneSounds>, Res<Defs>, Option<Res<Loadout>>, EventWriter<PlayAlias>, EventWriter<crate::fx::FxEvent>),
     mut commands: Commands,
     mats: Res<Mats>,
 ) {
@@ -736,7 +740,9 @@ fn knife(
         let hit_point = pos + Vec3::Y * 1.2;
         alias.write(PlayAlias::at("melee_hit", hit_point));
         let lethal = z.hp <= melee_damage;
-        if zombies::apply_damage(&mut z, melee_damage, pu.insta_kill > 0.0) {
+        let fatal = zombies::apply_damage(&mut z, melee_damage, pu.insta_kill > 0.0);
+        fx.write(crate::fx::FxEvent::FleshImpact { weapon: held, pos: hit_point, dir: fwd, head: false, fatal });
+        if fatal {
             earn(&mut score, &mut points, &pu, rules::kill_points_with(KillKind::Melee, pu.insta_kill > 0.0, lethal));
             killed.write(ZombieKilled { pos, drop_allowed: true });
             spawn_burst(&mut commands, &mats, hit_point, &mats.blood, 10, 2.5);
@@ -750,6 +756,10 @@ fn knife(
 }
 
 pub fn spawn_burst(commands: &mut Commands, mats: &Mats, at: Vec3, mat: &Handle<StandardMaterial>, n: usize, speed: f32) {
+    // The game's own effects replace these stand-ins when they are loaded.
+    if crate::fx::live() {
+        return;
+    }
     for _ in 0..n {
         let v = Vec3::new(fastrand::f32() - 0.5, fastrand::f32() * 0.8, fastrand::f32() - 0.5).normalize_or_zero() * speed * (0.4 + fastrand::f32());
         let size = 0.03 + fastrand::f32() * 0.05;
