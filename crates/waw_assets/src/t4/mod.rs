@@ -39,7 +39,9 @@ pub enum AssetType {
     MapEnts,
     GfxWorld,
     LightDef,
+    Font,
     Localize,
+    SndDriverGlobals,
     Weapon,
     Fx,
     ImpactFx,
@@ -67,6 +69,8 @@ impl AssetType {
             16 => MapEnts,
             17 => GfxWorld,
             18 => LightDef,
+            20 => Font,
+            25 => SndDriverGlobals,
             23 => Localize,
             24 => Weapon,
             26 => Fx,
@@ -369,6 +373,32 @@ impl WeaponInfo {
     }
 }
 
+/// A bitmap font (`Font_s`): glyphs in a shared atlas image.
+#[derive(Debug, Clone)]
+pub struct FontInfo {
+    pub name: String,
+    /// Height of the line box in atlas pixels.
+    pub pixel_height: i32,
+    pub glyph_count: usize,
+    pub glyphs_fpos: Option<usize>,
+    pub material: Option<u32>,
+}
+
+/// One character of a [`FontInfo`]. Positions are in atlas pixels relative
+/// to the text origin, which is the bottom of the line box.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Glyph {
+    pub letter: u16,
+    pub x0: i8,
+    pub y0: i8,
+    /// Advance to the next character.
+    pub dx: u8,
+    pub width: u8,
+    pub height: u8,
+    /// Atlas texture coordinates `s0, t0, s1, t1`.
+    pub uv: [f32; 4],
+}
+
 /// Everything the walk extracted from one zone.
 #[derive(Debug, Default)]
 pub struct ZoneData {
@@ -382,6 +412,7 @@ pub struct ZoneData {
     pub sounds: Vec<SoundList>,
     pub loaded_sounds: Vec<LoadedSoundInfo>,
     pub weapons: Vec<WeaponInfo>,
+    pub fonts: Vec<FontInfo>,
     pub xanims: Vec<XAnimInfo>,
     pub world: Option<WorldInfo>,
     pub map_ents: Option<String>,
@@ -432,6 +463,31 @@ impl ZoneData {
         &self.data[s.fpos..s.fpos + s.len]
     }
 
+    pub fn font(&self, name: &str) -> Option<&FontInfo> {
+        self.fonts.iter().find(|f| f.name.eq_ignore_ascii_case(name))
+    }
+
+    /// A font's glyph table.
+    pub fn glyphs(&self, font: &FontInfo) -> Vec<Glyph> {
+        let Some(p) = font.glyphs_fpos else { return Vec::new() };
+        let d = &self.data;
+        let f32_at = |o: usize| f32::from_le_bytes([d[o], d[o + 1], d[o + 2], d[o + 3]]);
+        (0..font.glyph_count)
+            .filter_map(|i| {
+                let o = p + 24 * i;
+                (o + 24 <= d.len()).then(|| Glyph {
+                    letter: u16::from_le_bytes([d[o], d[o + 1]]),
+                    x0: d[o + 2] as i8,
+                    y0: d[o + 3] as i8,
+                    dx: d[o + 4],
+                    width: d[o + 5],
+                    height: d[o + 6],
+                    uv: [f32_at(o + 8), f32_at(o + 12), f32_at(o + 16), f32_at(o + 20)],
+                })
+            })
+            .collect()
+    }
+
     pub fn localized(&self, key: &str) -> Option<&str> {
         self.localize.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
     }
@@ -458,6 +514,25 @@ mod tests {
         let lod0: usize = m.surfs[m.lod_surfs(0)].iter().map(|s| s.tri_count as usize).sum();
         assert_eq!((m.bones.len(), lod0), (28, 668));
         assert_eq!(zd.weapon("kar98k").and_then(|w| w.sound("fireSound")), Some("weap_kar98k_fire"));
+    }
+
+    /// The game's bitmap fonts come from code_post_gfx.ff.
+    #[test]
+    #[ignore]
+    fn reads_fonts() {
+        let root = std::env::var("UNDEAD_WAW").expect("set UNDEAD_WAW");
+        let ff = std::fs::read(std::path::Path::new(&root).join("zone/english/code_post_gfx.ff")).unwrap();
+        let zd = walk(crate::zone::decompress(&ff).unwrap());
+        assert_eq!(zd.unresolved, 0);
+        let names: Vec<&str> = zd.fonts.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names.len(), 9, "{names:?} stopped {:?} at {}", zd.stopped, zd.end_pos);
+        let f = zd.font("fonts/objectiveFont").unwrap();
+        assert_eq!((f.pixel_height, f.glyph_count), (28, 191));
+        let g = zd.glyphs(f);
+        assert_eq!(g[0].letter, 32);
+        assert_eq!(g[(b'0' - 32) as usize].dx, 13);
+        let m = &zd.materials[f.material.unwrap() as usize];
+        assert_eq!(m.textures.first().and_then(|t| t.image).map(|i| zd.image_name(i)), Some("gamefonts_pc"));
     }
 
     #[test]

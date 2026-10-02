@@ -74,6 +74,10 @@ pub struct CharAssets {
     pub heads: Vec<PartAssets>,
 }
 
+/// The game's display names of our weapons ("Colt M1911", "Kar98k").
+#[derive(Resource, Default)]
+pub struct WeaponNames(pub HashMap<String, String>);
+
 /// First-person arms, guns and weapon animations.
 #[derive(Resource, Default)]
 pub struct ViewRig {
@@ -286,7 +290,7 @@ fn poll_load(
     info!("Nacht nav graph: {} nodes, {} links", nav.nodes.len(), nav.edges.iter().map(Vec::len).sum::<usize>() / 2);
 
     let NachtScene {
-        images: imgs, lightmap, materials: mdefs, world, submodels, models, static_models, sky_model, collision, entities, sounds, weapon_sounds, map, characters, view_models: vms, zombie_anims, view_rig: vr, ..
+        images: imgs, lightmap, materials: mdefs, world, submodels, models, static_models, sky_model, collision, entities, sounds, weapon_sounds, weapon_names, map, characters, view_models: vms, zombie_anims, view_rig: vr, ..
     } = scene;
     let image_handles: HashMap<String, Handle<Image>> = imgs.into_iter().map(|(k, v)| (k, images.add(v))).collect();
     let lightmap = lightmap.map(|l| images.add(l));
@@ -363,6 +367,7 @@ fn poll_load(
         })
         .collect();
     zone_sounds.weapons = weapon_sounds;
+    commands.insert_resource(WeaponNames(weapon_names));
     info!("Zone sounds: {} aliases, {} weapons", zone_sounds.aliases.len(), zone_sounds.weapons.len());
     let missing: Vec<&str> = build::GAME_ALIASES.iter().copied().filter(|a| !zone_sounds.has(a)).collect();
     if !missing.is_empty() {

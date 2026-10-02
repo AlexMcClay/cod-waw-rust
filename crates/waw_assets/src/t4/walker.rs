@@ -305,6 +305,8 @@ impl<'a> Walker<'a> {
             MapEnts => self.map_ents()?,
             GfxWorld => self.gfxworld()?,
             LightDef => self.light_def()?,
+            Font => self.font()?,
+            SndDriverGlobals => self.snd_driver_globals()?,
             Localize => self.localize()?,
             Weapon => self.weapon()?,
             Fx => self.fx()?,
@@ -1340,6 +1342,27 @@ impl<'a> Walker<'a> {
         self.asset(AssetType::Image, h.u32(4), None)?;
         self.pop();
         Ok((AssetRef::Other(AssetType::LightDef), name))
+    }
+
+    fn font(&mut self) -> R<(AssetRef, String)> {
+        let h = self.read(24)?;
+        self.push(VIRTUAL);
+        let name = self.xstring(h.u32(0))?.unwrap_or_default();
+        let material = self.asset_idx(AssetType::Material, h.u32(0xc), None)?;
+        self.asset(AssetType::Material, h.u32(0x10), None)?;
+        let glyph_count = h.i32(8).max(0) as usize;
+        let glyphs_fpos = self.reusable(h.u32(0x14), 4, 24 * glyph_count)?;
+        self.pop();
+        self.out.fonts.push(FontInfo { name: name.clone(), pixel_height: h.i32(4), glyph_count, glyphs_fpos, material });
+        Ok((AssetRef::Other(AssetType::Font), name))
+    }
+
+    fn snd_driver_globals(&mut self) -> R<(AssetRef, String)> {
+        let h = self.read(23556)?;
+        self.push(VIRTUAL);
+        let name = self.xstring(h.u32(0))?.unwrap_or_default();
+        self.pop();
+        Ok((AssetRef::Other(AssetType::SndDriverGlobals), name))
     }
 
     fn localize(&mut self) -> R<(AssetRef, String)> {

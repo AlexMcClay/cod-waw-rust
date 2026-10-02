@@ -1,361 +1,156 @@
-//! On-screen HUD: round counter, points (with floating +/- popups), ammo,
-//! interaction prompts, power-up timers, crosshair/hitmarker, damage overlay,
-//! banners and help. (Game over and pause screens live in `menu.rs`.)
+//! The in-game HUD, laid out like World at War's zombies HUD: chalk tally
+//! marks for the round, the score on its blood-red bar with floating point
+//! popups, the weapon name, clip and reserve ammo, use hints, the Reload
+//! warning, power-up timers, the nuke flash, the low-health overlay and the
+//! crosshair. (Game over and pause screens live in `menu.rs`.)
+//!
+//! Positions use the game's 640x480 virtual screen, scaled by the window
+//! height with left/right elements pinned to the edges. Text is drawn with
+//! the game's own bitmap fonts (`code_post_gfx.ff` glyph tables over the
+//! `gamefonts_pc` atlas); without an install, Bevy's font stands in.
+//!
+//! Each frame the HUD is described as a list of quads and texts, which are
+//! synced onto pools of UI nodes.
 
 use crate::audio::{AssetDir, SoundBank};
-use crate::waw::Waw;
 use crate::interact::Prompt;
 use crate::player::{Health, Player, PlayerCtl};
+use crate::powerups::PowerupGrabbed;
+use crate::waw::{Waw, WawImages};
 use crate::weapons::{Gun, Loadout};
-use crate::{ActivePowerups, Banner, Defs, GameState, PointsEvent, Round, Score};
+use crate::{ActivePowerups, Defs, GameState, PointsEvent, Round, Score};
 use bevy::prelude::*;
-use zm_core::rules;
+use bevy::window::PrimaryWindow;
+use std::collections::HashMap;
+use waw_assets::t4::Glyph;
+use zm_core::rules::{self, Powerup};
+use zm_core::weapons::Kind;
 
-#[derive(Component)]
-struct RoundText;
-#[derive(Component)]
-struct PointsText;
-#[derive(Component)]
-struct PopupLayer;
-#[derive(Component)]
-struct Popup {
-    ttl: f32,
-    y: f32,
-    positive: bool,
-}
-#[derive(Component)]
-struct AmmoText;
-#[derive(Component)]
-struct WeaponText;
-#[derive(Component)]
-struct PromptText;
-#[derive(Component)]
-struct PowerupText;
-#[derive(Component)]
-struct BannerText;
-#[derive(Component)]
-struct Crosshair;
-#[derive(Component)]
-struct HitMarker;
-#[derive(Component)]
-struct DamageOverlay;
-/// Power-up icon from the install (0 = insta-kill, 1 = double points).
-#[derive(Component)]
-struct PowerupIcon(u8);
+/// The zombie scripts' dark red.
+const DARK_RED: Color = Color::srgb(0.423, 0.004, 0.0);
 
 /// Parent of every HUD element; hidden outside gameplay.
 #[derive(Component)]
 struct HudRoot;
+
+/// Pooled image quad `n`.
+#[derive(Component)]
+struct QuadSlot(usize);
+
+/// Pooled fallback text `n` (no install).
+#[derive(Component)]
+struct TextSlot(usize);
+
 #[derive(Component)]
 struct HelpText;
 
+/// One raster size of the game's UI face.
+struct HudFont {
+    pixel_height: f32,
+    glyphs: HashMap<u16, Glyph>,
+}
+
+/// The game's fonts and HUD images, if the install has them.
 #[derive(Resource, Default)]
-struct BannerState {
-    ttl: f32,
+struct HudAssets {
+    atlas: Option<(Handle<Image>, Vec2)>,
+    /// Sorted by raster height.
+    fonts: Vec<HudFont>,
+    chalk: Vec<Option<Handle<Image>>>,
+    scorebar: Option<Handle<Image>>,
+    /// bullet, rifle bullet, shotgun shell.
+    ammo: [Option<(Handle<Image>, Vec2)>; 3],
+    low_health: Option<Handle<Image>>,
+}
+
+/// Animation state of the script-driven parts.
+#[derive(Resource, Default)]
+struct HudAnim {
+    /// Round shown by the chalk.
+    shown_round: u32,
+    /// Seconds since round 1 started (the intro), if running.
+    intro: Option<f32>,
+    /// Seconds into a round-change fade.
+    change: Option<f32>,
+    /// Seconds since the last round ended.
+    round_end: Option<f32>,
+    was_intermission: bool,
+    popups: Vec<PopupAnim>,
+    max_ammo: Option<f32>,
+    nuke: Option<f32>,
+    /// Seconds into the session (for the help hint).
+    session: f32,
+}
+
+struct PopupAnim {
+    value: i32,
+    t: f32,
+    dx: f32,
+    dy: f32,
 }
 
 pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<BannerState>()
-            .add_systems(Startup, spawn_hud)
-            .add_systems(
-                Update,
-                (update_texts, popups, banner, crosshair, damage_overlay, help_toggle, hud_visibility, powerup_icons),
-            );
+        app.init_resource::<HudAnim>()
+            .init_resource::<HudAssets>()
+            .add_systems(Startup, (load_hud_assets, spawn_hud))
+            .add_systems(Update, (animate, draw).chain())
+            .add_systems(Update, (help_toggle, hud_visibility))
+            .add_systems(OnEnter(GameState::Loading), reset_anim)
+            .add_systems(OnEnter(GameState::MainMenu), reset_anim);
     }
 }
 
-fn text(s: impl Into<String>, size: f32, color: Color) -> (Text, TextFont, TextColor) {
-    (Text::new(s), TextFont { font_size: size, ..default() }, TextColor(color))
+fn reset_anim(mut anim: ResMut<HudAnim>) {
+    *anim = HudAnim::default();
 }
 
-fn abs(left: Option<f32>, right: Option<f32>, top: Option<f32>, bottom: Option<f32>) -> Node {
-    Node {
-        position_type: PositionType::Absolute,
-        left: left.map(Val::Px).unwrap_or(Val::Auto),
-        right: right.map(Val::Px).unwrap_or(Val::Auto),
-        top: top.map(Val::Px).unwrap_or(Val::Auto),
-        bottom: bottom.map(Val::Px).unwrap_or(Val::Auto),
-        ..default()
-    }
-}
-
-fn spawn_hud(
-    mut commands: Commands,
+fn load_hud_assets(
     waw: Res<Waw>,
-    mut wimg: ResMut<crate::waw::WawImages>,
+    mut wimg: ResMut<WawImages>,
     mut images: ResMut<Assets<Image>>,
     device: Option<Res<bevy::render::renderer::RenderDevice>>,
+    mut assets: ResMut<HudAssets>,
 ) {
-    let root = commands
-        .spawn((
-            Node { position_type: PositionType::Absolute, width: Val::Percent(100.0), height: Val::Percent(100.0), ..default() },
-            Visibility::Hidden,
-            HudRoot,
-        ))
-        .id();
-    // The game's power-up icons, bottom centre, shown while active.
-    let icons: Vec<(u8, Handle<Image>)> = [(0u8, "specialty_instakill_zombies"), (1, "specialty_2x_zombies")]
-        .into_iter()
-        .filter_map(|(i, name)| wimg.get(&waw, &mut images, device.as_deref(), name, true, false).map(|h| (i, h)))
-        .collect();
-    if !icons.is_empty() {
-        commands
-            .spawn((
-                ChildOf(root),
-                Node {
-                    position_type: PositionType::Absolute,
-                    width: Val::Percent(100.0),
-                    bottom: Val::Percent(19.0),
-                    justify_content: JustifyContent::Center,
-                    column_gap: Val::Px(14.0),
-                    ..default()
-                },
-            ))
-            .with_children(|row| {
-                for (i, h) in icons {
-                    row.spawn((ImageNode::new(h), Node { width: Val::Px(56.0), height: Val::Px(56.0), ..default() }, Visibility::Hidden, PowerupIcon(i)));
-                }
-            });
+    let Some(install) = &waw.install else { return };
+    let device = device.as_deref();
+    let mut get = |name: &str| wimg.get(&waw, &mut images, device, name, true, false);
+    let atlas = get("gamefonts_pc");
+    assets.chalk = (1..=5).map(|i| get(&format!("chalkmarks_{i}"))).collect();
+    assets.scorebar = get("scorebar_zom_1");
+    assets.low_health = get("overlay_low_health");
+    let ammo_names = ["ammo_counter_bullet", "ammo_counter_riflebullet", "ammo_counter_shotgunshell"];
+    let ammo: Vec<Option<Handle<Image>>> = ammo_names.iter().map(|n| get(n)).collect();
+    let size = |h: &Handle<Image>| images.get(h).map(|i| i.size().as_vec2());
+    for (slot, h) in assets.ammo.iter_mut().zip(ammo) {
+        *slot = h.and_then(|h| size(&h).map(|s| (h, s)));
     }
-    let blood = Color::srgb(0.7, 0.05, 0.03);
-    let pale = Color::srgb(0.92, 0.9, 0.82);
+    assets.atlas = atlas.and_then(|h| size(&h).map(|s| (h, s)));
+    // The glyph tables live in code_post_gfx.ff.
+    let zone = std::fs::read(install.fastfile("code_post_gfx"))
+        .ok()
+        .and_then(|raw| waw_assets::zone::decompress(&raw).ok())
+        .map(waw_assets::t4::walk);
+    if let Some(zd) = zone {
+        for name in ["fonts/smallFont", "fonts/objectiveFont", "fonts/normalFont", "fonts/bigFont"] {
+            if let Some(f) = zd.font(name) {
+                let glyphs = zd.glyphs(f).into_iter().map(|g| (g.letter, g)).collect();
+                assets.fonts.push(HudFont { pixel_height: f.pixel_height as f32, glyphs });
+            }
+        }
+        assets.fonts.sort_by(|a, b| a.pixel_height.total_cmp(&b.pixel_height));
+    }
+    info!("HUD: {} game fonts, atlas {}", assets.fonts.len(), assets.atlas.is_some());
+}
 
-    // Damage overlay (below everything else).
+fn spawn_hud(mut commands: Commands) {
     commands.spawn((
-        ChildOf(root),
         Node { position_type: PositionType::Absolute, width: Val::Percent(100.0), height: Val::Percent(100.0), ..default() },
-        BackgroundColor(Color::srgba(0.6, 0.0, 0.0, 0.0)),
-        DamageOverlay,
+        Visibility::Hidden,
+        HudRoot,
     ));
-
-    commands.spawn((
-        ChildOf(root),abs(Some(40.0), None, None, Some(30.0)), text("", 96.0, blood), RoundText));
-    commands.spawn((
-        ChildOf(root),abs(None, Some(40.0), None, Some(120.0)), text("500", 40.0, Color::srgb(1.0, 0.85, 0.3)), PointsText));
-    commands.spawn((
-        ChildOf(root),
-        Node { position_type: PositionType::Absolute, right: Val::Px(40.0), bottom: Val::Px(165.0), width: Val::Px(160.0), height: Val::Px(200.0), ..default() },
-        PopupLayer,
-    ));
-    commands.spawn((
-        ChildOf(root),abs(None, Some(40.0), None, Some(70.0)), text("", 34.0, pale), AmmoText));
-    commands.spawn((
-        ChildOf(root),abs(None, Some(40.0), None, Some(40.0)), text("", 22.0, Color::srgb(0.75, 0.75, 0.7)), WeaponText));
-
-    // Centred column for prompt / power-ups / banner.
-    let column = |commands: &mut Commands, top: Val, size: f32, color: Color, marker: (bool, bool, bool)| {
-        let mut e = commands.spawn((ChildOf(root), Node {
-            position_type: PositionType::Absolute,
-            width: Val::Percent(100.0),
-            top,
-            justify_content: JustifyContent::Center,
-            ..default()
-        }));
-        e.with_children(|p| {
-            let mut c = p.spawn((text("", size, color), TextLayout::new_with_justify(JustifyText::Center)));
-            if marker.0 {
-                c.insert(PromptText);
-            }
-            if marker.1 {
-                c.insert(PowerupText);
-            }
-            if marker.2 {
-                c.insert(BannerText);
-            }
-        });
-    };
-    column(&mut commands, Val::Percent(68.0), 26.0, pale, (true, false, false));
-    column(&mut commands, Val::Percent(85.0), 24.0, Color::srgb(0.5, 1.0, 0.5), (false, true, false));
-    column(&mut commands, Val::Percent(18.0), 64.0, blood, (false, false, true));
-
-    // Crosshair: four ticks around the centre.
-    commands
-        .spawn((
-            ChildOf(root),
-            Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            Crosshair,
-        ))
-        .with_children(|p| {
-            p.spawn(Node { width: Val::Px(30.0), height: Val::Px(30.0), ..default() }).with_children(|c| {
-                let tick = |c: &mut ChildSpawnerCommands, l: f32, t: f32, w: f32, h: f32| {
-                    c.spawn((
-                        Node { position_type: PositionType::Absolute, left: Val::Px(l), top: Val::Px(t), width: Val::Px(w), height: Val::Px(h), ..default() },
-                        BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.8)),
-                    ));
-                };
-                tick(c, 14.0, 0.0, 2.0, 8.0);
-                tick(c, 14.0, 22.0, 2.0, 8.0);
-                tick(c, 0.0, 14.0, 8.0, 2.0);
-                tick(c, 22.0, 14.0, 8.0, 2.0);
-            });
-        });
-    commands
-        .spawn((
-            ChildOf(root),
-            Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-        ))
-        .with_children(|p| {
-            p.spawn((text("X", 30.0, Color::srgba(1.0, 1.0, 1.0, 0.0)), HitMarker));
-        });
-
-    commands.spawn((
-        ChildOf(root),
-        abs(Some(16.0), None, Some(12.0), None),
-        text("", 16.0, Color::srgba(0.85, 0.85, 0.8, 0.85)),
-        HelpText,
-    ));
-
-}
-
-#[allow(clippy::type_complexity)]
-fn update_texts(
-    (round, score, defs, pu, prompt): (Res<Round>, Res<Score>, Res<Defs>, Res<ActivePowerups>, Res<Prompt>),
-    loadout: Option<Res<Loadout>>,
-    gun: Res<Gun>,
-    mut q: ParamSet<(
-        Query<&mut Text, With<RoundText>>,
-        Query<&mut Text, With<PointsText>>,
-        Query<&mut Text, With<AmmoText>>,
-        Query<&mut Text, With<WeaponText>>,
-        Query<&mut Text, With<PromptText>>,
-        Query<&mut Text, With<PowerupText>>,
-    )>,
-) {
-    if let Ok(mut t) = q.p0().single_mut() {
-        t.0 = if round.0.round == 0 { String::new() } else { round.0.round.to_string() };
-    }
-    if let Ok(mut t) = q.p1().single_mut() {
-        t.0 = score.points.to_string();
-    }
-    if let Some(l) = loadout {
-        let slot = l.current();
-        let def = &defs.0[slot.def];
-        if let Ok(mut t) = q.p2().single_mut() {
-            t.0 = if gun.reload.is_some() { "reloading...".into() } else { format!("{}  /  {}", slot.clip, slot.reserve) };
-        }
-        if let Ok(mut t) = q.p3().single_mut() {
-            let other = l.slots.iter().enumerate().filter(|(i, _)| *i != l.cur).map(|(_, s)| defs.0[s.def].name.clone()).collect::<Vec<_>>();
-            t.0 = if other.is_empty() { def.name.clone() } else { format!("{}   |   {}", def.name, other.join(", ")) };
-        }
-    }
-    if let Ok(mut t) = q.p4().single_mut() {
-        t.0 = prompt.0.clone();
-    }
-    if let Ok(mut t) = q.p5().single_mut() {
-        let mut parts = Vec::new();
-        if pu.insta_kill > 0.0 {
-            parts.push(format!("INSTA-KILL {:.0}", pu.insta_kill.ceil()));
-        }
-        if pu.double_points > 0.0 {
-            parts.push(format!("DOUBLE POINTS {:.0}", pu.double_points.ceil()));
-        }
-        t.0 = parts.join("      ");
-    }
-}
-
-fn popups(
-    mut commands: Commands,
-    time: Res<Time>,
-    mut events: EventReader<PointsEvent>,
-    layer: Query<Entity, With<PopupLayer>>,
-    mut q: Query<(Entity, &mut Node, &mut TextColor, &mut Popup)>,
-) {
-    let Ok(layer) = layer.single() else { return };
-    for ev in events.read() {
-        let positive = ev.0 >= 0;
-        let label = if positive { format!("+{}", ev.0) } else { ev.0.to_string() };
-        let x = fastrand::f32() * 60.0;
-        commands.entity(layer).with_children(|p| {
-            p.spawn((
-                Node { position_type: PositionType::Absolute, right: Val::Px(x), bottom: Val::Px(0.0), ..default() },
-                Text::new(label),
-                TextFont { font_size: 24.0, ..default() },
-                TextColor(if positive { Color::srgb(1.0, 0.85, 0.3) } else { Color::srgb(0.9, 0.2, 0.15) }),
-                Popup { ttl: 0.9, y: 0.0, positive },
-            ));
-        });
-    }
-    let dt = time.delta_secs();
-    for (e, mut node, mut color, mut p) in &mut q {
-        p.ttl -= dt;
-        if p.ttl <= 0.0 {
-            commands.entity(e).try_despawn();
-            continue;
-        }
-        p.y += dt * if p.positive { 90.0 } else { -40.0 };
-        node.bottom = Val::Px(p.y.max(-30.0));
-        color.0.set_alpha((p.ttl / 0.9).min(1.0));
-    }
-}
-
-fn banner(
-    time: Res<Time>,
-    mut events: EventReader<Banner>,
-    mut state: ResMut<BannerState>,
-    mut q: Query<(&mut Text, &mut TextColor), With<BannerText>>,
-) {
-    let Ok((mut t, mut c)) = q.single_mut() else { return };
-    for ev in events.read() {
-        t.0 = ev.0.clone();
-        state.ttl = 3.0;
-    }
-    state.ttl = (state.ttl - time.delta_secs()).max(0.0);
-    c.0.set_alpha((state.ttl / 0.8).min(1.0));
-}
-
-#[allow(clippy::type_complexity)]
-fn crosshair(
-    gun: Res<Gun>,
-    player: Query<&PlayerCtl, With<Player>>,
-    state: Res<State<GameState>>,
-    mut cross: Query<&mut Visibility, With<Crosshair>>,
-    mut hit: Query<(&mut TextColor, &mut TextFont), With<HitMarker>>,
-) {
-    let ads = player.single().map(|p| p.ads).unwrap_or(0.0);
-    if let Ok(mut v) = cross.single_mut() {
-        *v = if ads > 0.5 || *state.get() != GameState::Playing { Visibility::Hidden } else { Visibility::Inherited };
-    }
-    if let Ok((mut c, mut f)) = hit.single_mut() {
-        let a = (gun.hitmarker / 0.12).clamp(0.0, 1.0);
-        c.0 = if gun.headmarker { Color::srgba(1.0, 0.3, 0.2, a) } else { Color::srgba(1.0, 1.0, 1.0, a) };
-        f.font_size = 26.0 + a * 6.0;
-    }
-}
-
-fn damage_overlay(health: Res<Health>, mut q: Query<&mut BackgroundColor, With<DamageOverlay>>) {
-    if let Ok(mut bg) = q.single_mut() {
-        let missing = 1.0 - (health.hp / rules::PLAYER_MAX_HEALTH).clamp(0.0, 1.0);
-        let a = (missing * 0.45 + health.flash * 0.25).min(0.7);
-        bg.0 = Color::srgba(0.55, 0.0, 0.0, a);
-    }
-}
-
-/// Shows active power-up icons, blinking during their last five seconds.
-fn powerup_icons(time: Res<Time>, pu: Res<ActivePowerups>, mut q: Query<(&PowerupIcon, &mut Visibility, &mut Node)>) {
-    for (icon, mut vis, mut node) in &mut q {
-        let left = if icon.0 == 0 { pu.insta_kill } else { pu.double_points };
-        let blink = left < 5.0 && (time.elapsed_secs() * 6.0).sin() < 0.0;
-        *vis = if left > 0.0 && !blink { Visibility::Inherited } else { Visibility::Hidden };
-        // Hidden icons take no space so the others stay centred.
-        node.display = if left > 0.0 { Display::Flex } else { Display::None };
-    }
 }
 
 fn hud_visibility(state: Res<State<GameState>>, mut q: Query<&mut Visibility, With<HudRoot>>) {
@@ -368,26 +163,569 @@ fn hud_visibility(state: Res<State<GameState>>, mut q: Query<&mut Visibility, Wi
     }
 }
 
-fn help_toggle(
-    keys: Res<ButtonInput<KeyCode>>,
+// ---------------------------------------------------------------------------
+// Drawing
+
+#[derive(Clone, Copy, PartialEq)]
+enum H {
+    Left,
+    Center,
+    Right,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum V {
+    Top,
+    Middle,
+    Bottom,
+}
+
+struct QuadDesc {
+    image: Handle<Image>,
+    /// Screen rect in logical pixels.
+    rect: Rect,
+    /// Sub-rect of the image in texels.
+    uv: Option<Rect>,
+    color: Color,
+}
+
+struct TextDesc {
+    text: String,
+    pos: Vec2,
+    size: f32,
+    color: Color,
+    align: H,
+}
+
+/// The frame's HUD in screen pixels.
+struct Canvas<'a> {
+    w: f32,
+    h: f32,
+    /// Pixels per virtual unit.
+    u: f32,
+    assets: &'a HudAssets,
+    quads: Vec<QuadDesc>,
+    texts: Vec<TextDesc>,
+}
+
+impl Canvas<'_> {
+    /// A virtual position relative to an edge or the centre, in pixels.
+    fn at(&self, h: H, v: V, x: f32, y: f32) -> Vec2 {
+        let px = match h {
+            H::Left => 0.0,
+            H::Center => self.w * 0.5,
+            H::Right => self.w,
+        } + x * self.u;
+        let py = match v {
+            V::Top => 0.0,
+            V::Middle => self.h * 0.5,
+            V::Bottom => self.h,
+        } + y * self.u;
+        Vec2::new(px, py)
+    }
+
+    /// An image whose `align` corner sits at `p` (pixels), `size` in units.
+    fn image(&mut self, image: &Handle<Image>, p: Vec2, size: Vec2, align: (H, V), color: Color) {
+        let s = size * self.u;
+        let x = match align.0 {
+            H::Left => p.x,
+            H::Center => p.x - s.x * 0.5,
+            H::Right => p.x - s.x,
+        };
+        let y = match align.1 {
+            V::Top => p.y,
+            V::Middle => p.y - s.y * 0.5,
+            V::Bottom => p.y - s.y,
+        };
+        self.quads.push(QuadDesc { image: image.clone(), rect: Rect::new(x, y, x + s.x, y + s.y), uv: None, color });
+    }
+
+    fn solid(&mut self, rect: Rect, color: Color) {
+        self.quads.push(QuadDesc { image: Handle::default(), rect, uv: None, color });
+    }
+
+    /// The raster closest to (but not below) the drawn size, for sharp text.
+    fn font_for(&self, px: f32) -> Option<&HudFont> {
+        let f = &self.assets.fonts;
+        f.iter().find(|f| f.pixel_height >= px * 0.9).or(f.last())
+    }
+
+    fn measure(font: &HudFont, text: &str, scale: f32) -> f32 {
+        text.chars().map(|c| font.glyphs.get(&(c as u16)).or(font.glyphs.get(&(b'?' as u16))).map_or(0.0, |g| g.dx as f32)).sum::<f32>() * scale
+    }
+
+    /// Text `height` units tall whose line box is aligned at `p`: the
+    /// origin is the bottom of the box, like the game's.
+    fn text(&mut self, text: &str, p: Vec2, height: f32, align: (H, V), color: Color, shadow: bool) {
+        let px = height * self.u;
+        let origin_y = match align.1 {
+            V::Top => p.y + px,
+            V::Middle => p.y + px * 0.5,
+            V::Bottom => p.y,
+        };
+        let (Some(font), Some((atlas, atlas_size))) = (self.font_for(px), self.assets.atlas.clone()) else {
+            // Bevy's font stands in (no install).
+            let x = p.x;
+            self.texts.push(TextDesc { text: text.to_string(), pos: Vec2::new(x, origin_y - px), size: px * 0.9, color, align: align.0 });
+            return;
+        };
+        let scale = px / font.pixel_height;
+        let width = Self::measure(font, text, scale);
+        let mut pen = match align.0 {
+            H::Left => p.x,
+            H::Center => p.x - width * 0.5,
+            H::Right => p.x - width,
+        };
+        let mut glyph_quads = Vec::new();
+        for c in text.chars() {
+            let Some(g) = font.glyphs.get(&(c as u16)).or(font.glyphs.get(&(b'?' as u16))) else { continue };
+            if g.width > 0 && g.height > 0 {
+                let x = pen + g.x0 as f32 * scale;
+                let y = origin_y + g.y0 as f32 * scale;
+                let rect = Rect::new(x, y, x + g.width as f32 * scale, y + g.height as f32 * scale);
+                let uv = Rect::new(g.uv[0] * atlas_size.x, g.uv[1] * atlas_size.y, g.uv[2] * atlas_size.x, g.uv[3] * atlas_size.y);
+                glyph_quads.push((rect, uv));
+            }
+            pen += g.dx as f32 * scale;
+        }
+        if shadow {
+            let off = Vec2::splat((self.u * 0.75).max(1.0));
+            let a = color.alpha();
+            for (r, uv) in &glyph_quads {
+                let rect = Rect::from_corners(r.min + off, r.max + off);
+                self.quads.push(QuadDesc { image: atlas.clone(), rect, uv: Some(*uv), color: Color::srgba(0.0, 0.0, 0.0, a * 0.9) });
+            }
+        }
+        for (rect, uv) in glyph_quads {
+            self.quads.push(QuadDesc { image: atlas.clone(), rect, uv: Some(uv), color });
+        }
+    }
+}
+
+fn mix(a: Color, b: Color, t: f32) -> Color {
+    let (a, b) = (a.to_srgba(), b.to_srgba());
+    let t = t.clamp(0.0, 1.0);
+    Color::srgba(a.red + (b.red - a.red) * t, a.green + (b.green - a.green) * t, a.blue + (b.blue - a.blue) * t, a.alpha + (b.alpha - a.alpha) * t)
+}
+
+fn with_alpha(c: Color, a: f32) -> Color {
+    let mut c = c;
+    c.set_alpha(a.clamp(0.0, 1.0));
+    c
+}
+
+/// Advances the script-driven animations from game events.
+fn animate(
     time: Res<Time>,
+    state: Res<State<GameState>>,
+    round: Res<Round>,
+    mut anim: ResMut<HudAnim>,
+    mut points: EventReader<PointsEvent>,
+    mut grabbed: EventReader<PowerupGrabbed>,
+) {
+    if *state.get() != GameState::Playing {
+        points.clear();
+        grabbed.clear();
+        return;
+    }
+    let dt = time.delta_secs();
+    anim.session += dt;
+    let r = round.0.round;
+    if r != anim.shown_round && r > 0 {
+        if r == 1 {
+            anim.intro = Some(0.0);
+            anim.shown_round = 1;
+        } else if anim.change.is_none() {
+            anim.change = Some(0.0);
+        }
+    }
+    if let Some(t) = anim.change.as_mut() {
+        *t += dt;
+        // The new tally takes over halfway (faded out).
+        if *t >= 0.5 {
+            anim.shown_round = r;
+        }
+        if anim.change.is_some_and(|t| t >= 1.0) {
+            anim.change = None;
+        }
+    }
+    if let Some(t) = anim.intro.as_mut() {
+        *t += dt;
+        if *t > 7.0 {
+            anim.intro = None;
+        }
+    }
+    let intermission = round.0.in_intermission() && r > 0;
+    if intermission && !anim.was_intermission {
+        anim.round_end = Some(0.0);
+    }
+    anim.was_intermission = intermission;
+    if let Some(t) = anim.round_end.as_mut() {
+        *t += dt;
+        if *t > 15.0 {
+            anim.round_end = None;
+        }
+    }
+    for ev in points.read() {
+        anim.popups.push(PopupAnim { value: ev.0, t: 0.0, dx: -(20.0 + fastrand::f32() * 39.0), dy: -(-15.0 + fastrand::f32() * 30.0) });
+    }
+    for p in anim.popups.iter_mut() {
+        p.t += dt;
+    }
+    anim.popups.retain(|p| p.t < 0.5);
+    for ev in grabbed.read() {
+        match ev.0 {
+            Powerup::MaxAmmo => anim.max_ammo = Some(0.0),
+            Powerup::Nuke => anim.nuke = Some(0.0),
+            _ => {}
+        }
+    }
+    let anim = &mut *anim;
+    for t in [&mut anim.max_ammo, &mut anim.nuke] {
+        if let Some(v) = t.as_mut() {
+            *v += dt;
+            if *v > 2.5 {
+                *t = None;
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+fn draw(
+    window: Query<&Window, With<PrimaryWindow>>,
+    assets: Res<HudAssets>,
+    anim: Res<HudAnim>,
+    (score, defs, pu, prompt, health, gun): (Res<Score>, Res<Defs>, Res<ActivePowerups>, Res<Prompt>, Res<Health>, Res<Gun>),
+    loadout: Option<Res<Loadout>>,
+    names: Option<Res<crate::nacht::WeaponNames>>,
+    time: Res<Time>,
+    player: Query<(&PlayerCtl, &Projection), With<Player>>,
+    root: Query<Entity, With<HudRoot>>,
+    mut quads: Query<(&QuadSlot, &mut Node, &mut ImageNode, &mut Visibility), Without<TextSlot>>,
+    mut texts: Query<(&TextSlot, &mut Node, &mut Text, &mut TextFont, &mut TextColor, &mut Visibility), Without<QuadSlot>>,
+    mut commands: Commands,
+) {
+    let (Ok(win), Ok(root)) = (window.single(), root.single()) else { return };
+    let (w, h) = (win.width(), win.height());
+    let mut c = Canvas { w, h, u: h / 480.0, assets: &assets, quads: Vec::new(), texts: Vec::new() };
+    let t = time.elapsed_secs();
+
+    // Low-health overlay (under everything): pulses harder the lower the
+    // health, flashes on a hit.
+    if let Some(img) = &assets.low_health {
+        let hurt = 1.0 - (health.hp / rules::PLAYER_MAX_HEALTH).clamp(0.0, 1.0);
+        let pulse = 0.8 + 0.2 * (t * std::f32::consts::TAU / 0.8).sin();
+        let a = (hurt * 1.4 * pulse + health.flash * 0.6).min(1.0);
+        if a > 0.01 {
+            c.quads.push(QuadDesc { image: img.clone(), rect: Rect::new(0.0, 0.0, w, h), uv: None, color: with_alpha(Color::WHITE, a) });
+        }
+    } else {
+        let a = ((1.0 - health.hp / rules::PLAYER_MAX_HEALTH) * 0.45 + health.flash * 0.25).min(0.7);
+        c.solid(Rect::new(0.0, 0.0, w, h), Color::srgba(0.55, 0.0, 0.0, a));
+    }
+
+    draw_round(&mut c, &anim);
+    draw_score(&mut c, &anim, score.points);
+    if let Some(l) = &loadout {
+        draw_weapon(&mut c, l, &defs, names.as_deref(), &gun, t);
+    }
+
+    // Use hint: centred under the crosshair.
+    if !prompt.0.is_empty() {
+        let p = c.at(H::Center, V::Middle, 0.0, 85.0);
+        c.text(&prompt.0, p, 14.86, (H::Center, V::Bottom), Color::WHITE, true);
+    }
+
+    // Power-up timers: "Double Points: 27", "Insta-Kill: 12", "Max Ammo!".
+    let timer = |c: &mut Canvas, label: &str, secs: f32, y: f32| {
+        if secs > 0.0 {
+            let p = c.at(H::Center, V::Top, 0.0, y);
+            c.text(&format!("{label}: {}", secs.ceil() as i32), p, 24.0, (H::Center, V::Top), Color::WHITE, true);
+        }
+    };
+    timer(&mut c, "Double Points", pu.double_points, 350.0);
+    timer(&mut c, "Insta-Kill", pu.insta_kill, 380.0);
+    if let Some(m) = anim.max_ammo {
+        let k = ((m - 0.5) / 1.5).clamp(0.0, 1.0);
+        let a = (m / 0.5).min(1.0) * (1.0 - k);
+        let p = c.at(H::Center, V::Top, 0.0, 290.0 - 20.0 * k);
+        c.text("Max Ammo!", p, 24.0, (H::Center, V::Top), with_alpha(Color::WHITE, a), true);
+    }
+
+    draw_crosshair(&mut c, &player, &loadout, &defs, &gun);
+
+    // Nuke: a white flash over everything.
+    if let Some(n) = anim.nuke {
+        let a = if n < 0.2 { n / 0.2 * 0.8 } else if n < 0.5 { 0.8 } else { (0.8 * (1.0 - (n - 0.5) / 1.0)).max(0.0) };
+        c.solid(Rect::new(0.0, 0.0, w, h), with_alpha(Color::WHITE, a));
+    }
+
+    // The help hint for the first seconds of a session.
+    if anim.session < 10.0 {
+        let p = c.at(H::Left, V::Top, 8.0, 8.0);
+        let a = (10.0 - anim.session).min(1.0) * 0.6;
+        c.text("H - help", p, 10.0, (H::Left, V::Top), with_alpha(Color::WHITE, a), true);
+    }
+
+    sync(&mut commands, root, c.quads, c.texts, &mut quads, &mut texts);
+}
+
+/// The chalk tally (rounds 1-10), the round number from 11, and the intro.
+fn draw_round(c: &mut Canvas, anim: &HudAnim) {
+    let r = anim.shown_round;
+    if r == 0 {
+        return;
+    }
+    // Colour: red, whitening and blinking after a round ends.
+    let mut color = DARK_RED;
+    let mut alpha = 1.0;
+    if let Some(e) = anim.round_end {
+        let white = if e < 2.5 { e / 2.5 } else if e < 12.5 { 1.0 } else { 1.0 - (e - 12.5) / 2.5 };
+        color = mix(DARK_RED, Color::WHITE, white);
+        if (2.5..12.5).contains(&e) {
+            let k = (e - 2.5).fract();
+            alpha = if k < 0.5 { 1.0 - k * 2.0 } else { (k - 0.5) * 2.0 };
+        }
+    }
+    if let Some(ch) = anim.change {
+        alpha *= if ch < 0.5 { 1.0 - ch * 2.0 } else { (ch - 0.5) * 2.0 };
+    }
+    // Where the chalk sits: bottom-left, or sliding there during the intro.
+    let home = c.at(H::Left, V::Bottom, -5.0, 0.0);
+    let mut pos = home;
+    if let Some(i) = anim.intro {
+        let start = c.at(H::Center, V::Bottom, -5.0, -200.0);
+        let k = ((i - 4.75) / 1.75).clamp(0.0, 1.0);
+        pos = start.lerp(home, k);
+        alpha *= ((i - 1.5) / 0.5).clamp(0.0, 1.0);
+        // "Round" above it: fades in white, turns red, fades out.
+        let ra = (i / 1.0).min(1.0) * (1.0 - ((i - 4.5) / 1.0).clamp(0.0, 1.0));
+        let rc = mix(Color::WHITE, DARK_RED, ((i - 1.0) / 3.0).clamp(0.0, 1.0));
+        let p = c.at(H::Center, V::Bottom, 0.0, -265.0);
+        c.text("Round", p, 32.0, (H::Center, V::Bottom), with_alpha(rc, ra), false);
+    }
+    let col = with_alpha(color, alpha);
+    let chalk = |c: &mut Canvas, n: u32, p: Vec2| match c.assets.chalk.get(n as usize - 1).cloned().flatten() {
+        Some(img) => c.image(&img, p, Vec2::splat(64.0), (H::Left, V::Bottom), col),
+        None => c.text(&n.to_string(), p, 64.0, (H::Left, V::Bottom), col, false),
+    };
+    match r {
+        1..=5 => chalk(c, r, pos),
+        6..=10 => {
+            chalk(c, 5, pos);
+            chalk(c, r - 5, pos + Vec2::new(64.0 * c.u, 0.0));
+        }
+        _ => c.text(&r.to_string(), pos, 64.0, (H::Left, V::Bottom), col, false),
+    }
+}
+
+/// The score on its red brush stroke, and the floating point popups.
+fn draw_score(c: &mut Canvas, anim: &HudAnim, points: u32) {
+    let anchor = c.at(H::Right, V::Bottom, -103.0, -71.0);
+    if let Some(bar) = c.assets.scorebar.clone() {
+        let p = anchor + Vec2::new(-6.0 * c.u, 0.0);
+        c.image(&bar, p, Vec2::new(144.0, 20.0), (H::Left, V::Middle), Color::srgba(0.424, 0.004, 0.0, 0.8));
+    }
+    let size = 15.0;
+    let p = anchor + Vec2::new(6.0 * c.u, 0.0);
+    c.text(&points.to_string(), p, size, (H::Left, V::Middle), Color::WHITE, false);
+    for pop in &anim.popups {
+        let k = (pop.t / 0.5).min(1.0);
+        let p = anchor + Vec2::new(pop.dx, pop.dy) * k * c.u;
+        let a = if pop.t < 0.25 { 1.0 } else { 1.0 - (pop.t - 0.25) / 0.25 };
+        let (text, color) = if pop.value >= 1 { (format!("+{}", pop.value), Color::srgb(0.9, 0.9, 0.0)) } else { (pop.value.to_string(), DARK_RED) };
+        c.text(&text, p, 16.0, (H::Right, V::Middle), with_alpha(color, a), false);
+    }
+}
+
+/// Weapon name, clip icons, reserve ammo and the Reload warning.
+fn draw_weapon(c: &mut Canvas, l: &Loadout, defs: &Defs, names: Option<&crate::nacht::WeaponNames>, gun: &Gun, t: f32) {
+    let slot = l.current();
+    let def = &defs.0[slot.def];
+    let name = names.and_then(|n| n.0.get(def.id)).cloned().unwrap_or_else(|| def.name.clone());
+    let white = Color::srgba(1.0, 1.0, 1.0, 0.75);
+    let p = c.at(H::Right, V::Bottom, -15.0, -40.0);
+    c.text(&name, p, 14.86, (H::Right, V::Bottom), white, true);
+    let p = c.at(H::Right, V::Bottom, -75.0, 4.0);
+    c.text(&slot.reserve.to_string(), p, 14.86, (H::Left, V::Bottom), white, true);
+
+    // One icon per round in the clip: bullets in a row growing left,
+    // rifle rounds stacked.
+    let kind = match def.kind {
+        Kind::Rifle => 1,
+        Kind::Shotgun => 2,
+        _ => 0,
+    };
+    if let Some((img, size)) = c.assets.ammo[kind].clone() {
+        let base = c.at(H::Right, V::Bottom, -79.0, -4.0);
+        let col = Color::srgba(1.0, 1.0, 1.0, 0.65);
+        for i in 0..slot.clip.min(60) {
+            let step = if kind == 1 { Vec2::new(0.0, -(size.y + 1.0)) } else { Vec2::new(-(size.x + 1.0), 0.0) };
+            let p = base + step * i as f32 * c.u;
+            c.image(&img, p, size, (H::Right, V::Bottom), col);
+        }
+    } else {
+        let p = c.at(H::Right, V::Bottom, -79.0, 4.0);
+        c.text(&slot.clip.to_string(), p, 14.86, (H::Right, V::Bottom), white, true);
+    }
+
+    // Reload / LOW AMMO, pulsing, when the clip is a third full or less.
+    let low = def.clip > 0 && (slot.clip as f32) <= def.clip as f32 * 0.33 && gun.reload.is_none();
+    if low && !(slot.clip == 0 && slot.reserve == 0 && def.clip == 0) {
+        let k = 0.5 + 0.5 * (t * 1.7 * std::f32::consts::TAU).sin();
+        let (text, a, b) = if slot.reserve > 0 {
+            ("Reload", Color::srgba(0.7, 0.7, 0.7, 0.8), Color::WHITE)
+        } else if slot.clip > 0 {
+            ("LOW AMMO", Color::srgba(0.7, 0.7, 0.3, 0.8), Color::srgb(1.0, 1.0, 0.5))
+        } else {
+            ("NO AMMO", Color::srgba(0.8, 0.25, 0.25, 0.8), Color::srgb(1.0, 0.25, 0.25))
+        };
+        let p = c.at(H::Center, V::Middle, 0.0, 30.0);
+        c.text(text, p, 14.86, (H::Center, V::Middle), mix(a, b, k), true);
+    }
+}
+
+/// Four ticks around the centre, spread with the weapon's accuracy; gone
+/// when aiming, faded while firing.
+fn draw_crosshair(c: &mut Canvas, player: &Query<(&PlayerCtl, &Projection), With<Player>>, loadout: &Option<Res<Loadout>>, defs: &Defs, gun: &Gun) {
+    let Ok((ctl, proj)) = player.single() else { return };
+    if ctl.ads > 0.5 || ctl.sprinting {
+        return;
+    }
+    let fov = match proj {
+        Projection::Perspective(p) => p.fov,
+        _ => 1.2,
+    };
+    let spread = loadout.as_ref().map(|l| defs.0[l.current().def].spread).unwrap_or(2.0) * if ctl.moving { 1.6 } else { 1.0 };
+    let off = spread.to_radians().tan() / (fov * 0.5).tan() * c.h * 0.5 + 4.0 * c.u;
+    let firing = gun.since_shot.is_some_and(|s| s < 0.25);
+    let a = (if firing { 0.35 } else { 0.8 }) * (1.0 - ctl.ads * 2.0);
+    let col = with_alpha(Color::WHITE, a);
+    let center = Vec2::new(c.w * 0.5, c.h * 0.5);
+    let (len, wid) = (8.0 * c.u * 0.6, (1.0 * c.u).max(1.0));
+    for (dx, dy) in [(0.0, -1.0), (0.0, 1.0), (-1.0, 0.0), (1.0, 0.0)] {
+        let p = center + Vec2::new(dx, dy) * (off + len * 0.5);
+        let half = if dx == 0.0 { Vec2::new(wid, len) * 0.5 } else { Vec2::new(len, wid) * 0.5 };
+        c.solid(Rect::from_center_half_size(p, half), col);
+    }
+}
+
+/// Puts the frame's quads and texts onto pooled UI nodes.
+fn sync(
+    commands: &mut Commands,
+    root: Entity,
+    quad_list: Vec<QuadDesc>,
+    text_list: Vec<TextDesc>,
+    quads: &mut Query<(&QuadSlot, &mut Node, &mut ImageNode, &mut Visibility), Without<TextSlot>>,
+    texts: &mut Query<(&TextSlot, &mut Node, &mut Text, &mut TextFont, &mut TextColor, &mut Visibility), Without<QuadSlot>>,
+) {
+    let mut have = 0;
+    for (slot, mut node, mut img, mut vis) in quads.iter_mut() {
+        have = have.max(slot.0 + 1);
+        match quad_list.get(slot.0) {
+            Some(q) => {
+                node.left = Val::Px(q.rect.min.x);
+                node.top = Val::Px(q.rect.min.y);
+                node.width = Val::Px(q.rect.width());
+                node.height = Val::Px(q.rect.height());
+                if img.image != q.image {
+                    img.image = q.image.clone();
+                }
+                img.rect = q.uv;
+                img.color = q.color;
+                vis.set_if_neq(Visibility::Inherited);
+            }
+            None => {
+                vis.set_if_neq(Visibility::Hidden);
+            }
+        }
+    }
+    for i in have..quad_list.len() {
+        let q = &quad_list[i];
+        let mut img = ImageNode::new(q.image.clone()).with_color(q.color);
+        img.rect = q.uv;
+        commands.spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(q.rect.min.x),
+                top: Val::Px(q.rect.min.y),
+                width: Val::Px(q.rect.width()),
+                height: Val::Px(q.rect.height()),
+                ..default()
+            },
+            img,
+            ZIndex(i as i32),
+            QuadSlot(i),
+            ChildOf(root),
+        ));
+    }
+    let mut have = 0;
+    for (slot, mut node, mut text, mut font, mut color, mut vis) in texts.iter_mut() {
+        have = have.max(slot.0 + 1);
+        match text_list.get(slot.0) {
+            Some(d) => {
+                text.0.clone_from(&d.text);
+                font.font_size = d.size;
+                color.0 = d.color;
+                node.top = Val::Px(d.pos.y);
+                let x = match d.align {
+                    H::Left => d.pos.x,
+                    H::Center => d.pos.x - d.size * 0.27 * d.text.len() as f32,
+                    H::Right => d.pos.x - d.size * 0.55 * d.text.len() as f32,
+                };
+                node.left = Val::Px(x);
+                vis.set_if_neq(Visibility::Inherited);
+            }
+            None => {
+                vis.set_if_neq(Visibility::Hidden);
+            }
+        }
+    }
+    for i in have..text_list.len() {
+        let d = &text_list[i];
+        commands.spawn((
+            Node { position_type: PositionType::Absolute, left: Val::Px(d.pos.x), top: Val::Px(d.pos.y), ..default() },
+            Text::new(d.text.clone()),
+            TextFont { font_size: d.size, ..default() },
+            TextColor(d.color),
+            ZIndex(10_000 + i as i32),
+            TextSlot(i),
+            ChildOf(root),
+        ));
+    }
+}
+
+fn help_toggle(
+    mut commands: Commands,
+    keys: Res<ButtonInput<KeyCode>>,
     assets: Res<AssetDir>,
     waw: Res<Waw>,
     bank: Option<Res<SoundBank>>,
-    mut shown: Local<Option<bool>>,
-    mut q: Query<&mut Text, With<HelpText>>,
+    root: Query<Entity, With<HudRoot>>,
+    mut q: Query<(&mut Text, &mut Visibility), With<HelpText>>,
+    mut shown: Local<bool>,
 ) {
-    let visible = shown.get_or_insert(true);
     if keys.just_pressed(KeyCode::KeyH) {
-        *visible = !*visible;
+        *shown = !*shown;
     }
-    // Auto-hide after a while the first time.
-    if time.elapsed_secs() > 25.0 && time.elapsed_secs() - time.delta_secs() <= 25.0 {
-        *visible = false;
-    }
-    let Ok(mut t) = q.single_mut() else { return };
-    if !*visible {
-        t.0 = "H - help".into();
+    let Ok((mut t, mut vis)) = q.single_mut() else {
+        if let Ok(root) = root.single() {
+            commands.spawn((
+                Node { position_type: PositionType::Absolute, left: Val::Px(16.0), top: Val::Px(12.0), ..default() },
+                Text::new(""),
+                TextFont { font_size: 16.0, ..default() },
+                TextColor(Color::srgba(0.85, 0.85, 0.8, 0.85)),
+                ZIndex(20_000),
+                Visibility::Hidden,
+                HelpText,
+                ChildOf(root),
+            ));
+        }
+        return;
+    };
+    vis.set_if_neq(if *shown { Visibility::Inherited } else { Visibility::Hidden });
+    if !*shown {
         return;
     }
     let source = match (&waw.install, &assets.root) {
@@ -395,11 +733,7 @@ fn help_toggle(
         (None, Some(p)) => p.display().to_string(),
         (None, None) => "none - using built-in sounds".into(),
     };
-    let assets_line = format!(
-        "Assets: {source}  ({} sounds, {} weapon files)",
-        bank.map(|b| b.loaded_from_disk).unwrap_or(0),
-        assets.weapon_overrides
-    );
+    let assets_line = format!("Assets: {source}  ({} sounds, {} weapon files)", bank.map(|b| b.loaded_from_disk).unwrap_or(0), assets.weapon_overrides);
     t.0 = format!(
         "UNDEAD ROUNDS\n\
          Esc pause menu\n\

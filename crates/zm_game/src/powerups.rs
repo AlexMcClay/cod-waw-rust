@@ -10,6 +10,10 @@ use bevy::pbr::NotShadowCaster;
 use bevy::prelude::*;
 use zm_core::rules::{self, Powerup};
 
+/// A power-up was picked up (the HUD shows its text or flash).
+#[derive(Event)]
+pub struct PowerupGrabbed(pub Powerup);
+
 /// The looping sound while a timed power-up runs.
 #[derive(Component)]
 struct PowerupLoop(Powerup);
@@ -25,7 +29,8 @@ pub struct PowerupsPlugin;
 
 impl Plugin for PowerupsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, on_killed)
+        app.add_event::<PowerupGrabbed>()
+            .add_systems(Update, on_killed)
             .add_systems(Update, (animate_drops, pickup, tick_timers).chain().run_if(in_state(GameState::Playing)));
     }
 }
@@ -127,6 +132,7 @@ fn pickup(
     board_q: Query<&Board>,
     (mut alias, mut points, mut banner, mut killed): (EventWriter<PlayAlias>, EventWriter<PointsEvent>, EventWriter<Banner>, EventWriter<ZombieKilled>),
     loops: Query<&PowerupLoop>,
+    mut grabbed: EventWriter<PowerupGrabbed>,
 ) {
     let Ok(pt) = player.single() else { return };
     let me = Vec2::new(pt.translation.x, pt.translation.z);
@@ -142,6 +148,7 @@ fn pickup(
             }
         };
         banner.write(Banner(format!("{}!", d.kind.label().to_uppercase())));
+        grabbed.write(PowerupGrabbed(d.kind));
         match d.kind {
             Powerup::MaxAmmo => {
                 loadout.refill_all(&defs.0);

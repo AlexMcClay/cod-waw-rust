@@ -262,6 +262,8 @@ pub struct NachtScene {
     pub sounds: HashMap<String, Vec<SceneSound>>,
     /// Our weapon id -> its sound fields and notetrack sounds.
     pub weapon_sounds: HashMap<String, WeaponSounds>,
+    /// Our weapon id -> the game's display name ("Colt M1911").
+    pub weapon_names: HashMap<String, String>,
     pub characters: Vec<SceneCharacter>,
     pub zombie_anims: Vec<AnimClip>,
     pub view_rig: Option<SceneViewRig>,
@@ -969,6 +971,15 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     aliases.sort();
     aliases.dedup();
     let sounds = collect_sounds(&zones, iwd, &aliases);
+    let localized = |key: &str| zones.iter().find_map(|z| z.localized(key).or_else(|| z.localized(key.trim_start_matches('&'))).map(str::to_string));
+    let weapon_names = wanted
+        .weapon_ids
+        .iter()
+        .filter_map(|&id| {
+            let w = zones.iter().find_map(|z| z.weapon(zone_weapon_name(id)))?;
+            localized(&w.display_name).filter(|n| !n.trim().is_empty()).map(|n| (id.to_string(), n))
+        })
+        .collect();
     let images = std::mem::take(&mut b.images);
     let materials = std::mem::take(&mut b.materials);
     drop(b);
@@ -987,6 +998,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         entities,
         sounds,
         weapon_sounds,
+        weapon_names,
         characters,
         zombie_anims,
         view_rig,

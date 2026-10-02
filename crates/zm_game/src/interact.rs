@@ -83,6 +83,7 @@ fn interact(
     debris: Query<(Entity, &Debris)>,
     (mut alias, mut points, zs): (EventWriter<PlayAlias>, EventWriter<PointsEvent>, Res<ZoneSounds>),
     mut repair_timer: Local<f32>,
+    names: Option<Res<crate::nacht::WeaponNames>>,
     mut commands: Commands,
     mats: Res<Mats>,
 ) {
@@ -144,7 +145,7 @@ fn interact(
 
     match target {
         Target::Window(i) => {
-            prompt.0 = "Hold F to rebuild barrier".into();
+            prompt.0 = "Press & hold F to Rebuild Barrier".into();
             if hold {
                 *repair_timer += time.delta_secs();
                 if *repair_timer >= 0.7 {
@@ -168,13 +169,15 @@ fn interact(
         Target::WallBuy(i) => {
             let wb = &level_ref.wall_buys[i];
             let Some(def) = weapons::find(&defs.0, &wb.weapon_id) else { return };
-            let name = &defs.0[def].name;
+            let name = names.as_ref().and_then(|n| n.0.get(defs.0[def].id)).cloned().unwrap_or_else(|| defs.0[def].name.clone());
             let owned = loadout.has(def).is_some();
             let cost = if owned { wb.cost / 2 } else { wb.cost };
-            prompt.0 = if owned {
-                format!("Press F to buy ammo for {name} [Cost: {cost}]")
+            // The game's hints: once the chalk drawing has been bought it
+            // offers both prices.
+            prompt.0 = if world.wall_bought[i] {
+                format!("For Weapon [Cost: {}], For Ammo [Cost: {}]", wb.cost, wb.cost / 2)
             } else {
-                format!("Press F to buy {name} [Cost: {cost}]")
+                format!("Press & hold F to buy {name} [Cost: {}]", wb.cost)
             };
             if press {
                 if try_spend(&mut score, &mut points, cost) {
@@ -197,7 +200,7 @@ fn interact(
         }
         Target::Door(i) => {
             let door = &level_ref.doors[i];
-            prompt.0 = format!("Press F to clear debris to the {} [Cost: {}]", door.name, door.cost);
+            prompt.0 = format!("Press & hold F to Clear Debris [Cost: {}]", door.cost);
             if press {
                 if try_spend(&mut score, &mut points, door.cost) {
                     world.door_open[i] = true;
@@ -219,7 +222,7 @@ fn interact(
         }
         Target::Crate => match mcrate.0 {
             CrateState::Idle => {
-                prompt.0 = format!("Press F for a random weapon [Cost: {}]", rules::CRATE_COST);
+                prompt.0 = format!("Press F for a Random Weapon [Cost: {}]", rules::CRATE_COST);
                 if press {
                     if try_spend(&mut score, &mut points, rules::CRATE_COST) {
                         let result = roll_crate(&defs.0, &loadout);
@@ -235,7 +238,7 @@ fn interact(
             }
             CrateState::Rolling { .. } => {}
             CrateState::Ready { def, .. } => {
-                prompt.0 = format!("Press F to take {}", defs.0[def].name);
+                prompt.0 = "Press F to trade weapons".into();
                 if press {
                     loadout.give(&defs.0, def);
                     gun.reload = None;
