@@ -1,7 +1,7 @@
 //! Player weapons: loadout, hitscan firing, reloading, knifing, and the
 //! procedural first-person viewmodel.
 
-use crate::audio::{PlaySfx, Sfx};
+use crate::audio::{PlayAlias, PlaySfx, Sfx, ZoneSounds};
 use crate::player::{Player, PlayerCtl};
 use crate::world::Mats;
 use crate::zombies::{self, Zombie};
@@ -141,6 +141,7 @@ fn switch_weapons(
     scroll: Res<AccumulatedMouseScroll>,
     mut loadout: ResMut<Loadout>,
     mut gun: ResMut<Gun>,
+    (defs, zs, mut alias): (Res<Defs>, Res<ZoneSounds>, EventWriter<PlayAlias>),
 ) {
     let n = loadout.slots.len();
     if n < 2 {
@@ -159,6 +160,10 @@ fn switch_weapons(
         gun.switch = 0.45;
         gun.reload = None;
         gun.cooldown = 0.0;
+        let id = defs.0[loadout.slots[t].def].id;
+        if let Some(a) = weapon_sound(&zs, id, "raiseSoundPlayer", Sfx::Reload) {
+            alias.write(a.volume(0.6));
+        }
     }
 }
 
@@ -168,7 +173,8 @@ fn reload(
     defs: Res<Defs>,
     mut loadout: ResMut<Loadout>,
     mut gun: ResMut<Gun>,
-    mut sfx: EventWriter<PlaySfx>,
+    zs: Res<ZoneSounds>,
+    mut alias: EventWriter<PlayAlias>,
 ) {
     let dt = time.delta_secs();
     gun.switch = (gun.switch - dt).max(0.0);
@@ -183,7 +189,10 @@ fn reload(
             let take = need.min(slot.reserve);
             slot.clip += take;
             slot.reserve -= take;
-            sfx.write(PlaySfx::at(Sfx::Reload, 0.7));
+            // With game data the reload anim's notetracks make the sounds.
+            if !zs.weapons.contains_key(def.id) {
+                alias.write(PlayAlias::local("").or(Sfx::Reload).volume(0.7));
+            }
         }
         return;
     }
@@ -192,7 +201,20 @@ fn reload(
     if wants && slot.clip < def.clip && slot.reserve > 0 && gun.switch <= 0.0 {
         gun.reload = Some(def.reload_time);
         gun.reload_empty = slot.clip == 0;
-        sfx.write(PlaySfx::at(Sfx::Reload, 0.5));
+        let field = if gun.reload_empty { "reloadEmptySoundPlayer" } else { "reloadSoundPlayer" };
+        if let Some(a) = weapon_sound(&zs, def.id, field, Sfx::Reload) {
+            alias.write(a.volume(0.5));
+        }
+    }
+}
+
+/// A sound a weapon definition names (`field`), or the procedural stand-in
+/// when the weapon has no game data (prototype map without an install).
+pub fn weapon_sound(zs: &ZoneSounds, weapon: &str, field: &str, fallback: Sfx) -> Option<PlayAlias> {
+    if zs.weapons.contains_key(weapon) {
+        zs.weapon_field(weapon, field).map(PlayAlias::local)
+    } else {
+        Some(PlayAlias::local("").or(fallback))
     }
 }
 
@@ -228,6 +250,7 @@ fn fire(
     mut player: Query<(&Transform, &mut PlayerCtl), With<Player>>,
     mut zq: Query<(Entity, &Transform, &mut Zombie), Without<Player>>,
     (mut sfx, mut points, mut killed): (EventWriter<PlaySfx>, EventWriter<PointsEvent>, EventWriter<ZombieKilled>),
+    (zs, mut alias): (Res<ZoneSounds>, EventWriter<PlayAlias>),
     mut commands: Commands,
     mats: Res<Mats>,
 ) {
@@ -254,7 +277,9 @@ fn fire(
     }
     if loadout.slots[cur].clip == 0 {
         if mouse.just_pressed(MouseButton::Left) {
-            sfx.write(PlaySfx::at(Sfx::DryFire, 0.6));
+            if let Some(a) = weapon_sound(&zs, def.id, "emptyFireSoundPlayer", Sfx::DryFire) {
+                alias.write(a.volume(0.6));
+            }
         }
         return;
     }
@@ -265,7 +290,15 @@ fn fire(
     gun.kick = 1.0;
     gun.flash = 0.05;
     ctl.recoil += def.kick * 0.012 * (1.0 - 0.5 * ctl.ads);
-    sfx.write(PlaySfx::weapon(Sfx::for_weapon(def.kind), def.id));
+    // The last round may have its own sound (the Garand's ping).
+    match zs.weapon_field(def.id, "fireLastSoundPlayer").filter(|_| loadout.slots[cur].clip == 0) {
+        Some(last) => {
+            alias.write(PlayAlias::local(last));
+        }
+        None => {
+            sfx.write(PlaySfx::weapon(Sfx::for_weapon(def.kind), def.id));
+        }
+    }
 
     let origin = cam.translation;
     let fwd = cam.forward().as_vec3();
@@ -312,6 +345,8 @@ fn fire(
                 let kind = if def.kind == Kind::Wonder { KillKind::Explosive } else if head { KillKind::Head } else { KillKind::Body };
                 if head {
                     score.headshots += 1;
+                    // The head pops.
+                    alias.write(PlayAlias::at("zombie_head_gib", end).or(Sfx::Headshot).volume(0.8));
                 }
                 earn(&mut score, &mut points, &pu, rules::kill_points(kind));
                 killed.write(ZombieKilled { pos: end, drop_allowed: true });
@@ -350,7 +385,10 @@ fn fire(
     if any_hit {
         gun.hitmarker = 0.12;
         gun.headmarker = any_head;
-        sfx.write(PlaySfx::at(if any_head { Sfx::Headshot } else { Sfx::Hit }, 0.5));
+        // Nacht has no hit sound; keep the stand-in for the prototype map.
+        if zs.aliases.is_empty() {
+            sfx.write(PlaySfx::at(if any_head { Sfx::Headshot } else { Sfx::Hit }, 0.5));
+        }
     }
 }
 
@@ -364,7 +402,8 @@ fn knife(
     mut score: ResMut<Score>,
     player: Query<&Transform, With<Player>>,
     mut zq: Query<(&Transform, &mut Zombie), Without<Player>>,
-    (mut sfx, mut points, mut killed): (EventWriter<PlaySfx>, EventWriter<PointsEvent>, EventWriter<ZombieKilled>),
+    (mut points, mut killed): (EventWriter<PointsEvent>, EventWriter<ZombieKilled>),
+    (zs, defs, loadout, mut alias): (Res<ZoneSounds>, Res<Defs>, Option<Res<Loadout>>, EventWriter<PlayAlias>),
     mut commands: Commands,
     mats: Res<Mats>,
 ) {
@@ -378,7 +417,10 @@ fn knife(
     gun.knife_cd = 0.65;
     gun.knife_anim = 0.35;
     gun.reload = None;
-    sfx.write(PlaySfx::at(Sfx::Knife, 0.6));
+    let held = loadout.map(|l| defs.0[l.current().def].id).unwrap_or("");
+    if let Some(a) = weapon_sound(&zs, held, "meleeSwipeSoundPlayer", Sfx::Knife) {
+        alias.write(a.volume(0.8));
+    }
     let fwd = cam.forward().as_vec3();
     let flat = Vec3::new(fwd.x, 0.0, fwd.z).normalize_or_zero();
     let me = Vec3::new(cam.translation.x, 0.0, cam.translation.z);
@@ -394,6 +436,7 @@ fn knife(
         .min_by(|a, b| a.0.total_cmp(&b.0));
     if let Some((_, pos, mut z)) = target {
         let hit_point = pos + Vec3::Y * 1.2;
+        alias.write(PlayAlias::at("melee_hit", hit_point));
         if zombies::apply_damage(&mut z, KNIFE_DAMAGE, pu.insta_kill > 0.0) {
             earn(&mut score, &mut points, &pu, rules::kill_points(KillKind::Melee));
             killed.write(ZombieKilled { pos, drop_allowed: true });
@@ -677,6 +720,7 @@ fn animate_view_rig(
     player: Query<&PlayerCtl, With<Player>>,
     rig_q: Query<&ViewRigState>,
     mut tq: Query<&mut Transform>,
+    (zs, mut alias, mut last): (Res<ZoneSounds>, EventWriter<PlayAlias>, Local<Option<(String, f32)>>),
 ) {
     let (Some(loadout), Ok(rig), Ok(ctl)) = (loadout, rig_q.single(), player.single()) else { return };
     let Some(anims) = view_rig.anims.get(rig.weapon) else { return };
@@ -711,6 +755,29 @@ fn animate_view_rig(
             _ => get(if empty { "empty_idle" } else { "idle" }).or_else(|| get("idle")).map(|c| (c, 0.0)),
         }
     };
+    if let Some((clip, p)) = choice.as_ref() {
+        // Notetrack sounds crossed since the last frame (a new clip starts
+        // from its beginning; looping clips wrap).
+        let p = p.clamp(0.0, 1.0);
+        let from = match last.as_ref() {
+            Some((name, q)) if *name == clip.name => Some(*q),
+            _ => None,
+        };
+        for (note, t) in &clip.notify {
+            let crossed = match from {
+                Some(q) if p >= q => *t > q && *t <= p,
+                Some(q) => *t > q || *t <= p,
+                None => *t <= p && p > 0.0,
+            };
+            let crossed = crossed || (from.is_none() && *t == 0.0);
+            if crossed {
+                if let Some(a) = zs.notetrack(rig.weapon, note) {
+                    alias.write(PlayAlias::local(a));
+                }
+            }
+        }
+        *last = Some((clip.name.clone(), p));
+    }
     if let Some((clip, p)) = choice {
         let map = crate::nacht::track_map(&clip, &rig.joints);
         crate::nacht::pose_mapped(&clip, p.clamp(0.0, 1.0) * clip.numframes, &rig.joints, &map, &mut tq, None);

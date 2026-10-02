@@ -1,7 +1,7 @@
 //! "Press F" interactions: rebuilding barricades, buying wall weapons and
 //! ammo, clearing debris, and the mystery crate.
 
-use crate::audio::{PlaySfx, Sfx};
+use crate::audio::{PlayAlias, Sfx, ZoneSounds};
 use crate::player::Player;
 use crate::weapons::{Gun, Loadout};
 use crate::world::{spawn_board, CrateDisplay, CrateLid, Debris, Mats};
@@ -81,7 +81,7 @@ fn interact(
     ),
     player: Query<&Transform, With<Player>>,
     debris: Query<(Entity, &Debris)>,
-    (mut sfx, mut points): (EventWriter<PlaySfx>, EventWriter<PointsEvent>),
+    (mut alias, mut points, zs): (EventWriter<PlayAlias>, EventWriter<PointsEvent>, Res<ZoneSounds>),
     mut repair_timer: Local<f32>,
     mut commands: Commands,
     mats: Res<Mats>,
@@ -154,7 +154,11 @@ fn interact(
                         boards.0[i] = n + 1;
                         spawn_board(&mut commands, level_ref, &mats, i, n);
                         earn(&mut score, &mut points, &pu, rules::POINTS_BOARD);
-                        sfx.write(PlaySfx::new(Sfx::BoardRepair));
+                        // The board floats up, then slams into place.
+                        let at = crate::v3(level_ref.windows[i].center);
+                        alias.write(PlayAlias::at("repair_boards", at).or(Sfx::BoardRepair));
+                        alias.write(PlayAlias::at("boards_float", at));
+                        alias.write(PlayAlias::at("board_slam", at).after(0.8));
                     }
                 }
             } else {
@@ -176,9 +180,18 @@ fn interact(
                 if try_spend(&mut score, &mut points, cost) {
                     loadout.give(&defs.0, def);
                     gun.reload = None;
-                    sfx.write(PlaySfx::new(if owned { Sfx::Purchase } else { Sfx::WallBuy }));
+                    alias.write(PlayAlias::local("cha_ching").or(if owned { Sfx::Purchase } else { Sfx::WallBuy }));
+                    if !owned {
+                        if let Some(a) = crate::weapons::weapon_sound(&zs, defs.0[def].id, "firstRaiseSoundPlayer", Sfx::Reload) {
+                            alias.write(a.volume(0.6));
+                        }
+                    }
+                    if !world.wall_bought[i] {
+                        world.wall_bought[i] = true;
+                        alias.write(PlayAlias::at("weap_wall", crate::v3(wb.pos)));
+                    }
                 } else {
-                    sfx.write(PlaySfx::new(Sfx::Deny));
+                    alias.write(PlayAlias::at("no_cha_ching", crate::v3(wb.pos)).or(Sfx::Deny));
                 }
             }
         }
@@ -194,10 +207,13 @@ fn interact(
                             commands.entity(e).try_despawn();
                         }
                     }
-                    sfx.write(PlaySfx::new(Sfx::DoorOpen));
-                    sfx.write(PlaySfx::new(Sfx::Purchase));
+                    // The debris is pulled away and lands with a slam.
+                    let at = crate::v3(door.blocker.center());
+                    alias.write(PlayAlias::at("cha_ching", at).or(Sfx::Purchase));
+                    alias.write(PlayAlias::at("weap_wall", at).or(Sfx::DoorOpen));
+                    alias.write(PlayAlias::at("couch_slam", at).after(1.2));
                 } else {
-                    sfx.write(PlaySfx::new(Sfx::Deny));
+                    alias.write(PlayAlias::at("no_cha_ching", crate::v3(door.blocker.center())).or(Sfx::Deny));
                 }
             }
         }
@@ -208,9 +224,12 @@ fn interact(
                     if try_spend(&mut score, &mut points, rules::CRATE_COST) {
                         let result = roll_crate(&defs.0, &loadout);
                         mcrate.0 = CrateState::Rolling { t: 0.0, result, shown: result, tick: 0.0 };
-                        sfx.write(PlaySfx::new(Sfx::CrateOpen));
+                        // The lid opens to the music box jingle.
+                        let at = crate::v3(level_ref.crate_box.center());
+                        alias.write(PlayAlias::at("lid_open", at).or(Sfx::CrateOpen));
+                        alias.write(PlayAlias::at("music_box", at));
                     } else {
-                        sfx.write(PlaySfx::new(Sfx::Deny));
+                        alias.write(PlayAlias::local("").or(Sfx::Deny));
                     }
                 }
             }
@@ -221,14 +240,18 @@ fn interact(
                     loadout.give(&defs.0, def);
                     gun.reload = None;
                     mcrate.0 = CrateState::Idle;
-                    sfx.write(PlaySfx::new(Sfx::Purchase));
+                    alias.write(PlayAlias::local("cha_ching").or(Sfx::Purchase));
+                    alias.write(PlayAlias::at("lid_close", crate::v3(level_ref.crate_box.center())));
+                    if let Some(a) = crate::weapons::weapon_sound(&zs, defs.0[def].id, "firstRaiseSoundPlayer", Sfx::Reload) {
+                        alias.write(a.volume(0.6));
+                    }
                 }
             }
         },
     }
 }
 
-fn crate_tick(time: Res<Time>, defs: Res<Defs>, mut mcrate: ResMut<MysteryCrate>, mut sfx: EventWriter<PlaySfx>) {
+fn crate_tick(time: Res<Time>, defs: Res<Defs>, level: Res<LevelRes>, mut mcrate: ResMut<MysteryCrate>, mut alias: EventWriter<PlayAlias>) {
     let dt = time.delta_secs();
     let pool = weapons::crate_pool(&defs.0);
     mcrate.0 = match mcrate.0 {
@@ -242,7 +265,7 @@ fn crate_tick(time: Res<Time>, defs: Res<Defs>, mut mcrate: ResMut<MysteryCrate>
                 shown = pool[fastrand::usize(..pool.len())].0;
             }
             if t >= 4.2 {
-                sfx.write(PlaySfx::new(Sfx::CrateReady));
+                alias.write(PlayAlias::local("").or(Sfx::CrateReady));
                 CrateState::Ready { def: result, t: 0.0 }
             } else {
                 CrateState::Rolling { t, result, shown, tick }
@@ -250,6 +273,8 @@ fn crate_tick(time: Res<Time>, defs: Res<Defs>, mut mcrate: ResMut<MysteryCrate>
         }
         CrateState::Ready { def, t } => {
             if t + dt > 12.0 {
+                // Not taken: the weapon sinks back and the lid shuts.
+                alias.write(PlayAlias::at("lid_close", crate::v3(level.0.crate_box.center())));
                 CrateState::Idle
             } else {
                 CrateState::Ready { def, t: t + dt }

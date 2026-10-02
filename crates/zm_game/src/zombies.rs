@@ -4,7 +4,7 @@
 //! off -> vault through -> chase the player via the shared flow field ->
 //! die (fall, sink, despawn).
 
-use crate::audio::{PlaySfx, Sfx};
+use crate::audio::{PlayAlias, PlaySfx, Sfx};
 use crate::player::{self, Health, Player};
 use crate::world::{Board, Mats};
 use crate::{Boards, Dynamic, GameState, LevelRes, Round, World};
@@ -148,8 +148,9 @@ fn animate_previews(
 fn animate_rigs(
     time: Res<Time>,
     models: Option<Res<crate::nacht::ZombieModels>>,
-    mut zq: Query<(&Zombie, &mut ZombieRig)>,
+    mut zq: Query<(Entity, &Zombie, &mut ZombieRig)>,
     mut tq: Query<&mut Transform>,
+    mut alias: EventWriter<PlayAlias>,
 ) {
     let Some(models) = models else { return };
     if models.clips.is_empty() {
@@ -160,7 +161,7 @@ fn animate_rigs(
         let opts: Vec<usize> = names.iter().filter_map(|n| models.clip(n)).collect();
         (!opts.is_empty()).then(|| opts[v % opts.len()])
     };
-    for (z, mut rig) in &mut zq {
+    for (entity, z, mut rig) in &mut zq {
         let v = rig.variant;
         let (want, rate) = match z.state {
             ZState::Dying => (find(&["ai_zombie_death_v1", "ai_zombie_death_v2"], v), 1.3),
@@ -188,9 +189,19 @@ fn animate_rigs(
             rig.time = 0.0;
             rig.map = crate::nacht::track_map(&models.clips[want], &rig.joints);
         }
-        rig.time += dt * rate;
         let clip = &models.clips[want];
+        let before = if rig.time == 0.0 { -1.0 } else { clip.frame_at(rig.time) / clip.numframes.max(1.0) };
+        rig.time += dt * rate;
         let frame = clip.frame_at(rig.time);
+        // `sndnt#alias` notetracks crossed this frame play on the zombie.
+        let now = frame / clip.numframes.max(1.0);
+        for (note, t) in &clip.notify {
+            let Some(name) = note.strip_prefix("sndnt#") else { continue };
+            let crossed = if now >= before { *t > before && *t <= now } else { *t > before || *t <= now };
+            if crossed {
+                alias.write(PlayAlias::on(name, entity));
+            }
+        }
         let ZombieRig { joints, map, .. } = &*rig;
         crate::nacht::pose_mapped(clip, frame, joints, map, &mut tq, None);
     }
@@ -486,6 +497,7 @@ fn ai(
     mut zq: Query<(&mut Transform, &mut Zombie), Without<Player>>,
     board_q: Query<(Entity, &Board)>,
     mut sfx: EventWriter<PlaySfx>,
+    (mut alias, zs): (EventWriter<PlayAlias>, Res<crate::audio::ZoneSounds>),
     mut commands: Commands,
 ) {
     let dt = time.delta_secs().min(0.05);
@@ -502,7 +514,8 @@ fn ai(
         let pos = Vec3::new(t.translation.x, 0.0, t.translation.z);
         let to_player = ppos - pos;
         let dist_player = to_player.length();
-        if z.groan_cd <= 0.0 {
+        // With the game's sounds, vocals come from the animations.
+        if z.groan_cd <= 0.0 && zs.aliases.is_empty() {
             z.groan_cd = 3.0 + fastrand::f32() * 5.0;
             let vol = (1.0 - dist_player / 22.0).clamp(0.0, 1.0) * 0.6;
             sfx.write(PlaySfx::at(Sfx::ZombieGroan, vol));
@@ -521,8 +534,10 @@ fn ai(
             if z.swing <= 0.0 {
                 let reach = if z.state == ZState::Chase { 1.45 } else { 2.0 };
                 if dist_player < reach {
-                    sfx.write(PlaySfx::at(Sfx::ZombieAttack, 0.8));
-                    if player::damage_player(&mut health, rules::ZOMBIE_HIT_DAMAGE, &mut sfx) {
+                    if zs.aliases.is_empty() {
+                        sfx.write(PlaySfx::at(Sfx::ZombieAttack, 0.8));
+                    }
+                    if player::damage_player(&mut health, rules::ZOMBIE_HIT_DAMAGE, &mut alias) {
                         next.set(GameState::GameOver);
                     }
                 }
@@ -594,7 +609,7 @@ fn ai(
                             }
                         }
                         let vol = (1.0 - dist_player / 25.0).clamp(0.15, 1.0);
-                        sfx.write(PlaySfx::at(Sfx::BoardTear, vol));
+                        alias.write(PlayAlias::at("break_boards", crate::v3(w.center)).or(Sfx::BoardTear).volume(if zs.aliases.is_empty() { vol } else { 1.0 }));
                         z.timer = match z.gait {
                             Gait::Walk => 1.3,
                             Gait::Run => 1.0,

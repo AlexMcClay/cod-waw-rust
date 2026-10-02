@@ -1,7 +1,7 @@
 //! First-person controller: mouse look, walking/sprinting/jumping, collision
 //! against the bunker, health and regeneration.
 
-use crate::audio::{PlaySfx, Sfx};
+use crate::audio::{PlayAlias, Sfx};
 use crate::settings::UserSettings;
 use crate::{cursor_locked, GameState, LevelRes, World};
 use bevy::core_pipeline::bloom::Bloom;
@@ -127,7 +127,7 @@ impl Plugin for PlayerPlugin {
             .add_systems(Startup, spawn_player)
             .add_systems(
                 Update,
-                (look, movement, regen, tweak_settings).chain().run_if(in_state(GameState::Playing)),
+                (look, movement, regen, breathing, tweak_settings).chain().run_if(in_state(GameState::Playing)),
             )
             .add_systems(Update, apply_exposure);
     }
@@ -147,6 +147,7 @@ pub fn spawn_player(mut commands: Commands, level: Res<LevelRes>, settings: Res<
             ..default()
         },
         Transform::from_xyz(x, EYE, z),
+        SpatialListener::new(0.3),
         Player,
         PlayerCtl::new(0.0, 0.0),
     ));
@@ -341,6 +342,24 @@ fn movement(
     t.translation = Vec3::new(x, c.feet_y + c.eye + bob, z);
 }
 
+/// Heavy breathing while badly hurt, a relieved breath on recovery.
+fn breathing(time: Res<Time>, hp: Res<Health>, mut alias: EventWriter<PlayAlias>, mut state: Local<(bool, f32)>) {
+    let hurt = hp.hp <= rules::PLAYER_MAX_HEALTH * 0.35;
+    let (breathing, wait) = &mut *state;
+    if hurt {
+        *wait -= time.delta_secs();
+        if *wait <= 0.0 {
+            alias.write(PlayAlias::local("breathing_hurt"));
+            *wait = 1.2 + fastrand::f32() * 0.4;
+        }
+        *breathing = true;
+    } else if *breathing {
+        *breathing = false;
+        *wait = 0.0;
+        alias.write(PlayAlias::local("breathing_better"));
+    }
+}
+
 fn regen(time: Res<Time>, mut hp: ResMut<Health>) {
     let dt = time.delta_secs();
     hp.since_hit += dt;
@@ -351,11 +370,11 @@ fn regen(time: Res<Time>, mut hp: ResMut<Health>) {
 }
 
 /// Damage the player. Returns true if this hit downed them.
-pub fn damage_player(hp: &mut Health, amount: f32, sfx: &mut EventWriter<PlaySfx>) -> bool {
+pub fn damage_player(hp: &mut Health, amount: f32, alias: &mut EventWriter<PlayAlias>) -> bool {
     hp.hp -= amount;
     hp.since_hit = 0.0;
     hp.flash = 1.0;
-    sfx.write(PlaySfx::new(Sfx::PlayerHurt));
+    alias.write(PlayAlias::local("player_pain_small").or(Sfx::PlayerHurt));
     hp.hp <= 0.0
 }
 

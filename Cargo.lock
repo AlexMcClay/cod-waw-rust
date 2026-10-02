@@ -5231,6 +5231,7 @@ dependencies = [
  "bevy",
  "fastrand",
  "waw_assets",
+ "windows 0.62.2",
  "zm_core",
 ]
 

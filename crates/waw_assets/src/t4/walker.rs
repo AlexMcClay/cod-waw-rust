@@ -1385,6 +1385,16 @@ impl<'a> Walker<'a> {
             let a = self.xstring(h.u32(0x50 + 4 * i))?;
             w.xanims.push(a.unwrap_or_default());
         }
+        // Viewmodel notetrack -> sound alias (u16 script strings, 0-terminated).
+        for i in 0..20 {
+            let (k, v) = (h.u16(0xf0 + 2 * i) as usize, h.u16(0x118 + 2 * i) as usize);
+            if k == 0 {
+                break;
+            }
+            if let (Some(k), Some(v)) = (self.out.script_strings.get(k), self.out.script_strings.get(v)) {
+                w.notetrack_sounds.push((k.clone(), v.clone()));
+            }
+        }
         self.xstring(h.u32(0xdc))?;
         self.asset(T::Fx, h.u32(0x17c), None)?;
         self.asset(T::Fx, h.u32(0x180), None)?;

@@ -29,3 +29,5 @@ __pycache__/
 # Local previews decoded from game files
 /research/hud/local/
 /research/audio/local/
+/research/audio/sounds_common.json
+/research/audio/nacht_emitters.json

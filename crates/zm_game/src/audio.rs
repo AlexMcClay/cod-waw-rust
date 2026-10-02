@@ -246,13 +246,123 @@ impl SoundBank {
     }
 }
 
+/// One playable variant of a game sound alias.
+#[derive(Clone)]
+pub struct AliasSound {
+    pub handle: Handle<AudioSource>,
+    pub volume: (f32, f32),
+    pub pitch: (f32, f32),
+    pub spatial: bool,
+    /// Full volume up to `.0` metres, silent from `.1`.
+    pub distance: (f32, f32),
+}
+
 /// Sounds decoded from the install's fastfiles (filled once a zone is read).
 #[derive(Resource, Default)]
 pub struct ZoneSounds {
     /// Sound alias name -> variants.
-    pub aliases: HashMap<String, Vec<Handle<AudioSource>>>,
-    /// Our weapon id -> its real fire sound variants.
-    pub weapon_fire: HashMap<String, Vec<Handle<AudioSource>>>,
+    pub aliases: HashMap<String, Vec<AliasSound>>,
+    /// Our weapon id -> its sound fields and notetrack sounds.
+    pub weapons: HashMap<String, crate::nacht::build::WeaponSounds>,
+}
+
+impl ZoneSounds {
+    pub fn has(&self, alias: &str) -> bool {
+        self.aliases.contains_key(alias)
+    }
+
+    /// The alias a weapon definition names for `field`, if it is loaded.
+    pub fn weapon_field(&self, weapon: &str, field: &str) -> Option<String> {
+        self.weapons.get(weapon)?.fields.get(field).filter(|a| self.has(a)).cloned()
+    }
+
+    /// The alias a viewmodel notetrack plays for this weapon. Weapons map
+    /// notetracks to aliases; anims shared by every weapon (the knife) name
+    /// the alias directly.
+    pub fn notetrack(&self, weapon: &str, note: &str) -> Option<String> {
+        let note = note.to_ascii_lowercase();
+        match self.weapons.get(weapon) {
+            Some(w) if !w.notetracks.is_empty() => w.notetracks.get(&note).filter(|a| self.has(a)).cloned(),
+            _ => self.has(&note).then_some(note),
+        }
+    }
+}
+
+/// Request to play a game sound alias. Falls back to `fallback` (the
+/// configured/procedural sound) when the alias is not available, e.g. on
+/// the prototype map without an install.
+#[derive(Event, Clone)]
+pub struct PlayAlias {
+    pub alias: String,
+    /// World position for positional sounds (`None` = on the player).
+    pub at: Option<Vec3>,
+    /// Entity to attach to (follows it; skipped if it is gone).
+    pub on: Option<Entity>,
+    pub volume: f32,
+    /// Seconds to wait before playing.
+    pub delay: f32,
+    pub fallback: Option<Sfx>,
+}
+
+impl PlayAlias {
+    pub fn local(alias: impl Into<String>) -> Self {
+        PlayAlias { alias: alias.into(), at: None, on: None, volume: 1.0, delay: 0.0, fallback: None }
+    }
+    pub fn at(alias: impl Into<String>, pos: Vec3) -> Self {
+        PlayAlias { at: Some(pos), ..Self::local(alias) }
+    }
+    pub fn on(alias: impl Into<String>, entity: Entity) -> Self {
+        PlayAlias { on: Some(entity), ..Self::local(alias) }
+    }
+    pub fn after(mut self, secs: f32) -> Self {
+        self.delay = secs;
+        self
+    }
+    pub fn volume(mut self, v: f32) -> Self {
+        self.volume = v;
+        self
+    }
+    pub fn or(mut self, sfx: Sfx) -> Self {
+        self.fallback = Some(sfx);
+        self
+    }
+}
+
+/// A looping alias on this entity for as long as the component (or the
+/// entity) exists.
+#[derive(Component, Clone)]
+pub struct AliasLoop {
+    pub alias: String,
+    pub volume: f32,
+}
+
+impl AliasLoop {
+    pub fn new(alias: impl Into<String>) -> Self {
+        AliasLoop { alias: alias.into(), volume: 1.0 }
+    }
+}
+
+/// The audio entity playing an [`AliasLoop`].
+#[derive(Component)]
+struct LoopVoice(Entity);
+
+/// Distance falloff applied every frame to a positional sound.
+#[derive(Component)]
+struct Falloff {
+    volume: f32,
+    near: f32,
+    far: f32,
+}
+
+/// Sounds waiting for their delay.
+#[derive(Resource, Default)]
+pub struct PendingSounds(Vec<PlayAlias>);
+
+impl PendingSounds {
+    /// Drops everything queued (new session).
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
 }
 
 /// Request to play a sound. `volume` is linear 0..1.
@@ -265,9 +375,6 @@ pub struct PlaySfx {
 }
 
 impl PlaySfx {
-    pub fn new(sfx: Sfx) -> Self {
-        PlaySfx { sfx, volume: 1.0, weapon: None }
-    }
     pub fn at(sfx: Sfx, volume: f32) -> Self {
         PlaySfx { sfx, volume, weapon: None }
     }
@@ -281,9 +388,11 @@ pub struct AudioPlugin;
 impl Plugin for AudioPlugin {
     fn build(&self, app: &mut App) {
         app.add_event::<PlaySfx>()
+            .add_event::<PlayAlias>()
             .init_resource::<ZoneSounds>()
+            .init_resource::<PendingSounds>()
             .add_systems(PreStartup, load_sounds)
-            .add_systems(PostUpdate, play_sounds);
+            .add_systems(PostUpdate, (play_aliases, play_sounds, start_loops, stop_loops, apply_falloff).chain());
     }
 }
 
@@ -365,14 +474,19 @@ fn play_sounds(
             continue;
         }
         played.push((ev.sfx, ev.weapon));
-        // The weapon's own sound, then a configured zone alias, then files/synth.
-        let from_weapon = ev.weapon.and_then(|w| zone.weapon_fire.get(w)).filter(|l| !l.is_empty());
-        let from_alias = || {
+        // The weapon's own fire sound, then a configured zone alias, then
+        // files/synth.
+        let weapon_alias = ev.weapon.and_then(|w| zone.weapon_field(w, "fireSoundPlayer").or_else(|| zone.weapon_field(w, "fireSound")));
+        let config_alias = || {
             let names = bank.aliases.get(&ev.sfx)?;
             let name = &names[fastrand::usize(..names.len())];
-            zone.aliases.get(name).filter(|l| !l.is_empty())
+            zone.has(name).then(|| name.clone())
         };
-        let list = match from_weapon.or_else(from_alias).or_else(|| bank.sounds.get(&ev.sfx)) {
+        if let Some(alias) = weapon_alias.or_else(config_alias) {
+            spawn_alias(&mut commands, pick(&zone.aliases[&alias]), &alias, ev.volume, None, None, false, &settings);
+            continue;
+        }
+        let list = match bank.sounds.get(&ev.sfx) {
             Some(l) if !l.is_empty() => l,
             _ => continue,
         };
@@ -382,5 +496,158 @@ fn play_sounds(
             PlaybackSettings::DESPAWN.with_volume(Volume::Linear(ev.volume * settings.sfx())),
             crate::Dynamic,
         ));
+    }
+}
+
+/// Linear volume over distance as the game does: full up to `near`,
+/// nothing past `far`.
+fn falloff(d: f32, near: f32, far: f32) -> f32 {
+    if d <= near {
+        1.0
+    } else if d >= far {
+        0.0
+    } else {
+        1.0 - (d - near) / (far - near).max(1e-3)
+    }
+}
+
+fn is_music(alias: &str) -> bool {
+    alias.starts_with("mx_")
+}
+
+/// Spawns one variant of an alias and returns the audio entity.
+#[allow(clippy::too_many_arguments)]
+fn spawn_alias(
+    commands: &mut Commands,
+    sound: &AliasSound,
+    alias: &str,
+    req_volume: f32,
+    at: Option<Vec3>,
+    on: Option<Entity>,
+    looping: bool,
+    settings: &UserSettings,
+) -> Entity {
+    let lerp = |(a, b): (f32, f32)| a + (b - a) * fastrand::f32();
+    let base = lerp(sound.volume) * req_volume * if is_music(alias) { settings.music() } else { settings.sfx() };
+    let mut playback = if looping { PlaybackSettings::LOOP } else { PlaybackSettings::DESPAWN };
+    playback = playback.with_speed(lerp(sound.pitch));
+    let positional = sound.spatial && (at.is_some() || on.is_some());
+    let mut e = commands.spawn((AudioPlayer::new(sound.handle.clone()), crate::Dynamic));
+    if positional {
+        // Bevy pans; the game's linear falloff is applied by `apply_falloff`
+        // (a tiny spatial scale keeps Bevy's own attenuation out of it).
+        playback = playback
+            .with_spatial(true)
+            .with_spatial_scale(bevy::audio::SpatialScale::new(0.001))
+            .with_volume(Volume::Linear(0.0));
+        e.insert((
+            Transform::from_translation(at.unwrap_or(Vec3::ZERO)),
+            Falloff { volume: base, near: sound.distance.0, far: sound.distance.1.max(sound.distance.0 + 1.0) },
+        ));
+        if let Some(parent) = on {
+            e.insert(ChildOf(parent));
+        }
+    } else {
+        playback = playback.with_volume(Volume::Linear(base));
+    }
+    e.insert(playback);
+    e.id()
+}
+
+fn pick(list: &[AliasSound]) -> &AliasSound {
+    &list[fastrand::usize(..list.len())]
+}
+
+#[allow(clippy::too_many_arguments)]
+fn play_aliases(
+    time: Res<Time>,
+    mut events: EventReader<PlayAlias>,
+    mut pending: ResMut<PendingSounds>,
+    zone: Res<ZoneSounds>,
+    settings: Res<UserSettings>,
+    alive: Query<(), With<Transform>>,
+    mut sfx: EventWriter<PlaySfx>,
+    mut commands: Commands,
+) {
+    let dt = time.delta_secs();
+    let mut due: Vec<PlayAlias> = Vec::new();
+    pending.0.retain_mut(|p| {
+        p.delay -= dt;
+        if p.delay <= 0.0 {
+            due.push(p.clone());
+            false
+        } else {
+            true
+        }
+    });
+    for ev in events.read() {
+        if ev.delay > 0.0 {
+            pending.0.push(ev.clone());
+        } else {
+            due.push(ev.clone());
+        }
+    }
+    for ev in due {
+        if ev.on.is_some_and(|e| alive.get(e).is_err()) {
+            continue;
+        }
+        match zone.aliases.get(&ev.alias).filter(|l| !l.is_empty()) {
+            Some(list) => {
+                spawn_alias(&mut commands, pick(list), &ev.alias, ev.volume, ev.at, ev.on, false, &settings);
+            }
+            // An empty alias means "only the stand-in, and only without the
+            // game's sounds".
+            None if ev.alias.is_empty() && !zone.aliases.is_empty() => {}
+            None => {
+                if let Some(f) = ev.fallback {
+                    sfx.write(PlaySfx::at(f, ev.volume));
+                }
+            }
+        }
+    }
+}
+
+fn start_loops(
+    zone: Res<ZoneSounds>,
+    settings: Res<UserSettings>,
+    added: Query<(Entity, &AliasLoop, Option<&Transform>), Without<LoopVoice>>,
+    mut commands: Commands,
+) {
+    for (e, l, t) in &added {
+        let Some(list) = zone.aliases.get(&l.alias).filter(|l| !l.is_empty()) else { continue };
+        let voice = spawn_alias(&mut commands, pick(list), &l.alias, l.volume, t.map(|_| Vec3::ZERO), t.map(|_| e), true, &settings);
+        commands.entity(e).insert(LoopVoice(voice));
+    }
+}
+
+/// Stops loops whose [`AliasLoop`] was removed from a living entity.
+fn stop_loops(mut removed: RemovedComponents<AliasLoop>, voices: Query<&LoopVoice>, mut commands: Commands) {
+    for e in removed.read() {
+        if let Ok(v) = voices.get(e) {
+            commands.entity(v.0).try_despawn();
+            commands.entity(e).try_remove::<LoopVoice>();
+        }
+    }
+}
+
+fn apply_falloff(listener: Query<&GlobalTransform, With<SpatialListener>>, mut sounds: Query<(&GlobalTransform, &Falloff, Option<&mut SpatialAudioSink>)>) {
+    let Ok(l) = listener.single() else { return };
+    for (t, f, sink) in &mut sounds {
+        if let Some(mut sink) = sink {
+            let v = f.volume * falloff(t.translation().distance(l.translation()), f.near, f.far);
+            sink.set_volume(Volume::Linear(v));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn linear_falloff() {
+        assert_eq!(falloff(1.0, 2.0, 10.0), 1.0);
+        assert_eq!(falloff(6.0, 2.0, 10.0), 0.5);
+        assert_eq!(falloff(12.0, 2.0, 10.0), 0.0);
     }
 }

@@ -359,6 +359,8 @@ pub struct WeaponInfo {
     /// `(field, alias name)` for every sound the weapon references.
     pub sounds: Vec<(&'static str, String)>,
     pub xanims: Vec<String>,
+    /// Viewmodel notetrack name -> sound alias it plays.
+    pub notetrack_sounds: Vec<(String, String)>,
 }
 
 impl WeaponInfo {

@@ -20,6 +20,7 @@ mod settings;
 mod waw;
 mod weapons;
 mod world;
+mod xwma;
 mod zombies;
 
 use bevy::prelude::*;
@@ -53,6 +54,8 @@ pub struct LevelRes(pub Level);
 #[derive(Resource)]
 pub struct World {
     pub door_open: Vec<bool>,
+    /// Wall weapons bought at least once (their chalk drawing slid out).
+    pub wall_bought: Vec<bool>,
     /// What blocks the player (walls, window fills, crate, closed doors).
     pub player_solids: Vec<Aabb>,
     /// What stops bullets (walls, closed doors, crate) — windows are open.
@@ -72,6 +75,7 @@ impl World {
     pub fn new(level: &Level) -> Self {
         let mut w = World {
             door_open: vec![false; level.doors.len()],
+            wall_bought: vec![false; level.wall_buys.len()],
             player_solids: Vec::new(),
             bullet_solids: Vec::new(),
             nav: NavGrid::build(level, 0.3, &[]),

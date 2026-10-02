@@ -195,7 +195,8 @@ impl Plugin for NachtPlugin {
             .add_systems(Startup, start_load)
             .add_systems(OnEnter(GameState::Loading), start_load)
             .add_systems(Update, poll_load)
-            .add_systems(Update, follow_sky);
+            .add_systems(Update, follow_sky)
+            .add_systems(Update, ambience.run_if(in_state(GameState::Playing).and(resource_exists::<NachtActive>)));
     }
 }
 
@@ -285,7 +286,7 @@ fn poll_load(
     info!("Nacht nav graph: {} nodes, {} links", nav.nodes.len(), nav.edges.iter().map(Vec::len).sum::<usize>() / 2);
 
     let NachtScene {
-        images: imgs, lightmap, materials: mdefs, world, submodels, models, static_models, sky_model, collision, entities, sounds, weapon_fire, map, characters, view_models: vms, zombie_anims, view_rig: vr, ..
+        images: imgs, lightmap, materials: mdefs, world, submodels, models, static_models, sky_model, collision, entities, sounds, weapon_sounds, map, characters, view_models: vms, zombie_anims, view_rig: vr, ..
     } = scene;
     let image_handles: HashMap<String, Handle<Image>> = imgs.into_iter().map(|(k, v)| (k, images.add(v))).collect();
     let lightmap = lightmap.map(|l| images.add(l));
@@ -345,12 +346,28 @@ fn poll_load(
         .into_iter()
         .map(|(n, m)| (n, ModelParts { parts: m.surfaces.into_iter().map(|s| (meshes.add(s.mesh), mat_handles[s.material].clone())).collect() }))
         .collect();
-    let mut to_handles = |m: HashMap<String, Vec<Vec<u8>>>| -> HashMap<String, Vec<Handle<AudioSource>>> {
-        m.into_iter().map(|(k, v)| (k, v.into_iter().map(|b| audio.add(AudioSource { bytes: b.into() })).collect())).collect()
-    };
-    zone_sounds.aliases = to_handles(sounds);
-    zone_sounds.weapon_fire = to_handles(weapon_fire);
-    info!("Zone sounds: {} aliases, {} weapon fire sounds", zone_sounds.aliases.len(), zone_sounds.weapon_fire.len());
+    zone_sounds.aliases = sounds
+        .into_iter()
+        .map(|(k, v)| {
+            let variants = v
+                .into_iter()
+                .map(|s| crate::audio::AliasSound {
+                    handle: audio.add(AudioSource { bytes: s.wav.into() }),
+                    volume: s.volume,
+                    pitch: s.pitch,
+                    spatial: s.spatial,
+                    distance: s.distance,
+                })
+                .collect();
+            (k, variants)
+        })
+        .collect();
+    zone_sounds.weapons = weapon_sounds;
+    info!("Zone sounds: {} aliases, {} weapons", zone_sounds.aliases.len(), zone_sounds.weapons.len());
+    let missing: Vec<&str> = build::GAME_ALIASES.iter().copied().filter(|a| !zone_sounds.has(a)).collect();
+    if !missing.is_empty() {
+        warn!("Sound aliases not found in the install: {missing:?}");
+    }
 
     // Boards and door blockers are spawned per session (they can be removed).
     let mut gameplay_submodels: Vec<usize> = level.windows.iter().flat_map(|w| w.board_models.iter().map(|b| b.0)).collect();
@@ -454,6 +471,7 @@ pub fn spawn_scene(
         let e = spawn_model(&mut commands, parts, Transform::default(), (SessionEntity, SkyBox, NotShadowCaster));
         commands.entity(e).insert(NotShadowCaster);
     }
+    spawn_ambience(&mut commands, &assets);
 }
 
 /// Spawns the parts of the map that change during a game: window boards,
@@ -523,5 +541,75 @@ fn follow_sky(cam: Query<&GlobalTransform, With<crate::player::Player>>, mut sky
     let Ok(c) = cam.single() else { return };
     for mut t in &mut sky {
         t.translation = c.translation();
+    }
+}
+
+/// An ambient one-shot that repeats at random intervals.
+#[derive(Component)]
+struct AmbientRandom {
+    alias: String,
+    min: f32,
+    max: f32,
+    wait: f32,
+}
+
+/// A looping sound kept at the point of a segment closest to the listener.
+#[derive(Component)]
+struct LineEmitter {
+    a: Vec3,
+    b: Vec3,
+}
+
+/// The map's ambient sound emitters (structs with `script_sound`), as the
+/// game's client script plays them.
+fn spawn_ambience(commands: &mut Commands, assets: &NachtAssets) {
+    use waw_assets::zombiemap::AmbientKind;
+    let map = waw_assets::zombiemap::ZombieMap::from_entities(&assets.scene_entities);
+    for em in &map.ambient {
+        let at = Transform::from_translation(to_bevy(em.origin));
+        match &em.kind {
+            AmbientKind::Random { min, max } => {
+                let wait = fastrand::f32() * max;
+                commands.spawn((at, AmbientRandom { alias: em.alias.clone(), min: *min, max: *max, wait }, SessionEntity));
+            }
+            AmbientKind::Looper => {
+                commands.spawn((at, crate::audio::AliasLoop::new(em.alias.clone()), SessionEntity));
+            }
+            AmbientKind::Line { end } => {
+                let line = LineEmitter { a: to_bevy(em.origin), b: to_bevy(*end) };
+                commands.spawn((at, line, crate::audio::AliasLoop::new(em.alias.clone()), SessionEntity));
+            }
+        }
+    }
+}
+
+fn ambience(
+    time: Res<Time>,
+    listener: Query<&GlobalTransform, With<SpatialListener>>,
+    mut randoms: Query<(&Transform, &mut AmbientRandom)>,
+    mut lines: Query<(&mut Transform, &LineEmitter), Without<AmbientRandom>>,
+    mut alias: EventWriter<crate::audio::PlayAlias>,
+    mut spooky: Local<f32>,
+) {
+    let dt = time.delta_secs();
+    for (t, mut r) in &mut randoms {
+        r.wait -= dt;
+        if r.wait <= 0.0 {
+            r.wait = r.min + fastrand::f32() * (r.max - r.min).max(0.0);
+            alias.write(crate::audio::PlayAlias::at(r.alias.clone(), t.translation));
+        }
+    }
+    // The level's ambient package: a spooky 2D one-shot every 5-8 s.
+    *spooky -= dt;
+    if *spooky <= 0.0 {
+        *spooky = 5.0 + fastrand::f32() * 3.0;
+        alias.write(crate::audio::PlayAlias::local("amb_spooky_2d"));
+    }
+    let Ok(l) = listener.single() else { return };
+    let p = l.translation();
+    for (mut t, line) in &mut lines {
+        let ab = line.b - line.a;
+        let k = ((p - line.a).dot(ab) / ab.length_squared().max(1e-4)).clamp(0.0, 1.0);
+        t.translation = line.a + ab * k;
     }
 }

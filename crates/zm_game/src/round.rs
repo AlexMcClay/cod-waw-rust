@@ -1,7 +1,7 @@
 //! Round flow, game over, and session setup/teardown (new game, restart,
 //! quit to menu).
 
-use crate::audio::{PlaySfx, Sfx};
+use crate::audio::{AliasLoop, PendingSounds, PlayAlias, Sfx, ZoneSounds};
 use crate::interact::MysteryCrate;
 use crate::player::{self, Health, Player, PlayerCtl};
 use crate::weapons::{Gun, Loadout, Tracers};
@@ -18,11 +18,42 @@ pub struct RoundPlugin;
 
 impl Plugin for RoundPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, tick.run_if(in_state(GameState::Playing)))
+        app.init_resource::<Music>()
+            .init_resource::<Heartbeat>()
+            .add_systems(Update, (tick, music).run_if(in_state(GameState::Playing)))
             .add_systems(OnEnter(GameState::GameOver), game_over)
+            .add_systems(Update, heartbeat.run_if(in_state(GameState::GameOver)))
             .add_systems(OnEnter(GameState::MainMenu), reset_session)
             .add_systems(OnEnter(GameState::Loading), reset_session)
             .add_systems(Update, finish_loading.run_if(in_state(GameState::Loading)));
+    }
+}
+
+/// Nacht's music: the splash once, then the quiet wave loop for the rest
+/// of the game (seconds into the session).
+#[derive(Resource, Default)]
+pub struct Music {
+    elapsed: f32,
+    looping: bool,
+}
+
+/// The entity playing the music loop.
+#[derive(Component)]
+struct MusicLoop;
+
+const SPLASH_AT: f32 = 1.0;
+/// When the splash (11.1 s) has finished.
+const LOOP_AT: f32 = 12.2;
+
+fn music(time: Res<Time>, mut m: ResMut<Music>, zs: Res<ZoneSounds>, mut alias: EventWriter<PlayAlias>, mut commands: Commands) {
+    let before = m.elapsed;
+    m.elapsed += time.delta_secs();
+    if before < SPLASH_AT && m.elapsed >= SPLASH_AT {
+        alias.write(PlayAlias::local("mx_splash_screen"));
+    }
+    if !m.looping && m.elapsed >= LOOP_AT && zs.has("mx_zombie_wave_1") {
+        m.looping = true;
+        commands.spawn((AliasLoop::new("mx_zombie_wave_1"), MusicLoop, Dynamic));
     }
 }
 
@@ -34,7 +65,7 @@ fn tick(
     world: Res<World>,
     mats: Res<Mats>,
     mut commands: Commands,
-    mut sfx: EventWriter<PlaySfx>,
+    mut alias: EventWriter<PlayAlias>,
     mut banner: EventWriter<Banner>,
     models: Option<Res<nacht::ZombieModels>>,
 ) {
@@ -45,24 +76,46 @@ fn tick(
                 // No open window (shouldn't happen) - give the zombie back.
                 round.0.to_spawn += 1;
                 round.0.alive -= 1;
-            } else if fastrand::f32() < 0.35 {
-                sfx.write(PlaySfx::at(Sfx::ZombieSpawn, 0.35));
             }
         }
         RoundEvent::RoundStarted(r) => {
             banner.write(Banner(format!("ROUND {r}")));
-            sfx.write(PlaySfx::new(if r == 1 { Sfx::GameStart } else { Sfx::RoundStart }));
+            // The chalk sound as the new tally appears.
+            let fallback = if r == 1 { Sfx::GameStart } else { Sfx::RoundStart };
+            alias.write(PlayAlias::local("chalk").after(if r == 1 { 1.5 } else { 0.5 }).or(fallback));
         }
         RoundEvent::RoundEnded(r) => {
             banner.write(Banner(format!("ROUND {r} SURVIVED")));
-            sfx.write(PlaySfx::new(Sfx::RoundEnd));
+            alias.write(PlayAlias::local("round_over").after(2.5).or(Sfx::RoundEnd));
         }
         RoundEvent::None => {}
     }
 }
 
-fn game_over(mut sfx: EventWriter<PlaySfx>) {
-    sfx.write(PlaySfx::new(Sfx::GameOver));
+fn game_over(mut alias: EventWriter<PlayAlias>, music: Query<Entity, With<MusicLoop>>, mut commands: Commands, mut beat: ResMut<Heartbeat>) {
+    for e in &music {
+        commands.entity(e).despawn();
+    }
+    alias.write(PlayAlias::local("mx_game_over").after(1.0).or(Sfx::GameOver));
+    *beat = Heartbeat { wait: 3.0, interval: 0.5, volume: 0.5 };
+}
+
+/// The heartbeat under the game-over screen: slowing down, getting louder.
+#[derive(Resource, Default)]
+pub struct Heartbeat {
+    wait: f32,
+    interval: f32,
+    volume: f32,
+}
+
+fn heartbeat(time: Res<Time>, mut beat: ResMut<Heartbeat>, mut alias: EventWriter<PlayAlias>) {
+    beat.wait -= time.delta_secs();
+    if beat.wait <= 0.0 {
+        alias.write(PlayAlias::local("heart_beat").volume(beat.volume));
+        beat.wait = beat.interval;
+        beat.interval = (beat.interval * 1.05).min(2.0);
+        beat.volume = (beat.volume * 1.05).min(1.0);
+    }
 }
 
 /// Ends any running session: despawns the level and everything spawned
@@ -83,6 +136,7 @@ pub fn reset_session(
         ResMut<Health>,
     ),
     (mut loadout, mut gun, mut mcrate, mut tracers): (ResMut<Loadout>, ResMut<Gun>, ResMut<MysteryCrate>, ResMut<Tracers>),
+    (mut music, mut pending): (ResMut<Music>, ResMut<PendingSounds>),
 ) {
     for e in &dynamic {
         commands.entity(e).try_despawn();
@@ -101,6 +155,8 @@ pub fn reset_session(
     *gun = Gun::default();
     *mcrate = MysteryCrate::default();
     tracers.0.clear();
+    *music = Music::default();
+    pending.clear();
     player::reset_player(&mut player_q, &level);
 }
 

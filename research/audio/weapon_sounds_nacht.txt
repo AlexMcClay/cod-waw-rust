@@ -1,0 +1,914 @@
+=== zombie_melee
+   times_ms iFireTime=75 iRechamberTime=50 iMeleeTime=700 meleeChargeTime=700 iReloadTime=1900 iReloadEmptyTime=2650 iDropTime=700 iRaiseTime=700 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=830 iEmptyRaiseTime=350 iEmptyDropTime=250 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  emptyFireSound             player_out_of_ammo
+   snd  meleeSwipeSound            attack_vocals
+   snd  meleeSwipeSoundPlayer      attack_vocals
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_pistol_reload_notempty_3p
+   snd  reloadSoundPlayer          gear_player
+   snd  reloadEmptySound           gr_pistol_reload_empty_3p
+   snd  reloadEmptySoundPlayer     gear_player
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+=== fraggrenade
+   times_ms iFireTime=400 iMeleeTime=660 iReloadTime=2000 iDropTime=250 iRaiseTime=250 quickDropTime=500 quickRaiseTime=500 iFirstRaiseTime=500 iEmptyRaiseTime=500 iEmptyDropTime=500 iAltRaiseTime=1000 iAltDropTime=50
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  pullbackSound              grenade_pull_pin
+   snd  pullbackSoundPlayer        grenade_pull_pin
+   snd  fireSound                  foley_throw
+   snd  fireSoundPlayer            foley_throw
+   snd  emptyFireSound             player_out_of_ammo
+   snd  reloadSound                weap_fraggrenade_reload
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+=== kar98k
+   times_ms iFireTime=330 iRechamberTime=1000 iRechamberBoltTime=650 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=2500 iReloadEmptyTime=2500 iReloadAddTime=1650 iReloadStartAddTime=1650 iDropTime=400 iRaiseTime=500 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=900 iEmptyRaiseTime=500 iEmptyDropTime=400 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_kar98k_fire
+   snd  fireSoundPlayer            weap_kar98k_fire_plr
+   snd  fireLastSound              weap_kar98k_fire
+   snd  fireLastSoundPlayer        weap_kar98k_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  rechamberSound             gr_rifle_rechamber_3p
+   snd  reloadSound                gr_rifle_round_in_3p
+   snd  reloadStartSound           gr_rifle_open_3p
+   snd  reloadEndSound             gr_rifle_close_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_kar98_bolt_up_plr', 'gr_kar98_bolt_up_plr'), ('gr_kar98_bolt_back_plr', 'gr_kar98_bolt_back_plr'), ('gr_kar98_clip_in_plr', 'gr_kar98_clip_in_plr'), ('gr_kar98_bolt_front_plr', 'gr_kar98_bolt_front_plr'), ('gr_kar98_clip_eject_plr', 'gr_kar98_clip_eject_plr'), ('gr_kar98_clip_land_plr', 'gr_kar98_clip_land_plr'), ('gr_kar98_bolt_down_plr', 'gr_kar98_bolt_down_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim rechamber    viewmodel_kar98_rechamber            zone nf=31 gr_kar98_bolt_up_plr@f7(0.233s) gr_kar98_bolt_back_plr@f11(0.367s) gr_kar98_bolt_front_plr@f19(0.633s)
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_kar98_reload               zone nf=79 gr_kar98_bolt_up_plr@f5(0.167s) gr_kar98_bolt_back_plr@f9(0.300s) gr_kar98_clip_in_plr@f44(1.467s) gr_kar98_bolt_front_plr@f64(2.133s) gr_kar98_clip_eject_plr@f65(2.167s) gr_kar98_bolt_down_plr@f71(2.367s)
+   anim reloadEmpty  viewmodel_kar98_reload               zone nf=79 gr_kar98_bolt_up_plr@f5(0.167s) gr_kar98_bolt_back_plr@f9(0.300s) gr_kar98_clip_in_plr@f44(1.467s) gr_kar98_bolt_front_plr@f64(2.133s) gr_kar98_clip_eject_plr@f65(2.167s) gr_kar98_bolt_down_plr@f71(2.367s)
+   anim adsRechamber viewmodel_kar98_rechamber            zone nf=31 gr_kar98_bolt_up_plr@f7(0.233s) gr_kar98_bolt_back_plr@f11(0.367s) gr_kar98_bolt_front_plr@f19(0.633s)
+=== walther
+   times_ms iFireTime=135 iRechamberTime=100 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=2100 iReloadEmptyTime=2500 iReloadAddTime=1600 iDropTime=300 iRaiseTime=350 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=1000 iEmptyRaiseTime=350 iEmptyDropTime=500 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          p38_first_raise
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_p38_fire
+   snd  fireSoundPlayer            weap_p38_fire_plr
+   snd  fireLastSound              weap_p38_fire
+   snd  fireLastSoundPlayer        weap_p38_fire_plr
+   snd  emptyFireSound             dryfire_pistol
+   snd  emptyFireSoundPlayer       dryfire_pistol_plr
+   snd  meleeSwipeSound            melee_swing_small
+   snd  meleeSwipeSoundPlayer      melee_swing_small_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_pistol_reload_notempty_3p
+   snd  reloadEmptySound           gr_pistol_reload_empty_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      p38_first_raise
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_p38_mag_in_plr', 'gr_p38_mag_in_plr'), ('gr_p38_mag_out_plr', 'gr_p38_mag_out_plr'), ('gr_p38_slide_forward_plr', 'gr_p38_slide_forward_plr'), ('gr_p38_futz_plr', 'gr_p38_futz_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_Walther_p38_reload_notempty zone nf=62 gr_p38_mag_out_plr@f9(0.375s) gr_p38_futz_plr@f28(1.167s) gr_p38_mag_in_plr@f42(1.750s)
+   anim reloadEmpty  viewmodel_Walther_p38_reload         zone nf=66 gr_p38_mag_out_plr@f9(0.375s) gr_p38_futz_plr@f37(1.542s) gr_p38_mag_in_plr@f42(1.750s) gr_p38_slide_forward_plr@f56(2.333s)
+=== stielhandgranate
+   times_ms iFireTime=400 iMeleeTime=660 iReloadTime=2000 iDropTime=250 iRaiseTime=250 quickDropTime=500 quickRaiseTime=500 iFirstRaiseTime=500 iEmptyRaiseTime=500 iEmptyDropTime=500 iAltRaiseTime=400 iAltDropTime=50
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  pullbackSound              grenade_pull_pin
+   snd  pullbackSoundPlayer        grenade_pull_pin
+   snd  fireSound                  foley_throw
+   snd  fireSoundPlayer            foley_throw
+   snd  emptyFireSound             player_out_of_ammo
+   snd  reloadSound                weap_fraggrenade_reload
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+=== m1garand
+   times_ms iFireTime=135 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=3400 iReloadEmptyTime=1600 iReloadAddTime=2500 iDropTime=250 iRaiseTime=800 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=1000 iEmptyRaiseTime=400 iEmptyDropTime=250 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_m1garand_fire
+   snd  fireSoundPlayer            weap_m1garand_fire_plr
+   snd  fireLastSound              weap_m1garand_lastshot
+   snd  fireLastSoundPlayer        weap_m1garand_lastshot_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_smg_reload_notempty_3p
+   snd  reloadSoundPlayer          gear_player
+   snd  reloadEmptySound           gr_smg_reload_empty_3p
+   snd  reloadEmptySoundPlayer     gear_player
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_m1gar_breech_close_plr', 'gr_m1gar_breech_close_plr'), ('gr_m1gar_clip_in_plr', 'gr_m1gar_clip_in_plr'), ('gr_m1gar_clip_out_plr', 'gr_m1gar_clip_out_plr'), ('gr_m1gar_pull_slide_plr', 'gr_m1gar_pull_slide_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_m1garand_partial_reload    zone nf=105 gr_m1gar_pull_slide_plr@f12(0.500s) gr_m1gar_clip_out_plr@f22(0.917s) gr_m1gar_futz_plr@f25(1.042s) gr_m1gar_breech_close_plr@f29(1.208s) gr_m1gar_pull_slide_plr@f65(2.708s) gr_m1gar_clip_in_plr@f75(3.125s) gr_m1gar_breech_close_plr@f82(3.417s)
+   anim reloadEmpty  viewmodel_m1garand_reload            zone nf=46 gr_m1garand_futz_plr@f17(0.708s) gr_m1gar_clip_in_plr@f24(1.000s) gr_m1gar_breech_close_plr@f33(1.375s)
+   anim firstRaise   viewmodel_m1garand_first_pullout     zone nf=64 gr_m1gar_pull_slide_plr@f16(0.667s) gr_m1gar_breech_close_plr@f32(1.333s)
+=== kar98k_scoped_zombie
+   times_ms iFireTime=330 iRechamberTime=1200 iRechamberBoltTime=650 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=600 iReloadEmptyTime=600 iReloadAddTime=200 iReloadStartTime=1800 iReloadStartAddTime=1400 iReloadEndTime=770 iDropTime=500 iRaiseTime=700 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=850 iEmptyRaiseTime=400 iEmptyDropTime=330 deployTime=500 breakdownTime=500 iAltDropTime=660
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_kar98k_fire_snp
+   snd  fireSoundPlayer            weap_kar98k_fire_plr_snp
+   snd  fireLastSound              weap_kar98k_fire_snp
+   snd  fireLastSoundPlayer        weap_kar98k_fire_plr_snp
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  rechamberSound             gr_rifle_rechamber_3p
+   snd  reloadSound                gr_rifle_round_in_3p
+   snd  reloadStartSound           gr_rifle_open_3p
+   snd  reloadEndSound             gr_rifle_close_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_kar98_shell_in_plr', 'gr_kar98_shell_in_plr'), ('gr_kar98_bolt_up_plr', 'gr_kar98_bolt_up_plr'), ('gr_kar98_bolt_back_plr', 'gr_kar98_bolt_back_plr'), ('gr_kar98_clip_in_plr', 'gr_kar98_clip_in_plr'), ('gr_kar98_bolt_front_plr', 'gr_kar98_bolt_front_plr'), ('gr_kar98_clip_eject_plr', 'gr_kar98_clip_eject_plr'), ('gr_kar98_clip_land_plr', 'gr_kar98_clip_land_plr'), ('gr_kar98_bolt_down_plr', 'gr_kar98_bolt_down_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim rechamber    viewmodel_kar98scoped_rechamber      zone nf=31 gr_kar98_bolt_up_plr@f7(0.233s) gr_kar98_bolt_back_plr@f11(0.367s) gr_kar98_bolt_front_plr@f19(0.633s)
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_kar98scoped_reload_loop    zone nf=20 gr_kar98_shell_in_plr@f6(0.200s)
+   anim reloadEmpty  viewmodel_kar98scoped_reload_loop    zone nf=20 gr_kar98_shell_in_plr@f6(0.200s)
+   anim reloadStart  viewmodel_kar98scoped_reload_start   zone nf=55 gr_kar98_bolt_up_plr@f4(0.133s) gr_kar98_bolt_back_plr@f7(0.233s) gr_kar98_shell_in_plr@f41(1.367s)
+   anim reloadEnd    viewmodel_kar98scoped_reload_end     zone nf=28 gr_kar98_bolt_front_plr@f10(0.333s) gr_kar98_bolt_down_plr@f15(0.500s)
+   anim adsRechamber viewmodel_kar98scoped_rechamber      zone nf=31 gr_kar98_bolt_up_plr@f7(0.233s) gr_kar98_bolt_back_plr@f11(0.367s) gr_kar98_bolt_front_plr@f19(0.633s)
+=== m2_flamethrower_zombie
+   times_ms iFireTime=200 iRechamberBoltTime=100000 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=1830 iReloadAddTime=1300 iDropTime=500 iRaiseTime=1000 quickDropTime=250 quickRaiseTime=500 iFirstRaiseTime=1300 iEmptyRaiseTime=500 iEmptyDropTime=500 iAltDropTime=700
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_flamethrower_foley_F
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  emptyFireSound             player_out_of_ammo
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_flamethrower_foley_F
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+=== molotov
+   times_ms iFireTime=400 iMeleeTime=660 iReloadTime=1500 iRaiseTime=250 quickRaiseTime=500 iFirstRaiseTime=500 iEmptyRaiseTime=500 iAltRaiseTime=50
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  pullbackSound              weap_molotov_light
+   snd  pullbackSoundPlayer        weap_molotov_light
+   snd  fireSound                  weap_molotov_throw
+   snd  fireSoundPlayer            weap_molotov_throw
+   snd  emptyFireSound             player_out_of_ammo
+   snd  detonateSound              weap_molotov_impact
+   snd  detonateSoundPlayer        weap_molotov_impact
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+=== napalmblob
+   times_ms iFireTime=400 iMeleeTime=660 iReloadTime=2000 iDropTime=250 iRaiseTime=250 quickDropTime=500 quickRaiseTime=500 iFirstRaiseTime=500 iEmptyRaiseTime=500 iEmptyDropTime=500 iAltRaiseTime=50 iAltDropTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  pullbackSound              weap_fraggrenade_pin
+   snd  fireSound                  weap_fraggrenade_fire
+   snd  emptyFireSound             player_out_of_ammo
+   snd  reloadSound                weap_fraggrenade_reload
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSoundPlayer      weap_putaway_plr
+   snd  putawaySound               weap_putaway
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+=== napalmbloblight
+   times_ms iFireTime=400 iMeleeTime=660 iReloadTime=2000 iDropTime=250 iRaiseTime=250 quickDropTime=500 quickRaiseTime=500 iFirstRaiseTime=500 iEmptyRaiseTime=500 iEmptyDropTime=500 iAltRaiseTime=50 iAltDropTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  pullbackSound              weap_fraggrenade_pin
+   snd  fireSound                  weap_fraggrenade_fire
+   snd  emptyFireSound             player_out_of_ammo
+   snd  reloadSound                weap_fraggrenade_reload
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSoundPlayer      weap_putaway_plr
+   snd  putawaySound               weap_putaway
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+=== doublebarrel
+   times_ms iFireTime=283 iRechamberTime=800 iRechamberBoltTime=250 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=3000 iReloadEmptyTime=4000 iReloadAddTime=2650 iReloadStartTime=900 iReloadEndTime=950 iDropTime=380 iRaiseTime=600 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=600 iEmptyRaiseTime=440 iEmptyDropTime=380 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_shotgun_fire_pump
+   snd  fireSoundPlayer            weap_dbshot_fire_plr
+   snd  fireLastSound              weap_shotgun_fire_pump
+   snd  fireLastSoundPlayer        weap_dbshot_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_dbshot_click_plr', 'gr_dbshot_click_plr'), ('gr_dbshot_break_plr', 'gr_dbshot_break_plr'), ('gr_dbshot_shake_plr', 'gr_dbshot_shake_plr'), ('gr_dbshot_shake_1brl_plr', 'gr_dbshot_shake_1brl_plr'), ('gr_dbshot_shell_in_1_plr', 'gr_dbshot_shell_in_1_plr'), ('gr_dbshot_shell_in_2_plr', 'gr_dbshot_shell_in_2_plr'), ('gr_dbshot_close_plr', 'gr_dbshot_close_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_double_barrel_shotgun_partial_reload zone nf=94 gr_dbshot_click_plr@f8(0.267s) gr_dbshot_break_plr@f18(0.600s) gr_dbshot_shake_1brl_plr@f40(1.333s) gr_dbshot_shell_in_1_plr@f60(2.000s) gr_dbshot_close_plr@f80(2.667s)
+   anim reloadEmpty  viewmodel_double_barrel_shotgun_reload zone nf=110 gr_dbshot_click_plr@f5(0.167s) gr_dbshot_break_plr@f19(0.633s) gr_dbshot_shake_plr@f31(1.033s) gr_dbshot_shell_in_1_plr@f66(2.200s) gr_dbshot_shell_in_2_plr@f75(2.500s) gr_dbshot_close_plr@f95(3.167s)
+=== m1carbine
+   times_ms iFireTime=135 iRechamberTime=100 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=2900 iReloadEmptyTime=3700 iReloadAddTime=2200 iReloadStartAddTime=2300 iDropTime=400 iRaiseTime=500 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=1400 iEmptyRaiseTime=500 iEmptyDropTime=400 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          carbine_first_raise
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_carbine_fire
+   snd  fireSoundPlayer            weap_carbine_fire_plr
+   snd  fireLastSound              weap_carbine_fire
+   snd  fireLastSoundPlayer        weap_carbine_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_smg_reload_notempty_3p
+   snd  reloadEmptySound           gr_smg_reload_empty_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      carbine_first_raise
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr'), ('gr_m1carbine_mag_out_plr', 'gr_m1carbine_mag_out_plr'), ('gr_m1carbine_futz_plr', 'gr_m1carbine_futz_plr'), ('gr_m1carbine_mag_in_plr', 'gr_m1carbine_mag_in_plr'), ('gr_m1carbine_tap_plr', 'gr_m1carbine_tap_plr'), ('gr_m1carbine_charge_plr', 'gr_m1carbine_charge_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_carbine_reload             zone nf=95 gr_m1carbine_mag_out_plr@f23(0.767s) gr_m1carbine_futz_plr@f50(1.667s) gr_m1carbine_mag_in_plr@f55(1.833s) gr_m1carbine_tap_plr@f71(2.367s)
+   anim reloadEmpty  viewmodel_carbine_reload_empty       zone nf=111 gr_m1carbine_mag_out_plr@f20(0.667s) gr_m1carbine_futz_plr@f50(1.667s) gr_m1carbine_mag_in_plr@f54(1.800s) gr_m1carbine_tap_plr@f71(2.367s) gr_m1carbine_charge_plr@f94(3.133s)
+=== fg42_bipod
+   times_ms iFireTime=64 iRechamberTime=100 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=2400 iReloadEmptyTime=3500 iReloadAddTime=1850 iReloadStartAddTime=1750 iDropTime=500 iRaiseTime=700 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=700 iEmptyRaiseTime=500 iEmptyDropTime=500 deployTime=1400 breakdownTime=1300
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_fg42_fire
+   snd  fireSoundPlayer            weap_fg42_fire_plr
+   snd  fireLastSound              weap_fg42_fire
+   snd  fireLastSoundPlayer        weap_fg42_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_smg_reload_notempty_3p
+   snd  reloadEmptySound           gr_smg_reload_empty_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr'), ('gr_fg42_mag_out_plr', 'gr_fg42_mag_out_plr'), ('gr_fg42_futz_plr', 'gr_fg42_futz_plr'), ('gr_fg42_mag_in_plr', 'gr_fg42_mag_in_plr'), ('gr_fg42_pull_plr', 'gr_fg42_pull_plr'), ('gr_fg42_release_plr', 'gr_fg42_release_plr'), ('gr_mg_deploy_start', 'gr_mg_deploy_start'), ('gr_mg_deploy_end', 'gr_mg_deploy_end'), ('gr_mg_break_down', 'gr_mg_break_down')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_fg42_partial_reload        zone nf=89 gr_fg42_mag_out_plr@f15(0.500s) gr_fg42_futz_plr@f61(2.033s) gr_fg42_mag_in_plr@f67(2.233s)
+   anim reloadEmpty  viewmodel_fg42_reload                zone nf=148 gr_fg42_mag_out_plr@f15(0.500s) gr_fg42_futz_plr@f61(2.033s) gr_fg42_mag_in_plr@f67(2.233s) gr_fg42_pull_plr@f110(3.667s) gr_fg42_release_plr@f116(3.867s)
+   anim deploy       viewmodel_fg42_deploy                zone nf=40 gr_mg_deploy_start@f11(0.367s) gr_mg_deploy_end@f17(0.567s)
+   anim breakdown    viewmodel_fg42_breakdown             zone nf=40 gr_mg_break_down@f10(0.333s)
+=== doublebarrel_sawed_grip
+   times_ms iFireTime=283 iRechamberTime=800 iRechamberBoltTime=250 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=3000 iReloadEmptyTime=4000 iReloadAddTime=2650 iReloadStartTime=900 iReloadEndTime=950 iDropTime=380 iRaiseTime=600 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=600 iEmptyRaiseTime=440 iEmptyDropTime=380 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_shotgun_fire_pump
+   snd  fireSoundPlayer            weap_dbsawshot_fire_plr
+   snd  fireLastSound              weap_shotgun_fire_pump
+   snd  fireLastSoundPlayer        weap_dbsawshot_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_dbshot_click_plr', 'gr_dbshot_click_plr'), ('gr_dbshot_break_plr', 'gr_dbshot_break_plr'), ('gr_dbshot_shake_plr', 'gr_dbshot_shake_plr'), ('gr_dbshot_shake_1brl_plr', 'gr_dbshot_shake_1brl_plr'), ('gr_dbshot_shell_in_1_plr', 'gr_dbshot_shell_in_1_plr'), ('gr_dbshot_shell_in_2_plr', 'gr_dbshot_shell_in_2_plr'), ('gr_dbshot_close_plr', 'gr_dbshot_close_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim rechamber    viewmodel_trenchgun_rechamber        zone nf=27 gr_shotgun_pull_plr@f7(0.233s) gr_shotgun_push_plr@f14(0.467s)
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_double_barrel_shotgun_partial_reload zone nf=94 gr_dbshot_click_plr@f8(0.267s) gr_dbshot_break_plr@f18(0.600s) gr_dbshot_shake_1brl_plr@f40(1.333s) gr_dbshot_shell_in_1_plr@f60(2.000s) gr_dbshot_close_plr@f80(2.667s)
+   anim reloadEmpty  viewmodel_double_barrel_shotgun_reload zone nf=110 gr_dbshot_click_plr@f5(0.167s) gr_dbshot_break_plr@f19(0.633s) gr_dbshot_shake_plr@f31(1.033s) gr_dbshot_shell_in_1_plr@f66(2.200s) gr_dbshot_shell_in_2_plr@f75(2.500s) gr_dbshot_close_plr@f95(3.167s)
+=== gewehr43
+   times_ms iFireTime=125 iRechamberTime=100 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=3000 iReloadEmptyTime=4000 iReloadAddTime=2050 iReloadStartAddTime=2350 iDropTime=500 iRaiseTime=600 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=1000 iEmptyRaiseTime=400 iEmptyDropTime=300 deployTime=500 breakdownTime=500 iAltRaiseTime=500 iAltDropTime=900
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          gewehr_first_raise
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_g43_fire
+   snd  fireSoundPlayer            weap_g43_fire_plr
+   snd  fireLastSound              weap_g43_fire
+   snd  fireLastSoundPlayer        weap_g43_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_smg_reload_notempty_3p
+   snd  reloadEmptySound           gr_smg_reload_empty_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      gewehr_first_raise
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_g43_tap_plr', 'gr_g43_tap_plr'), ('gr_g43_mag_out_plr', 'gr_g43_mag_out_plr'), ('gr_g43_mag_in_plr', 'gr_g43_mag_in_plr'), ('gr_g43_tap_plr', 'gr_g43_tap_plr'), ('gr_kar98_bolt_back_plr', 'gr_kar98_bolt_back_plr'), ('gr_kar98_bolt_front_plr', 'gr_kar98_bolt_front_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_g43_noscope_partial_reload zone nf=99 gr_g43_mag_out_plr@f18(0.600s) gr_g43_mag_in_plr@f51(1.700s) gr_g43_tap_plr@f66(2.200s)
+   anim reloadEmpty  viewmodel_g43_noscope_reload         zone nf=142 gr_g43_tap_plr@f26(0.867s) gr_g43_mag_out_plr@f33(1.100s) gr_g43_mag_in_plr@f63(2.100s) gr_g43_tap_plr@f82(2.733s) gr_kar98_bolt_front_plr@f118(3.933s)
+=== ptrs41_zombie
+   times_ms iFireTime=800 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=4000 iReloadEmptyTime=5300 iReloadAddTime=2500 iDropTime=850 iRaiseTime=1100 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=1100 iEmptyRaiseTime=1100 iEmptyDropTime=850 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_ptrs_fire
+   snd  fireSoundPlayer            weap_ptrs_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_smg_reload_notempty_3p
+   snd  reloadEmptySound           gr_smg_reload_empty_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr'), ('gr_ptrs_clip_in_plr', 'gr_ptrs_clip_in_plr'), ('gr_ptrs_open_plr', 'gr_ptrs_open_plr'), ('gr_ptrs_close_plr', 'gr_ptrs_close_plr'), ('gr_ptrs_pull_plr', 'gr_ptrs_pull_plr'), ('gr_ptrs_release_plr', 'gr_ptrs_release_plr'), ('gr_ptrs_futz_plr', 'gr_ptrs_futz_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_ptrs_reload                zone nf=160 gr_ptrs_open_plr@f45(1.500s) gr_ptrs_futz_plr@f92(3.067s) gr_ptrs_clip_in_plr@f96(3.200s) gr_ptrs_close_plr@f121(4.033s)
+   anim reloadEmpty  viewmodel_ptrs_reload_empty          zone nf=190 gr_ptrs_open_plr@f37(1.233s) gr_ptrs_futz_plr@f76(2.533s) gr_ptrs_clip_in_plr@f80(2.667s) gr_ptrs_close_plr@f101(3.367s) gr_ptrs_pull_plr@f147(4.900s) gr_ptrs_release_plr@f155(5.167s)
+=== shotgun
+   times_ms iFireTime=283 iRechamberTime=800 iRechamberBoltTime=250 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=600 iReloadEmptyTime=600 iReloadStartTime=900 iReloadStartAddTime=750 iReloadEndTime=950 iDropTime=380 iRaiseTime=600 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=600 iEmptyRaiseTime=440 iEmptyDropTime=380 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_shotgun_fire_pump
+   snd  fireSoundPlayer            weap_shotgun_fire_pump_plr
+   snd  fireLastSound              weap_shotgun_fire_pump
+   snd  fireLastSoundPlayer        weap_shotgun_fire_pump_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  rechamberSound             gr_shotgun_rechamber
+   snd  reloadSound                gr_shotgun_shell
+   snd  reloadStartSound           gr_shotgun_pull
+   snd  reloadEndSound             gr_shotgun_push
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_shotgun_pull_plr', 'gr_shotgun_pull_plr'), ('gr_shotgun_push_plr', 'gr_shotgun_push_plr'), ('gr_shotgun_shell_plr', 'gr_shotgun_shell_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim rechamber    viewmodel_trenchgun_rechamber        zone nf=27 gr_shotgun_pull_plr@f7(0.233s) gr_shotgun_push_plr@f14(0.467s)
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_trenchgun_reload_loop      zone nf=39 gr_shotgun_shell_plr@f17(0.567s)
+   anim reloadEmpty  viewmodel_trenchgun_reload_loop      zone nf=39 gr_shotgun_shell_plr@f17(0.567s)
+   anim reloadStart  viewmodel_trenchgun_reload_start     zone nf=55 gr_shotgun_shell_plr@f34(1.133s)
+   anim reloadEnd    viewmodel_trenchgun_reload_end       zone nf=35 gr_shotgun_pull_plr@f12(0.400s) gr_shotgun_push_plr@f15(0.500s)
+   anim adsRechamber viewmodel_trenchgun_rechamber        zone nf=27 gr_shotgun_pull_plr@f7(0.233s) gr_shotgun_push_plr@f14(0.467s)
+=== stg44
+   times_ms iFireTime=112 iRechamberTime=100 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=2150 iReloadEmptyTime=2800 iReloadAddTime=1400 iReloadStartAddTime=1400 iDropTime=400 iRaiseTime=600 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=1000 iEmptyRaiseTime=600 iEmptyDropTime=400 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          stg44_first_raise
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_MP44_fire
+   snd  fireSoundPlayer            weap_MP44_fire_plr
+   snd  fireLastSoundPlayer        weap_MP44_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_smg_reload_notempty_3p
+   snd  reloadEmptySound           gr_smg_reload_empty_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      stg44_first_raise
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr'), ('gr_mp44_mag_out_plr', 'gr_mp44_mag_out_plr'), ('gr_mp44_futz_plr', 'gr_mp44_futz_plr'), ('gr_mp44_mag_in_plr', 'gr_mp44_mag_in_plr'), ('gr_mp44_charge_plr', 'gr_mp44_charge_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_mp44_reload                zone nf=60 gr_mp44_mag_out_plr@f11(0.367s) gr_mp44_futz_plr@f34(1.133s) gr_mp44_mag_in_plr@f41(1.367s)
+   anim reloadEmpty  viewmodel_mp44_reload_empty          zone nf=85 gr_mp44_mag_out_plr@f11(0.367s) gr_mp44_futz_plr@f34(1.133s) gr_mp44_mag_in_plr@f37(1.233s) gr_mp44_charge_plr@f63(2.100s)
+=== thompson
+   times_ms iFireTime=80 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=2100 iReloadEmptyTime=2450 iReloadAddTime=1600 iReloadStartAddTime=1200 iDropTime=380 iRaiseTime=440 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=600 iEmptyRaiseTime=440 iEmptyDropTime=380 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_thompson_fire
+   snd  fireSoundPlayer            weap_thompson_fire_plr
+   snd  emptyFireSound             dryfire_smg
+   snd  emptyFireSoundPlayer       dryfire_smg_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_smg_reload_notempty_3p
+   snd  reloadEmptySound           gr_smg_reload_empty_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_thompson_mag_in_plr', 'gr_thompson_mag_in_plr'), ('gr_thompson_mag_out_plr', 'gr_thompson_mag_out_plr'), ('gr_thompson_charge_plr', 'gr_thompson_charge_plr'), ('gr_thompson_futz_plr', 'gr_thompson_futz_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_thompson_reload            zone nf=58 gr_thompson_mag_out_plr@f13(0.433s) gr_thompson_mag_in_plr@f41(1.367s)
+   anim reloadEmpty  viewmodel_thompson_reload_empty      zone nf=77 gr_thompson_mag_out_plr@f13(0.433s) gr_thompson_mag_in_plr@f30(1.000s) gr_thompson_charge_plr@f52(1.733s)
+=== mp40
+   times_ms iFireTime=112 iRechamberTime=100 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=2300 iReloadEmptyTime=2900 iReloadAddTime=1850 iReloadStartAddTime=1850 iDropTime=300 iRaiseTime=350 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=1330 iEmptyRaiseTime=350 iEmptyDropTime=300 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_mp40_fire
+   snd  fireSoundPlayer            weap_mp40_fire_plr
+   snd  fireLastSound              weap_mp40_fire
+   snd  fireLastSoundPlayer        weap_mp40_fire_plr
+   snd  emptyFireSound             dryfire_smg
+   snd  emptyFireSoundPlayer       dryfire_smg_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_smg_reload_notempty_3p
+   snd  reloadEmptySound           gr_smg_reload_empty_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_mp40_mag_in_plr', 'gr_mp40_mag_in_plr'), ('gr_mp40_mag_out_plr', 'gr_mp40_mag_out_plr'), ('gr_mp40_charge_plr', 'gr_mp40_charge_plr'), ('gr_mp40_futz_plr', 'gr_mp40_futz_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_mp40_reload                zone nf=78 gr_mp40_mag_out_plr@f18(0.600s) gr_mp40_futz_plr@f49(1.633s) gr_mp40_mag_in_plr@f61(2.033s)
+   anim reloadEmpty  viewmodel_mp40_reload_empty          zone nf=100 gr_mp40_mag_out_plr@f18(0.600s) gr_mp40_futz_plr@f51(1.700s) gr_mp40_mag_in_plr@f61(2.033s) gr_mp40_charge_plr@f81(2.700s)
+   anim firstRaise   viewmodel_mp40_first_raise           zone nf=50 gr_mp40_charge_plr@f19(0.633s)
+=== mg42_bipod
+   times_ms iFireTime=64 iRechamberTime=100 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=4500 iReloadEmptyTime=4500 iReloadAddTime=2000 iReloadStartAddTime=2000 iDropTime=800 iRaiseTime=800 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=800 iEmptyRaiseTime=800 iEmptyDropTime=800 deployTime=1600 breakdownTime=1200
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_mg42_fire
+   snd  fireSoundPlayer            weap_mg42_fire_plr
+   snd  fireLastSound              weap_mg42_fire
+   snd  fireLastSoundPlayer        weap_mg42_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_smg_reload_notempty_3p
+   snd  reloadEmptySound           gr_smg_reload_empty_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr'), ('gr_mg42_jimmy_plr', 'gr_mg42_jimmy_plr'), ('gr_mg42_mag_out_plr', 'gr_mg42_mag_out_plr'), ('gr_mg42_futz_plr', 'gr_mg42_futz_plr'), ('gr_mg42_mag_in_plr', 'gr_mg42_mag_in_plr'), ('gr_mg42_pull_plr', 'gr_mg42_pull_plr'), ('gr_mg42_charge_plr', 'gr_mg42_charge_plr'), ('gr_mg_deploy_start', 'gr_mg_deploy_start'), ('gr_mg_deploy_end', 'gr_mg_deploy_end'), ('gr_mg_break_down', 'gr_mg_break_down')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_mg42_reload                zone nf=150 gr_mg42_jimmy_plr@f18(0.600s) gr_mg42_mag_out_plr@f25(0.833s) gr_mg42_futz_plr@f55(1.833s) gr_mg42_mag_in_plr@f64(2.133s) gr_mg42_pull_plr@f101(3.367s) gr_mg42_charge_plr@f111(3.700s)
+   anim reloadEmpty  viewmodel_mg42_reload_empty          zone nf=150 gr_mg42_jimmy_plr@f18(0.600s) gr_mg42_mag_out_plr@f25(0.833s) gr_mg42_futz_plr@f55(1.833s) gr_mg42_mag_in_plr@f64(2.133s) gr_mg42_pull_plr@f101(3.367s) gr_mg42_charge_plr@f111(3.700s)
+   anim deploy       viewmodel_mg42_deploy                zone nf=52 gr_mg_deploy_start@f23(0.767s) gr_mg_deploy_end@f32(1.067s)
+   anim breakdown    viewmodel_mg42_breakdown             zone nf=48 gr_mg_break_down@f19(0.633s)
+=== bar
+   times_ms iFireTime=160 iRechamberTime=100 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=2750 iReloadEmptyTime=3250 iReloadAddTime=1950 iReloadStartAddTime=1750 iDropTime=400 iRaiseTime=600 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=650 iEmptyRaiseTime=600 iEmptyDropTime=400 deployTime=500 breakdownTime=500 iAltRaiseTime=660 iAltDropTime=660
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_bar_fire
+   snd  fireSoundPlayer            weap_bar_fire_plr
+   snd  fireLastSound              weap_bar_fire
+   snd  fireLastSoundPlayer        weap_bar_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_smg_reload_notempty_3p
+   snd  reloadSoundPlayer          gear_player
+   snd  reloadEmptySound           gr_smg_reload_empty_3p
+   snd  reloadEmptySoundPlayer     gear_player
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_bar_charge_plr', 'gr_bar_charge_plr'), ('gr_bar_mag_in_plr', 'gr_bar_mag_in_plr'), ('gr_bar_mag_out_plr', 'gr_bar_mag_out_plr'), ('gr_bar_tap_plr', 'gr_bar_tap_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_bar_reload                 zone nf=106 gr_bar_mag_out_plr@f27(0.900s) gr_bar_mag_in_plr@f59(1.967s) gr_bar_tap_plr@f73(2.433s)
+   anim reloadEmpty  viewmodel_bar_reload_empty           zone nf=137 gr_bar_mag_out_plr@f27(0.900s) gr_bar_mag_in_plr@f58(1.933s) gr_bar_tap_plr@f73(2.433s) gr_bar_charge_plr@f102(3.400s)
+=== springfield
+   times_ms iFireTime=330 iRechamberTime=1000 iRechamberBoltTime=650 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=3200 iReloadEmptyTime=3200 iReloadAddTime=2000 iDropTime=400 iRaiseTime=500 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=750 iEmptyRaiseTime=500 iEmptyDropTime=400 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_springfield_fire
+   snd  fireSoundPlayer            weap_springfield_fire_plr
+   snd  fireLastSound              weap_springfield_fire
+   snd  fireLastSoundPlayer        weap_springfield_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  rechamberSound             gr_rifle_rechamber_3p
+   snd  reloadSound                gr_rifle_round_in_3p
+   snd  reloadStartSound           gr_rifle_open_3p
+   snd  reloadEndSound             gr_rifle_close_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr'), ('gr_springfield_bolt_back_plr', 'gr_springfield_bolt_back_plr'), ('gr_springfield_bolt_front_plr', 'gr_springfield_bolt_front_plr'), ('gr_springfield_bolt_down_plr', 'gr_springfield_bolt_down_plr'), ('gr_springfield_bolt_up_plr', 'gr_springfield_bolt_up_plr'), ('gr_springfield_clip_in_plr', 'gr_springfield_clip_in_plr'), ('gr_springfield_clip_eject_plr', 'gr_springfield_clip_eject_plr'), ('gr_springfield_clip_eject_plr', 'gr_springfield_clip_eject_plr'), ('gr_springfield_shell_in_plr', 'gr_springfield_shell_in_plr')]
+   anim rechamber    viewmodel_springfield_rechamber      zone nf=36 gr_springfield_bolt_up_plr@f5(0.167s) gr_springfield_bolt_back_plr@f11(0.367s) gr_springfield_bolt_front_plr@f19(0.633s) gr_springfield_bolt_down_plr@f23(0.767s)
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_springfield_reload         zone nf=92 gr_springfield_bolt_up_plr@f12(0.400s) gr_springfield_bolt_back_plr@f18(0.600s) gr_springfield_clip_in_plr@f55(1.833s) gr_springfield_clip_eject_plr@f78(2.600s) gr_springfield_bolt_front_plr@f78(2.600s) gr_springfield_bolt_down_plr@f83(2.767s) gr_springfield_clip_land_plr@f85(2.833s)
+   anim reloadEmpty  viewmodel_springfield_reload         zone nf=92 gr_springfield_bolt_up_plr@f12(0.400s) gr_springfield_bolt_back_plr@f18(0.600s) gr_springfield_clip_in_plr@f55(1.833s) gr_springfield_clip_eject_plr@f78(2.600s) gr_springfield_bolt_front_plr@f78(2.600s) gr_springfield_bolt_down_plr@f83(2.767s) gr_springfield_clip_land_plr@f85(2.833s)
+   anim adsRechamber viewmodel_springfield_rechamber      zone nf=36 gr_springfield_bolt_up_plr@f5(0.167s) gr_springfield_bolt_back_plr@f11(0.367s) gr_springfield_bolt_front_plr@f19(0.633s) gr_springfield_bolt_down_plr@f23(0.767s)
+=== m1garand_gl
+   times_ms iFireTime=135 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=3400 iReloadEmptyTime=1600 iReloadAddTime=2500 iDropTime=250 iRaiseTime=800 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=1000 iEmptyRaiseTime=400 iEmptyDropTime=250 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_m1garand_fire
+   snd  fireSoundPlayer            weap_m1garand_fire_plr
+   snd  fireLastSound              weap_m1garand_lastshot
+   snd  fireLastSoundPlayer        weap_m1garand_lastshot_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_smg_reload_notempty_3p
+   snd  reloadSoundPlayer          gear_player
+   snd  reloadEmptySound           gr_smg_reload_empty_3p
+   snd  reloadEmptySoundPlayer     gear_player
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_m1gar_breech_close_plr', 'gr_m1gar_breech_close_plr'), ('gr_m1gar_clip_in_plr', 'gr_m1gar_clip_in_plr'), ('gr_m1gar_clip_out_plr', 'gr_m1gar_clip_out_plr'), ('gr_m1gar_pull_slide_plr', 'gr_m1gar_pull_slide_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr'), ('gr_m1gren_load', 'gr_m1gren_load'), ('gr_m1gren_futz', 'gr_m1gren_futz'), ('gr_m1gren_click', 'gr_m1gren_click'), ('gr_m1gren_remove', 'gr_m1gren_remove')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_m1garand_partial_reload    zone nf=105 gr_m1gar_pull_slide_plr@f12(0.500s) gr_m1gar_clip_out_plr@f22(0.917s) gr_m1gar_futz_plr@f25(1.042s) gr_m1gar_breech_close_plr@f29(1.208s) gr_m1gar_pull_slide_plr@f65(2.708s) gr_m1gar_clip_in_plr@f75(3.125s) gr_m1gar_breech_close_plr@f82(3.417s)
+   anim reloadEmpty  viewmodel_m1garand_reload            zone nf=46 gr_m1garand_futz_plr@f17(0.708s) gr_m1gar_clip_in_plr@f24(1.000s) gr_m1gar_breech_close_plr@f33(1.375s)
+   anim firstRaise   viewmodel_m1garand_first_pullout     zone nf=64 gr_m1gar_pull_slide_plr@f16(0.667s) gr_m1gar_breech_close_plr@f32(1.333s)
+=== panzerschrek
+   times_ms iFireTime=330 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=2850 iReloadAddTime=1500 iDropTime=450 iRaiseTime=550 quickDropTime=150 quickRaiseTime=150 iFirstRaiseTime=550 iEmptyRaiseTime=550 iEmptyDropTime=500 iAltRaiseTime=150
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  projectileSound            weap_pnzr_fire_rocket
+   snd  fireSound                  weap_pnzr_fire
+   snd  fireSoundPlayer            weap_pnzr_fire_plr_f
+   snd  fireLastSound              weap_pnzr_fire
+   snd  fireLastSoundPlayer        weap_pnzr_fire_plr_f
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr'), ('gr_panzerschreck_down', 'gr_panzerschreck_down'), ('gr_panzerschreck_ground', 'gr_panzerschreck_ground'), ('gr_panzerschreck_start', 'gr_panzerschreck_start'), ('gr_panzerschreck_tap', 'gr_panzerschreck_tap'), ('gr_panzerschreck_up', 'gr_panzerschreck_up'), ('gr_panzerschreck_down_plr', 'gr_panzerschreck_down_plr'), ('gr_panzerschreck_ground_plr', 'gr_panzerschreck_ground_plr'), ('gr_panzerschreck_start_plr', 'gr_panzerschreck_start_plr'), ('gr_panzerschreck_tap_plr', 'gr_panzerschreck_tap_plr'), ('gr_panzerschreck_up_plr', 'gr_panzerschreck_up_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_panzerschreck_reload       zone nf=88 gr_panzerschreck_down_plr@f2(0.080s) gr_panzerschreck_ground_plr@f23(0.920s) gr_panzerschreck_start_plr@f33(1.320s) gr_panzerschreck_tap_plr@f44(1.760s) gr_panzerschreck_up_plr@f60(2.400s)
+=== mk2_frag
+   times_ms iFireTime=400 iMeleeTime=660 iReloadTime=2000 iDropTime=250 iRaiseTime=250 quickDropTime=500 quickRaiseTime=500 iFirstRaiseTime=500 iEmptyRaiseTime=500 iEmptyDropTime=500 iAltRaiseTime=1000 iAltDropTime=50
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  pullbackSound              grenade_pull_pin
+   snd  pullbackSoundPlayer        grenade_pull_pin
+   snd  fireSound                  foley_throw
+   snd  fireSoundPlayer            foley_throw
+   snd  emptyFireSound             player_out_of_ammo
+   snd  reloadSound                weap_fraggrenade_reload
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+=== m7_launcher
+   times_ms iFireTime=500 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=1500 iReloadAddTime=1500 iDropTime=2000 iRaiseTime=2200 quickDropTime=750 quickRaiseTime=750 iFirstRaiseTime=2200 iEmptyRaiseTime=500 iEmptyDropTime=500 iAltRaiseTime=2200 iAltDropTime=2000
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSoundPlayer            weap_m1gren_fire_plr
+   snd  fireLastSoundPlayer        weap_m1gren_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  reloadEmptySound           gr_smg_reload_notempty_3p
+   snd  reloadStartSound           gr_smg_reload_notempty_3p
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr'), ('gr_m1gren_load', 'gr_m1gren_load'), ('gr_m1gren_futz', 'gr_m1gren_futz'), ('gr_m1gren_click', 'gr_m1gren_click'), ('gr_m1gren_remove', 'gr_m1gren_remove')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_m1garand_grenade_reload    zone nf=64 gr_m1gren_futz@f17(0.708s) gr_m1gren_load@f20(0.833s)
+   anim firstRaise   viewmodel_m1garand_grenade_first_pullout zone nf=70 gr_m1gren_futz@f24(1.000s) gr_m1gren_load@f33(1.375s)
+   anim altRaise     viewmodel_m1garand_grenade_alt_pullout zone nf=80 gr_m1gren_load@f32(1.333s) gr_m1gren_futz@f38(1.583s)
+   anim altDrop      viewmodel_m1garand_grenade_alt_putaway zone nf=89 gr_m1gren_remove@f35(1.458s)
+=== sw_357
+   times_ms iFireTime=320 iRechamberTime=50 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=3000 iReloadEmptyTime=3000 iReloadAddTime=3500 iReloadStartAddTime=3500 iDropTime=400 iRaiseTime=400 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=830 iEmptyRaiseTime=350 iEmptyDropTime=250 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_357_fire
+   snd  fireSoundPlayer            weap_357_fire_plr
+   snd  fireLastSound              weap_357_fire
+   snd  fireLastSoundPlayer        weap_357_fire_plr
+   snd  emptyFireSound             dryfire_pistol
+   snd  emptyFireSoundPlayer       dryfire_pistol_plr
+   snd  meleeSwipeSound            melee_swing_small
+   snd  meleeSwipeSoundPlayer      melee_swing_small_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_pistol_reload_empty_3p
+   snd  reloadSoundPlayer          gear_player
+   snd  reloadEmptySound           gr_pistol_reload_empty_3p
+   snd  reloadEmptySoundPlayer     gear_player
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr'), ('gr_357_open', 'gr_357_open'), ('gr_357_empty', 'gr_357_empty'), ('gr_357_load', 'gr_357_load'), ('gr_357_close', 'gr_357_close')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_sw357_reload               zone nf=89 gr_357_open@f17(0.567s) gr_357_empty@f40(1.333s) gr_357_load@f62(2.067s) gr_357_close@f79(2.633s)
+   anim reloadEmpty  viewmodel_sw357_reload               zone nf=89 gr_357_open@f17(0.567s) gr_357_empty@f40(1.333s) gr_357_load@f62(2.067s) gr_357_close@f79(2.633s)
+=== 30cal_bipod
+   times_ms iFireTime=96 iRechamberTime=100 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=7000 iReloadEmptyTime=6000 iReloadAddTime=4750 iDropTime=830 iRaiseTime=900 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=1500 iEmptyRaiseTime=500 iEmptyDropTime=500 deployTime=1400 breakdownTime=2300 iAltDropTime=700
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_30cal_fire
+   snd  fireSoundPlayer            weap_30cal_fire_plr
+   snd  fireLastSound              weap_30cal_fire
+   snd  fireLastSoundPlayer        weap_30cal_fire_plr
+   snd  emptyFireSound             dryfire_rifle
+   snd  emptyFireSoundPlayer       dryfire_rifle_plr
+   snd  meleeSwipeSound            melee_swing
+   snd  meleeSwipeSoundPlayer      melee_swing_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_30cal_3p_full
+   snd  reloadEmptySound           gr_30cal_3p_full
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_30cal_start_plr', 'gr_30cal_start_plr'), ('gr_30cal_open_plr', 'gr_30cal_open_plr'), ('gr_30cal_grab_belt_plr', 'gr_30cal_grab_belt_plr'), ('gr_30cal_belt_remove_plr', 'gr_30cal_belt_remove_plr'), ('gr_30cal_belt_raise_plr', 'gr_30cal_belt_raise_plr'), ('gr_30cal_belt_contact_plr', 'gr_30cal_belt_contact_plr'), ('gr_30cal_belt_press_plr', 'gr_30cal_belt_press_plr'), ('gr_30cal_close_plr', 'gr_30cal_close_plr'), ('gr_30cal_charge_plr', 'gr_30cal_charge_plr'), ('gr_30cal_ammo_toss_plr', 'gr_30cal_ammo_toss_plr'), ('gr_30cal_charge_release_plr', 'gr_30cal_charge_release_plr'), ('gr_30cal_lid_bonk_plr', 'gr_30cal_lid_bonk_plr'), ('gr_30cal_tap_plr', 'gr_30cal_tap_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr'), ('gr_mg_deploy_start', 'gr_mg_deploy_start'), ('gr_mg_deploy_end', 'gr_mg_deploy_end'), ('gr_mg_break_down', 'gr_mg_break_down')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_30cal_partial_reload       zone nf=267 gr_30cal_start_plr@f13(0.433s) gr_30cal_charge_plr@f15(0.500s) gr_30cal_open_plr@f61(2.033s) gr_30cal_grab_belt_plr@f80(2.667s) gr_30cal_belt_remove_plr@f87(2.900s) gr_30cal_belt_raise_plr@f117(3.900s) gr_30cal_belt_contact_plr@f126(4.200s) gr_30cal_belt_press_plr@f136(4.533s) gr_30cal_lid_bonk_plr@f152(5.067s) gr_30cal_close_plr@f156(5.200s) gr_30cal_tap_plr@f178(5.933s) gr_30cal_ammo_toss_plr@f196(6.533s) gr_30cal_charge_release_plr@f236(7.867s)
+   anim reloadEmpty  viewmodel_30cal_reload               zone nf=262 gr_30cal_start_plr@f24(0.800s) gr_30cal_charge_plr@f27(0.900s) gr_30cal_open_plr@f85(2.833s) gr_30cal_belt_raise_plr@f116(3.867s) gr_30cal_belt_contact_plr@f125(4.167s) gr_30cal_belt_press_plr@f135(4.500s) gr_30cal_lid_bonk_plr@f152(5.067s) gr_30cal_close_plr@f154(5.133s) gr_30cal_tap_plr@f173(5.767s) gr_30cal_ammo_toss_plr@f193(6.433s) gr_30cal_charge_release_plr@f226(7.533s)
+   anim deploy       viewmodel_30cal_deploy               zone nf=48 gr_30cal_start_plr@f0(0.000s) gr_mg_deploy_start@f17(0.567s) gr_mg_deploy_end@f24(0.800s)
+   anim breakdown    viewmodel_30cal_breakdown            zone nf=71 gr_30cal_start_plr@f0(0.000s) gr_mg_break_down@f18(0.600s)
+=== zombie_colt
+   times_ms iFireTime=75 iRechamberTime=50 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=1900 iReloadEmptyTime=2650 iReloadAddTime=1400 iReloadStartAddTime=1650 iDropTime=300 iRaiseTime=400 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=830 iEmptyRaiseTime=350 iEmptyDropTime=250 deployTime=500 breakdownTime=500
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  fireSound                  weap_colt_fire
+   snd  fireSoundPlayer            weap_colt_fire_plr
+   snd  fireLastSound              weap_colt_fire
+   snd  fireLastSoundPlayer        weap_colt_fire_plr
+   snd  emptyFireSound             dryfire_pistol
+   snd  emptyFireSoundPlayer       dryfire_pistol_plr
+   snd  meleeSwipeSound            melee_swing_small
+   snd  meleeSwipeSoundPlayer      melee_swing_small_plr
+   snd  meleeHitSound              melee_hit
+   snd  reloadSound                gr_pistol_reload_notempty_3p
+   snd  reloadSoundPlayer          gear_player
+   snd  reloadEmptySound           gr_pistol_reload_empty_3p
+   snd  reloadEmptySoundPlayer     gear_player
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('gr_1911_mag_in_plr', 'gr_1911_mag_in_plr'), ('gr_1911_mag_out_plr', 'gr_1911_mag_out_plr'), ('gr_1911_slide_forward_plr', 'gr_1911_slide_forward_plr'), ('gr_1911_futz_plr', 'gr_1911_futz_plr'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_colt45_reload_notempty     common.ff nf=62 gr_1911_mag_out_plr@f9(0.375s) gr_1911_futz_plr@f39(1.625s) gr_1911_mag_in_plr@f43(1.792s)
+   anim reloadEmpty  viewmodel_colt45_reload              common.ff nf=70 gr_1911_mag_out_plr@f9(0.375s) gr_1911_futz_plr@f35(1.458s) gr_1911_mag_in_plr@f42(1.750s) gr_1911_slide_forward_plr@f56(2.333s)
+=== ray_gun
+   times_ms iFireTime=330 iMeleeTime=500 meleeChargeTime=1000 iReloadTime=3000 iDropTime=800 iRaiseTime=800 quickDropTime=250 quickRaiseTime=250 iFirstRaiseTime=800 iEmptyRaiseTime=800 iEmptyDropTime=800
+   snd  pickupSound                weap_pickup
+   snd  pickupSoundPlayer          weap_pickup_plr
+   snd  ammoPickupSound            ammo_pickup
+   snd  ammoPickupSoundPlayer      ammo_pickup_plr
+   snd  projectileSound            weap_rgun_loop
+   snd  fireSound                  weap_rgun_fire
+   snd  fireSoundPlayer            weap_rgun_fire_plr
+   snd  fireLastSound              weap_rgun_fire
+   snd  fireLastSoundPlayer        weap_rgun_fire_plr
+   snd  emptyFireSound             dryfire_pistol
+   snd  emptyFireSoundPlayer       dryfire_pistol_plr
+   snd  meleeSwipeSound            melee_swing_small
+   snd  meleeSwipeSoundPlayer      melee_swing_small_plr
+   snd  reloadSound                gr_raygun_reload
+   snd  reloadSoundPlayer          gear_player
+   snd  reloadEmptySound           gr_raygun_reload
+   snd  reloadEmptySoundPlayer     gear_player
+   snd  raiseSound                 weap_raise
+   snd  raiseSoundPlayer           weap_raise_plr
+   snd  firstRaiseSound            weap_raise
+   snd  firstRaiseSoundPlayer      weap_raise_plr
+   snd  putawaySound               weap_putaway
+   snd  putawaySoundPlayer         weap_putaway_plr
+   notetrackSoundMap [('ray_reload_open', 'ray_reload_open'), ('ray_reload_battery_out', 'ray_reload_battery_out'), ('ray_reload_battery_in', 'ray_reload_battery_in'), ('ray_reload_close', 'ray_reload_close'), ('knife_stab_plr', 'knife_stab_plr'), ('knife_pull_plr', 'knife_pull_plr'), ('knife_slash_plr', 'knife_slash_plr')]
+   anim meleeCharge  viewmodel_knife_stick                common.ff nf=29 knife_stab_plr@f2(0.067s) knife_pull_plr@f16(0.533s)
+   anim reload       viewmodel_ray_gun_reload             zone nf=119 ray_reload_open@f12(0.400s) ray_reload_battery_out@f39(1.300s) ray_reload_battery_in@f71(2.367s) ray_reload_close@f95(3.167s)
+=== fg42_bipod_crouch
+   times_ms iFireTime=64 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_fg42_fire
+   snd  fireSoundPlayer            weap_fg42_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+=== fg42_bipod_stand
+   times_ms iFireTime=64 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_fg42_fire
+   snd  fireSoundPlayer            weap_fg42_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+=== fg42_bipod_prone
+   times_ms iFireTime=64 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_fg42_fire
+   snd  fireSoundPlayer            weap_fg42_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+=== mg42_bipod_crouch
+   times_ms iFireTime=64 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_mg42_fire
+   snd  fireSoundPlayer            weap_mg42_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+   snd  overheatSound              hmg_overheat
+   snd  overheatSoundPlayer        hmg_overheat_plr
+=== mg42_bipod_stand
+   times_ms iFireTime=64 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_mg42_fire
+   snd  fireSoundPlayer            weap_mg42_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+   snd  overheatSound              hmg_overheat
+   snd  overheatSoundPlayer        hmg_overheat_plr
+=== mg42_bipod_prone
+   times_ms iFireTime=64 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_mg42_fire
+   snd  fireSoundPlayer            weap_mg42_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+   snd  overheatSound              hmg_overheat
+   snd  overheatSoundPlayer        hmg_overheat_plr
+=== type99_lmg_bipod_crouch
+   times_ms iFireTime=96 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_type99_fire
+   snd  fireSoundPlayer            weap_type99_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+=== type99_lmg_bipod_stand
+   times_ms iFireTime=96 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_type99_fire
+   snd  fireSoundPlayer            weap_type99_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+=== type99_lmg_bipod_prone
+   times_ms iFireTime=96 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_type99_fire
+   snd  fireSoundPlayer            weap_type99_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+=== 30cal_bipod_crouch
+   times_ms iFireTime=96 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_30cal_fire
+   snd  fireSoundPlayer            weap_30cal_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+=== 30cal_bipod_stand
+   times_ms iFireTime=96 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_30cal_fire
+   snd  fireSoundPlayer            weap_30cal_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway
+=== 30cal_bipod_prone
+   times_ms iFireTime=96 iRechamberBoltTime=100000 iReloadTime=50
+   snd  pickupSound                weap_pickup
+   snd  ammoPickupSound            weap_ammo_pickup
+   snd  fireSound                  weap_30cal_fire
+   snd  fireSoundPlayer            weap_30cal_fire_plr
+   snd  emptyFireSound             player_out_of_ammo
+   snd  raiseSound                 weap_raise
+   snd  putawaySound               weap_putaway

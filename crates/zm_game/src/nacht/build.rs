@@ -258,10 +258,10 @@ pub struct NachtScene {
     pub collision: TriMesh,
     pub map: ZombieMap,
     pub entities: Vec<mapents::Entity>,
-    /// Sound aliases from the zones: name -> playable WAV bytes per variant.
-    pub sounds: HashMap<String, Vec<Vec<u8>>>,
-    /// Our weapon id -> its real fire sound (WAV bytes per variant).
-    pub weapon_fire: HashMap<String, Vec<Vec<u8>>>,
+    /// Sound aliases from the zones: name -> variants.
+    pub sounds: HashMap<String, Vec<SceneSound>>,
+    /// Our weapon id -> its sound fields and notetrack sounds.
+    pub weapon_sounds: HashMap<String, WeaponSounds>,
     pub characters: Vec<SceneCharacter>,
     pub zombie_anims: Vec<AnimClip>,
     pub view_rig: Option<SceneViewRig>,
@@ -596,6 +596,80 @@ fn bake_lightmap(zone: &ZoneData, sun: Vec3) -> Option<Image> {
     Some(img)
 }
 
+/// One variant of a sound alias, decoded, with its authored properties.
+pub struct SceneSound {
+    pub wav: Vec<u8>,
+    pub volume: (f32, f32),
+    pub pitch: (f32, f32),
+    /// Positional (3D) in the game.
+    pub spatial: bool,
+    /// Full volume up to `.0`, silent beyond `.1` (metres).
+    pub distance: (f32, f32),
+}
+
+/// The sounds a weapon definition names.
+#[derive(Clone, Default)]
+pub struct WeaponSounds {
+    /// WeaponDef field (`fireSoundPlayer`, `raiseSoundPlayer`, ...) -> alias.
+    pub fields: HashMap<String, String>,
+    /// Viewmodel notetrack -> alias.
+    pub notetracks: HashMap<String, String>,
+}
+
+/// Sounds the game plays by alias name besides the configured ones.
+pub const GAME_ALIASES: &[&str] = &[
+    "mx_splash_screen",
+    "mx_zombie_wave_1",
+    "mx_game_over",
+    "chalk",
+    "round_over",
+    "cha_ching",
+    "no_cha_ching",
+    "weap_wall",
+    "lid_open",
+    "music_box",
+    "lid_close",
+    "couch_slam",
+    "break_boards",
+    "break_stone",
+    "repair_boards",
+    "boards_float",
+    "board_slam",
+    "spawn_powerup",
+    "spawn_powerup_loop",
+    "powerup_grabbed",
+    "full_ammo",
+    "insta_kill",
+    "insta_kill_loop",
+    "double_point_loop",
+    "points_loop_off",
+    "nuke_flash",
+    "nuked",
+    "zombie_head_gib",
+    "death_gibs",
+    "heart_beat",
+    "breathing_hurt",
+    "breathing_better",
+    "player_pain_small",
+    "melee_hit",
+    "amb_spooky_2d",
+];
+
+/// Weapon fields the first-person game uses.
+const WEAPON_SOUND_FIELDS: &[&str] = &[
+    "fireSoundPlayer",
+    "fireSound",
+    "fireLastSoundPlayer",
+    "emptyFireSoundPlayer",
+    "raiseSoundPlayer",
+    "firstRaiseSoundPlayer",
+    "putawaySoundPlayer",
+    "reloadSoundPlayer",
+    "reloadEmptySoundPlayer",
+    "meleeSwipeSoundPlayer",
+    "meleeHitSound",
+];
+
 /// The zone's weapon name for one of our weapon ids.
 fn zone_weapon_name(id: &str) -> &str {
     match id {
@@ -606,38 +680,68 @@ fn zone_weapon_name(id: &str) -> &str {
     }
 }
 
-/// Real fire sounds for our weapons, from the weapon definitions.
-fn weapon_fire_sounds(zones: &[&ZoneData], iwd: &Iwd, ids: &[&str]) -> HashMap<String, Vec<Vec<u8>>> {
+/// The sound fields and notetrack map of each of our weapons.
+fn weapon_sounds(zones: &[&ZoneData], ids: &[&str]) -> HashMap<String, WeaponSounds> {
     let mut out = HashMap::new();
     for &id in ids {
-        let name = zone_weapon_name(id);
-        let Some(w) = zones.iter().find_map(|zd| zd.weapon(name)) else { continue };
-        let Some(alias) = w.sound("fireSoundPlayer").or(w.sound("fireSound")) else { continue };
-        if let Some(v) = collect_sounds(zones, iwd, &[alias.to_string()]).remove(alias) {
-            out.insert(id.to_string(), v);
-        }
+        let Some(w) = zones.iter().find_map(|zd| zd.weapon(zone_weapon_name(id))) else { continue };
+        let fields = WEAPON_SOUND_FIELDS.iter().filter_map(|f| w.sound(f).map(|a| (f.to_string(), a.to_string()))).collect();
+        let notetracks = w.notetrack_sounds.iter().map(|(k, v)| (k.to_ascii_lowercase(), v.clone())).collect();
+        out.insert(id.to_string(), WeaponSounds { fields, notetracks });
     }
     out
 }
 
-/// Turns zone sound aliases into playable PCM WAVs.
-fn collect_sounds(zones: &[&ZoneData], iwd: &Iwd, wanted: &[String]) -> HashMap<String, Vec<Vec<u8>>> {
+/// Turns zone sound aliases into playable PCM WAVs with their properties.
+fn collect_sounds(zones: &[&ZoneData], iwd: &Iwd, wanted: &[String]) -> HashMap<String, Vec<SceneSound>> {
     let mut out = HashMap::new();
     for name in wanted {
         let name = name.as_str();
+        if out.contains_key(name) {
+            continue;
+        }
         let Some((zd, list)) = zones.iter().find_map(|zd| zd.sound(name).map(|l| (*zd, l))) else { continue };
         let mut variants = Vec::new();
         for a in &list.aliases {
             let bytes = match &a.file {
-                t4::SoundFile::Loaded(i) => Some(zd.loaded_sound_bytes(*i).to_vec()),
+                t4::SoundFile::Loaded(i) => {
+                    let own = zd.loaded_sound_bytes(*i);
+                    if !own.is_empty() {
+                        Some(own.to_vec())
+                    } else {
+                        // A reference to a sound loaded by another zone
+                        // (common.ff): find it by name.
+                        let wanted = zd.loaded_sounds.get(*i as usize).map(|l| l.name.trim_start_matches(',').to_string()).unwrap_or_default();
+                        zones.iter().find_map(|z| {
+                            z.loaded_sounds.iter().enumerate().find(|(_, l)| l.len > 0 && l.name.trim_start_matches(',') == wanted).map(|(j, _)| z.loaded_sound_bytes(j as u32).to_vec())
+                        })
+                    }
+                }
                 t4::SoundFile::Streamed { dir, name } => {
                     let path = if dir.is_empty() { format!("sound/{name}") } else { format!("sound/{}/{name}", dir.replace('\\', "/")) };
                     iwd.read(&path)
                 }
                 t4::SoundFile::None => None,
             };
-            if let Some(pcm) = bytes.and_then(|b| zm_core::wav::to_pcm_wav(&b).ok()) {
-                variants.push(pcm);
+            let decoded = bytes.and_then(|b| {
+                if crate::xwma::is_xwma(&b) {
+                    crate::xwma::decode(&b).map(|p| p.to_wav_bytes())
+                } else {
+                    zm_core::wav::to_pcm_wav(&b).ok()
+                }
+            });
+            // Developer aid: `UNDEAD_DUMP_SOUNDS=<dir>` writes every decoded sound.
+            if let (Some(w), Ok(dir)) = (&decoded, std::env::var("UNDEAD_DUMP_SOUNDS")) {
+                let _ = std::fs::write(format!("{dir}/{name}_{}.wav", variants.len()), w);
+            }
+            if let Some(wav) = decoded {
+                variants.push(SceneSound {
+                    wav,
+                    volume: (a.vol_min, a.vol_max.max(a.vol_min)),
+                    pitch: (a.pitch_min.max(0.1), a.pitch_max.max(a.pitch_min).max(0.1)),
+                    spatial: a.flags & 0x40 != 0,
+                    distance: (a.dist_min * INCH, a.dist_max.max(a.dist_min) * INCH),
+                });
             }
         }
         if !variants.is_empty() {
@@ -846,8 +950,25 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         SceneViewRig { arms, guns, anims }
     });
     let characters: Vec<SceneCharacter> = ZOMBIE_BODIES.iter().filter_map(|body| b.character(body, ZOMBIE_HEADS)).collect();
-    let sounds = collect_sounds(&zones, iwd, &wanted.aliases);
-    let weapon_fire = weapon_fire_sounds(&zones, iwd, &wanted.weapon_ids);
+    // Sounds: configured, scripted, weapon fields and notetracks, zombie
+    // animation notetracks (`sndnt#alias`) and the map's ambient emitters.
+    let weapon_sounds = weapon_sounds(&zones, &wanted.weapon_ids);
+    let mut aliases: Vec<String> = wanted.aliases.clone();
+    aliases.extend(GAME_ALIASES.iter().map(|a| a.to_string()));
+    for ws in weapon_sounds.values() {
+        aliases.extend(ws.fields.values().cloned());
+        aliases.extend(ws.notetracks.values().cloned());
+    }
+    // Viewmodel notetracks that name an alias directly (anims of weapons
+    // without a notetrack map, e.g. the knife lunge).
+    if let Some(vr) = &view_rig {
+        aliases.extend(vr.anims.values().flatten().flat_map(|(_, c)| c.notify.iter().map(|n| n.0.to_ascii_lowercase())));
+    }
+    aliases.extend(zombie_anims.iter().flat_map(|c| c.notify.iter().filter_map(|n| n.0.strip_prefix("sndnt#").map(str::to_string))));
+    aliases.extend(map.ambient.iter().map(|a| a.alias.clone()));
+    aliases.sort();
+    aliases.dedup();
+    let sounds = collect_sounds(&zones, iwd, &aliases);
     let images = std::mem::take(&mut b.images);
     let materials = std::mem::take(&mut b.materials);
     drop(b);
@@ -865,7 +986,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         map,
         entities,
         sounds,
-        weapon_fire,
+        weapon_sounds,
         characters,
         zombie_anims,
         view_rig,

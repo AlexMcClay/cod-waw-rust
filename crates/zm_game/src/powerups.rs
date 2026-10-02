@@ -1,6 +1,6 @@
 //! Kill bookkeeping and power-up drops.
 
-use crate::audio::{PlaySfx, Sfx};
+use crate::audio::{AliasLoop, PlayAlias, PlaySfx, Sfx, ZoneSounds};
 use crate::player::Player;
 use crate::weapons::Loadout;
 use crate::world::{spawn_board, Board, Mats};
@@ -9,6 +9,10 @@ use crate::{earn, ActivePowerups, Banner, Boards, Defs, Dynamic, GameState, Leve
 use bevy::pbr::NotShadowCaster;
 use bevy::prelude::*;
 use zm_core::rules::{self, Powerup};
+
+/// The looping sound while a timed power-up runs.
+#[derive(Component)]
+struct PowerupLoop(Powerup);
 
 #[derive(Component)]
 pub struct Drop {
@@ -32,7 +36,8 @@ fn on_killed(
     mut round: ResMut<Round>,
     mut score: ResMut<Score>,
     player: Query<&Transform, With<Player>>,
-    mut sfx: EventWriter<PlaySfx>,
+    (mut sfx, mut alias, zs): (EventWriter<PlaySfx>, EventWriter<PlayAlias>, Res<ZoneSounds>),
+    nacht: Option<Res<crate::nacht::NachtActive>>,
     mut commands: Commands,
     mats: Res<Mats>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -41,17 +46,24 @@ fn on_killed(
     for ev in events.read() {
         round.0.on_zombie_killed();
         score.kills += 1;
-        let vol = (1.0 - ev.pos.distance(ppos) / 25.0).clamp(0.1, 0.9);
-        sfx.write(PlaySfx::at(Sfx::ZombieDeath, vol));
+        // Zombies die silently in Nacht; the stand-in is for the prototype.
+        if zs.aliases.is_empty() {
+            let vol = (1.0 - ev.pos.distance(ppos) / 25.0).clamp(0.1, 0.9);
+            sfx.write(PlaySfx::at(Sfx::ZombieDeath, vol));
+        }
         if ev.drop_allowed && round.0.should_drop(fastrand::f32()) {
-            let kind = Powerup::ALL[fastrand::usize(..Powerup::ALL.len())];
-            spawn_drop(&mut commands, &mats, &mut meshes, kind, Vec3::new(ev.pos.x, 0.0, ev.pos.z));
-            sfx.write(PlaySfx::new(Sfx::PowerupSpawn));
+            // Nacht has no carpenter.
+            let pool: Vec<Powerup> = Powerup::ALL.into_iter().filter(|k| nacht.is_none() || *k != Powerup::Carpenter).collect();
+            let kind = pool[fastrand::usize(..pool.len())];
+            let at = Vec3::new(ev.pos.x, 0.0, ev.pos.z);
+            let drop = spawn_drop(&mut commands, &mats, &mut meshes, kind, at);
+            commands.entity(drop).insert(AliasLoop { alias: "spawn_powerup_loop".into(), volume: 1.0 });
+            alias.write(PlayAlias::at("spawn_powerup", at + Vec3::Y).or(Sfx::PowerupSpawn));
         }
     }
 }
 
-fn spawn_drop(commands: &mut Commands, mats: &Mats, meshes: &mut Assets<Mesh>, kind: Powerup, at: Vec3) {
+fn spawn_drop(commands: &mut Commands, mats: &Mats, meshes: &mut Assets<Mesh>, kind: Powerup, at: Vec3) -> Entity {
     // Each power-up gets a distinct, simple glowing shape.
     let (mesh, mat, scale): (Handle<Mesh>, Handle<StandardMaterial>, Vec3) = match kind {
         Powerup::MaxAmmo => (mats.cube.clone(), mats.glow_green.clone(), Vec3::new(0.45, 0.3, 0.3)),
@@ -61,14 +73,13 @@ fn spawn_drop(commands: &mut Commands, mats: &Mats, meshes: &mut Assets<Mesh>, k
         Powerup::Carpenter => (mats.cube.clone(), mats.glow_blue.clone(), Vec3::new(0.15, 0.55, 0.15)),
     };
     let y = 0.9;
-    commands
-        .spawn((
+    let mut e = commands.spawn((
             Transform::from_translation(at + Vec3::Y * y),
             Visibility::default(),
             Drop { kind, ttl: rules::POWERUP_TTL, base_y: y },
             Dynamic,
-        ))
-        .with_children(|p| {
+        ));
+    e.with_children(|p| {
             p.spawn((Mesh3d(mesh), MeshMaterial3d(mat), Transform::from_scale(scale), NotShadowCaster));
             if kind == Powerup::Carpenter {
                 p.spawn((
@@ -83,6 +94,7 @@ fn spawn_drop(commands: &mut Commands, mats: &Mats, meshes: &mut Assets<Mesh>, k
                 Transform::default(),
             ));
         });
+    e.id()
 }
 
 fn animate_drops(time: Res<Time>, mut commands: Commands, mut q: Query<(Entity, &mut Transform, &mut Visibility, &mut Drop)>) {
@@ -113,7 +125,8 @@ fn pickup(
     (defs, level, mats): (Res<Defs>, Res<LevelRes>, Res<Mats>),
     (mut loadout, mut pu, mut score, mut boards): (ResMut<Loadout>, ResMut<ActivePowerups>, ResMut<Score>, ResMut<Boards>),
     board_q: Query<&Board>,
-    (mut sfx, mut points, mut banner, mut killed): (EventWriter<PlaySfx>, EventWriter<PointsEvent>, EventWriter<Banner>, EventWriter<ZombieKilled>),
+    (mut alias, mut points, mut banner, mut killed): (EventWriter<PlayAlias>, EventWriter<PointsEvent>, EventWriter<Banner>, EventWriter<ZombieKilled>),
+    loops: Query<&PowerupLoop>,
 ) {
     let Ok(pt) = player.single() else { return };
     let me = Vec2::new(pt.translation.x, pt.translation.z);
@@ -122,27 +135,41 @@ fn pickup(
             continue;
         }
         commands.entity(e).try_despawn();
-        sfx.write(PlaySfx::new(Sfx::PowerupGrab));
+        alias.write(PlayAlias::at("powerup_grabbed", t.translation).after(0.1).or(Sfx::PowerupGrab));
+        let mut start_loop = |kind: Powerup, name: &str| {
+            if !loops.iter().any(|l| l.0 == kind) {
+                commands.spawn((AliasLoop { alias: name.into(), volume: 1.0 }, PowerupLoop(kind), Dynamic));
+            }
+        };
         banner.write(Banner(format!("{}!", d.kind.label().to_uppercase())));
         match d.kind {
             Powerup::MaxAmmo => {
                 loadout.refill_all(&defs.0);
-                sfx.write(PlaySfx::new(Sfx::MaxAmmo));
+                alias.write(PlayAlias::local("full_ammo").volume(0.7).or(Sfx::MaxAmmo));
             }
             Powerup::InstaKill => {
                 pu.insta_kill = rules::POWERUP_DURATION;
-                sfx.write(PlaySfx::new(Sfx::InstaKill));
+                start_loop(Powerup::InstaKill, "insta_kill_loop");
+                alias.write(PlayAlias::local("").or(Sfx::InstaKill));
             }
             Powerup::DoublePoints => {
                 pu.double_points = rules::POWERUP_DURATION;
-                sfx.write(PlaySfx::new(Sfx::DoublePoints));
+                start_loop(Powerup::DoublePoints, "double_point_loop");
+                alias.write(PlayAlias::local("").or(Sfx::DoublePoints));
             }
             Powerup::Nuke => {
-                for pos in zombies::kill_all(&mut zq) {
+                alias.write(PlayAlias::local("nuke_flash").or(Sfx::Nuke));
+                let mut dead = zombies::kill_all(&mut zq);
+                dead.sort_by(|a, b| a.distance(pt.translation).total_cmp(&b.distance(pt.translation)));
+                // Heads pop one after another, closest first.
+                let mut when = 0.0;
+                for pos in dead {
                     killed.write(ZombieKilled { pos, drop_allowed: false });
+                    when += 0.1 + fastrand::f32() * 0.6;
+                    alias.write(PlayAlias::at("nuked", pos + Vec3::Y).after(when));
+                    alias.write(PlayAlias::at("zombie_head_gib", pos + Vec3::Y * 1.6).after(when));
                 }
                 earn(&mut score, &mut points, &pu, rules::POINTS_NUKE);
-                sfx.write(PlaySfx::new(Sfx::Nuke));
             }
             Powerup::Carpenter => {
                 for (wi, n) in boards.0.iter_mut().enumerate() {
@@ -156,14 +183,30 @@ fn pickup(
                     *n = full;
                 }
                 earn(&mut score, &mut points, &pu, rules::POINTS_CARPENTER);
-                sfx.write(PlaySfx::new(Sfx::Carpenter));
+                alias.write(PlayAlias::local("").or(Sfx::Carpenter));
             }
         }
     }
 }
 
-fn tick_timers(time: Res<Time>, mut pu: ResMut<ActivePowerups>) {
+fn tick_timers(time: Res<Time>, mut pu: ResMut<ActivePowerups>, loops: Query<(Entity, &PowerupLoop)>, mut alias: EventWriter<PlayAlias>, mut commands: Commands) {
     let dt = time.delta_secs();
+    let mut ended = Vec::new();
+    if pu.insta_kill > 0.0 && pu.insta_kill <= dt {
+        ended.push((Powerup::InstaKill, "insta_kill"));
+    }
+    if pu.double_points > 0.0 && pu.double_points <= dt {
+        ended.push((Powerup::DoublePoints, "points_loop_off"));
+    }
     pu.insta_kill = (pu.insta_kill - dt).max(0.0);
     pu.double_points = (pu.double_points - dt).max(0.0);
+    // The loop stops and the "worn off" sound plays.
+    for (kind, sound) in ended {
+        for (e, l) in &loops {
+            if l.0 == kind {
+                commands.entity(e).despawn();
+            }
+        }
+        alias.write(PlayAlias::local(sound));
+    }
 }

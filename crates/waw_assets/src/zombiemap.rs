@@ -94,6 +94,27 @@ pub struct ZombieMap {
     pub lights: Vec<[f32; 3]>,
     /// Static props placed as script models: (model, origin, angles).
     pub props: Vec<(String, [f32; 3], [f32; 3])>,
+    /// Ambient sound emitters (structs with `script_sound`).
+    pub ambient: Vec<AmbientEmitter>,
+}
+
+/// How an ambient emitter plays (the `script_label` of its struct).
+#[derive(Debug, Clone, PartialEq)]
+pub enum AmbientKind {
+    /// A one-shot every `min..max` seconds.
+    Random { min: f32, max: f32 },
+    /// A loop that never stops.
+    Looper,
+    /// A loop whose source slides along the segment to `end`, kept at the
+    /// point closest to the listener.
+    Line { end: [f32; 3] },
+}
+
+#[derive(Debug, Clone)]
+pub struct AmbientEmitter {
+    pub alias: String,
+    pub origin: [f32; 3],
+    pub kind: AmbientKind,
 }
 
 fn cost(e: &Entity) -> u32 {
@@ -200,7 +221,21 @@ impl ZombieMap {
             .map(|e| (e.get("model").unwrap_or("").to_string(), e.origin(), e.angles()))
             .collect();
 
+        let ambient = ents
+            .iter()
+            .filter_map(|e| {
+                let alias = e.get("script_sound")?.to_string();
+                let kind = match e.get("script_label")? {
+                    "random" => AmbientKind::Random { min: e.f32("script_wait_min").unwrap_or(1.0), max: e.f32("script_wait_max").unwrap_or(3.0) },
+                    "looper" => AmbientKind::Looper,
+                    "line_emitter" => AmbientKind::Line { end: targets(e).first().map(|t| t.origin())? },
+                    _ => return None,
+                };
+                Some(AmbientEmitter { alias, origin: e.origin(), kind })
+            })
+            .collect();
         ZombieMap {
+            ambient,
             player_start,
             player_yaw,
             start_points,
@@ -338,5 +373,10 @@ mod tests {
         assert_eq!(m.traversals.len(), 12);
         assert_eq!(m.doors.len(), 3);
         assert_eq!(m.spawners.len(), 43);
+        // 43 random amb_spooky, 8 light + 5 fire loopers, 2 zombie line emitters.
+        let count = |k: fn(&AmbientKind) -> bool| m.ambient.iter().filter(|a| k(&a.kind)).count();
+        assert_eq!(count(|k| matches!(k, AmbientKind::Random { .. })), 43);
+        assert_eq!(count(|k| matches!(k, AmbientKind::Looper)), 13);
+        assert_eq!(count(|k| matches!(k, AmbientKind::Line { .. })), 2);
     }
 }

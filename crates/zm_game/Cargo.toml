@@ -14,3 +14,7 @@ zm_core = { path = "../zm_core" }
 waw_assets = { path = "../waw_assets" }
 bevy = { version = "0.16", features = ["wav"] }
 fastrand = "2"
+
+# xWMA sounds are decoded with the system's Media Foundation WMA decoder.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = ["Win32_Media_Audio", "Win32_Media_MediaFoundation", "Win32_System_Com"] }
