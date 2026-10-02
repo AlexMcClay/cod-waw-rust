@@ -1442,11 +1442,13 @@ impl<'a> Walker<'a> {
                 w.sounds.push((field, s));
             }
         }
+        // bounceSound: one alias per surface type.
         if h.u32(0x270) == FOLLOW {
             self.alloc(4);
             let arr = self.read(4 * 31)?;
             for i in 0..31 {
-                self.snd_alias_custom(arr, 4 * i)?;
+                let s = self.snd_alias_custom(arr, 4 * i)?;
+                w.bounce_sounds.push(s.unwrap_or_default());
             }
         }
         for o in [0x274, 0x278, 0x27c] {
@@ -1475,7 +1477,7 @@ impl<'a> Walker<'a> {
             self.asset(T::Material, h.u32(o), None)?;
         }
         self.xstring(h.u32(0x638))?;
-        self.asset(T::XModel, h.u32(0x680), None)?;
+        w.projectile_model = self.asset_idx(T::XModel, h.u32(0x680), None)?;
         self.asset(T::Fx, h.u32(0x688), None)?;
         self.asset(T::Fx, h.u32(0x690), None)?;
         for (o, field) in [(0x694, "projExplosionSound"), (0x698, "projDudSound"), (0x69c, "mortarShellSound"), (0x6a0, "tankShellSound")] {

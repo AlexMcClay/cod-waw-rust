@@ -38,6 +38,7 @@ Settings, `log.txt` and `crash.txt` live in `%LOCALAPPDATA%\UndeadRounds`.
 | Mouse, LMB / RMB | look, fire / aim down sights |
 | R | reload |
 | V or E | knife |
+| G or mouse 4 | throw a grenade (hold to cook) |
 | 1, 2, Q, mouse wheel | switch weapons (two slots) |
 | F | buy wall weapons and ammo, open doors and debris, use the mystery box |
 | Hold F at a window | rebuild boards (+10 points each) |

@@ -9,6 +9,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio;
+mod grenades;
 mod hud;
 mod interact;
 mod menu;
@@ -254,6 +255,7 @@ fn main() {
             world::WorldPlugin,
             player::PlayerPlugin,
             weapons::WeaponsPlugin,
+            grenades::GrenadesPlugin,
             zombies::ZombiesPlugin,
             interact::InteractPlugin,
             powerups::PowerupsPlugin,

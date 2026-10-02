@@ -61,6 +61,7 @@ struct HudAssets {
     /// bullet, rifle bullet, shotgun shell.
     ammo: [Option<(Handle<Image>, Vec2)>; 3],
     low_health: Option<Handle<Image>>,
+    grenade: Option<Handle<Image>>,
 }
 
 /// Animation state of the script-driven parts.
@@ -121,6 +122,7 @@ fn load_hud_assets(
     assets.chalk = (1..=5).map(|i| get(&format!("chalkmarks_{i}"))).collect();
     assets.scorebar = get("scorebar_zom_1");
     assets.low_health = get("overlay_low_health");
+    assets.grenade = get(crate::grenades::HUD_ICON);
     let ammo_names = ["ammo_counter_bullet", "ammo_counter_riflebullet", "ammo_counter_shotgunshell"];
     let ammo: Vec<Option<Handle<Image>>> = ammo_names.iter().map(|n| get(n)).collect();
     let size = |h: &Handle<Image>| images.get(h).map(|i| i.size().as_vec2());
@@ -397,7 +399,7 @@ fn draw(
     assets: Res<HudAssets>,
     anim: Res<HudAnim>,
     (score, defs, pu, prompt, health, gun): (Res<Score>, Res<Defs>, Res<ActivePowerups>, Res<Prompt>, Res<Health>, Res<Gun>),
-    loadout: Option<Res<Loadout>>,
+    (loadout, grenades): (Option<Res<Loadout>>, Option<Res<crate::grenades::Grenades>>),
     names: Option<Res<crate::nacht::WeaponNames>>,
     time: Res<Time>,
     player: Query<(&PlayerCtl, &Projection), With<Player>>,
@@ -429,6 +431,9 @@ fn draw(
     draw_score(&mut c, &anim, score.points);
     if let Some(l) = &loadout {
         draw_weapon(&mut c, l, &defs, names.as_deref(), &gun, t);
+    }
+    if let Some(g) = &grenades {
+        draw_grenades(&mut c, g);
     }
 
     // Use hint: centred under the crosshair.
@@ -591,6 +596,29 @@ fn draw_weapon(c: &mut Canvas, l: &Loadout, defs: &Defs, names: Option<&crate::n
     }
 }
 
+/// The grenade icon and count (`offhandFragIcon` / `offhandfragammo`), and
+/// the flash of a nearby explosion.
+fn draw_grenades(c: &mut Canvas, g: &crate::grenades::Grenades) {
+    if g.flash > 0.0 {
+        c.solid(Rect::new(0.0, 0.0, c.w, c.h), Color::srgba(1.0, 0.92, 0.8, g.flash.min(1.0)));
+    }
+    if g.count == 0 {
+        return;
+    }
+    let p = c.at(H::Right, V::Bottom, -104.0, -38.0);
+    match c.assets.grenade.clone() {
+        Some(img) => c.image(&img, p, Vec2::splat(24.0), (H::Left, V::Top), Color::srgba(1.0, 1.0, 1.0, 0.65)),
+        None => {
+            // Stand-in: a stick grenade's head and handle.
+            let u = c.u;
+            c.solid(Rect::new(p.x + 7.0 * u, p.y + 3.0 * u, p.x + 17.0 * u, p.y + 11.0 * u), Color::srgba(0.8, 0.8, 0.8, 0.65));
+            c.solid(Rect::new(p.x + 10.5 * u, p.y + 11.0 * u, p.x + 13.5 * u, p.y + 22.0 * u), Color::srgba(0.8, 0.8, 0.8, 0.65));
+        }
+    }
+    let p = c.at(H::Right, V::Bottom, -84.0, -8.0);
+    c.text(&g.count.to_string(), p, 14.86, (H::Left, V::Bottom), Color::srgba(1.0, 1.0, 1.0, 0.75), true);
+}
+
 /// Four ticks around the centre, spread with the weapon's accuracy; gone
 /// when aiming, faded while firing.
 fn draw_crosshair(c: &mut Canvas, player: &Query<(&PlayerCtl, &Projection), With<Player>>, loadout: &Option<Res<Loadout>>, defs: &Defs, gun: &Gun) {
@@ -744,6 +772,7 @@ fn help_toggle(
          Esc pause menu\n\
          WASD move, Shift sprint, Space jump, C crouch, Ctrl/Z prone\n\
          LMB fire, RMB aim, R reload, V/E knife\n\
+         G/mouse 4 grenade (hold to cook)\n\
          1/2/Q/wheel switch weapon\n\
          F interact (hold at windows to rebuild)\n\
          -/= mouse sensitivity, [/] brightness\n\
