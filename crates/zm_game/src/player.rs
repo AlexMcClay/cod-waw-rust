@@ -25,6 +25,8 @@ const RUN_SPEED: f32 = 190.0 * U;
 const SPRINT_SCALE: f32 = 1.5;
 const BACK_SCALE: f32 = 0.7;
 const STRAFE_SCALE: f32 = 0.8;
+/// Global slow-down while aimed; the weapon's `adsMoveSpeedScale` multiplies
+/// it (a pistol's 1.5 makes aimed walking faster than a rifle's 0.9).
 const ADS_SCALE: f32 = 0.6;
 const GRAVITY: f32 = 800.0 * U;
 const JUMP_HEIGHT: f32 = 39.0 * U;
@@ -194,6 +196,7 @@ fn look(
     windows: Query<&Window, With<PrimaryWindow>>,
     settings: Res<UserSettings>,
     time: Res<Time>,
+    held: Res<crate::weapons::HeldWeapon>,
     mut q: Query<(&mut Transform, &mut PlayerCtl, &mut Projection), With<Player>>,
 ) {
     let Ok((mut t, mut c, mut proj)) = q.single_mut() else { return };
@@ -206,7 +209,9 @@ fn look(
     t.rotation = Quat::from_euler(EulerRot::YXZ, c.yaw, (c.pitch + c.recoil).clamp(-1.55, 1.55), 0.0);
     if let Projection::Perspective(p) = proj.as_mut() {
         let sprint_fov = if c.sprinting { 6.0 } else { 0.0 };
-        let target = (settings.fov - 22.0 * c.ads + sprint_fov).to_radians();
+        // The weapon's own zoom (adsZoomFov, relative to the game's 65).
+        let aimed = held.ads_fov(settings.fov);
+        let target = (settings.fov + (aimed - settings.fov) * c.ads + sprint_fov).to_radians();
         p.fov += (target - p.fov) * (12.0 * time.delta_secs()).min(1.0);
     }
 }
@@ -217,6 +222,7 @@ fn movement(
     mouse: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
     world: Res<World>,
+    held: Res<crate::weapons::HeldWeapon>,
     mut walk: Option<ResMut<TestWalk>>,
     mut q: Query<(&mut Transform, &mut PlayerCtl), With<Player>>,
 ) {
@@ -240,7 +246,10 @@ fn movement(
     }
     let wish = wish.normalize_or_zero();
     let aiming = mouse.pressed(MouseButton::Right);
-    c.ads = (c.ads + if aiming { 6.0 } else { -6.0 } * dt).clamp(0.0, 1.0);
+    // The weapon's own aim-in / aim-out times.
+    let ads_rate = if aiming { 1.0 / held.ads_in_time.max(0.01) } else { -1.0 / held.ads_out_time.max(0.01) };
+    c.ads = (c.ads + ads_rate * dt).clamp(0.0, 1.0);
+    let sprint_time = SPRINT_TIME * held.sprint_duration_scale.max(0.1);
 
     // Stance: C toggles crouch, Ctrl toggles prone, jump or sprint stand up
     // one step at a time. Getting up needs head room.
@@ -280,7 +289,7 @@ fn movement(
         c.sprint_left -= dt;
     } else {
         c.sprinting = false;
-        c.sprint_left = (c.sprint_left + dt).min(SPRINT_TIME);
+        c.sprint_left = (c.sprint_left + dt).min(sprint_time);
     }
 
     let (s, co) = c.yaw.sin_cos();
@@ -293,7 +302,10 @@ fn movement(
         dir_scale = 1.0;
     }
     c.moving = wish_dir != Vec2::ZERO;
-    let wish_speed = RUN_SPEED * c.stance.speed_scale() * dir_scale * if c.sprinting { SPRINT_SCALE } else { 1.0 } * (1.0 - (1.0 - ADS_SCALE) * c.ads);
+    let wish_speed = RUN_SPEED * c.stance.speed_scale() * dir_scale * if c.sprinting { SPRINT_SCALE } else { 1.0 } * {
+        let a = c.ads;
+        held.move_speed_scale * (1.0 - a) + ADS_SCALE * held.ads_move_speed_scale * a
+    };
 
     // Quake-style friction and acceleration (the game's movement code is
     // derived from it): quick but not instant starts and stops.
