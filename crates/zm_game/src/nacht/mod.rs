@@ -4,12 +4,13 @@
 
 pub mod build;
 pub mod level;
+pub mod world_material;
 
 use crate::menu::{CurrentMap, LoadingStatus, MapKind};
 use crate::waw::Waw;
-use crate::world::{Debris, Flicker, Mats};
+use crate::world::{Debris, Mats};
 use crate::{Dynamic, GameState, SessionEntity};
-use bevy::pbr::{Lightmap, NotShadowCaster};
+use bevy::pbr::NotShadowCaster;
 use bevy::render::mesh::skinning::SkinnedMeshInverseBindposes;
 use bevy::prelude::*;
 use bevy::render::renderer::RenderDevice;
@@ -45,12 +46,12 @@ pub struct ModelParts {
 /// restarting is instant.
 #[derive(Resource)]
 pub struct NachtAssets {
-    pub world: Vec<(Handle<Mesh>, Handle<StandardMaterial>, bool)>,
+    pub world: Vec<(Handle<Mesh>, WorldMat)>,
     pub submodels: HashMap<usize, Vec<(Handle<Mesh>, Handle<StandardMaterial>)>>,
     pub models: HashMap<String, ModelParts>,
     pub static_models: Vec<(String, Transform)>,
     pub sky_model: Option<String>,
-    pub lightmap: Option<Handle<Image>>,
+    pub sky_scale: f32,
     pub collision: Arc<TriMesh>,
     pub nav: Arc<NavGraph>,
     pub level: Level,
@@ -58,8 +59,22 @@ pub struct NachtAssets {
     /// Brush submodels already used by gameplay (boards, doors) by number.
     pub gameplay_submodels: Vec<usize>,
     pub chest: Option<build::SceneChest>,
+    /// The light grid as an irradiance volume for models.
+    pub irradiance: Option<(Handle<Image>, Transform)>,
+    /// Fog and film grade from the map's own data.
+    pub fog: Option<waw_assets::look::Fog>,
+    pub film: Option<waw_assets::look::Film>,
     /// Our weapon id -> world model name (in `models`).
     pub weapon_world_models: HashMap<String, String>,
+}
+
+/// How a world surface group is drawn.
+#[derive(Clone)]
+pub enum WorldMat {
+    /// The game's lit world shader (lightmap + primary light).
+    Lit(Handle<world_material::WawWorldMaterial>),
+    /// Unlit or otherwise plain surfaces.
+    Plain(Handle<StandardMaterial>),
 }
 
 /// A model skinned to its own skeleton, uploaded.
@@ -199,6 +214,7 @@ impl Plugin for NachtPlugin {
             .init_resource::<ViewModels>()
             .init_resource::<ViewRig>()
             .init_resource::<NachtError>()
+            .add_plugins(world_material::WorldMaterialPlugin)
             .add_systems(Startup, start_load)
             .add_systems(OnEnter(GameState::Loading), start_load)
             .add_systems(Update, poll_load)
@@ -232,9 +248,12 @@ fn start_load(
         return;
     };
     let bc = crate::waw::bc_supported(device.as_deref());
+    let mut aliases = bank.map(|b| b.wanted_aliases()).unwrap_or_default();
+    aliases.extend(crate::grenades::ALIASES.iter().map(|a| a.to_string()));
     let wanted = build::Wanted {
-        aliases: bank.map(|b| b.wanted_aliases()).unwrap_or_default(),
-        weapon_ids: defs.0.iter().map(|d| d.id).collect(),
+        aliases,
+        // The offhand grenade is loaded like a weapon (viewmodel, anims, sounds).
+        weapon_ids: defs.0.iter().map(|d| d.id).chain([crate::grenades::GRENADE_ID]).collect(),
     };
     let t = AsyncComputeTaskPool::get().spawn(async move { build::build(&install, &iwd, bc, wanted) });
     commands.insert_resource(NachtTask(t));
@@ -257,6 +276,8 @@ fn poll_load(
     (mut zombie_models, mut view_models, mut view_rig): (ResMut<ZombieModels>, ResMut<ViewModels>, ResMut<ViewRig>),
     mut mats: ResMut<Mats>,
     mut zone_sounds: ResMut<crate::audio::ZoneSounds>,
+    mut world_mats: ResMut<Assets<world_material::WawWorldMaterial>>,
+    mut defs: ResMut<crate::Defs>,
 ) {
     if let Some(e) = &error.0 {
         if let Ok(mut t) = status.single_mut() {
@@ -294,10 +315,10 @@ fn poll_load(
     info!("Nacht nav graph: {} nodes, {} links", nav.nodes.len(), nav.edges.iter().map(Vec::len).sum::<usize>() / 2);
 
     let NachtScene {
-        images: imgs, lightmap, materials: mdefs, world, submodels, models, static_models, sky_model, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, ..
+        images: imgs, lightmap_pages, irradiance, fog, film, lights, materials: mdefs, world, submodels, models, static_models, sky_model, sky_scale, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, weapon_stats, flesh_penetration, ..
     } = scene;
+    crate::audio::apply_zone_weapon_stats(&mut defs.0, &weapon_stats, flesh_penetration);
     let image_handles: HashMap<String, Handle<Image>> = imgs.into_iter().map(|(k, v)| (k, images.add(v))).collect();
-    let lightmap = lightmap.map(|l| images.add(l));
     let mat_handles: Vec<Handle<StandardMaterial>> = mdefs
         .iter()
         .map(|m| {
@@ -311,11 +332,11 @@ fn poll_load(
                     Blend::Opaque => AlphaMode::Opaque,
                     Blend::Mask => AlphaMode::Mask(0.5),
                     Blend::Blend => AlphaMode::Blend,
+                    Blend::Add => AlphaMode::Add,
                 },
                 unlit: m.unlit,
                 double_sided: m.two_sided,
                 cull_mode: if m.two_sided { None } else { Some(bevy::render::render_resource::Face::Back) },
-                lightmap_exposure: 250.0,
                 depth_bias: if m.blend == Blend::Blend { 2.0 } else { 0.0 },
                 ..default()
             })
@@ -347,7 +368,63 @@ fn poll_load(
         view_models.0.len(),
         view_rig.guns.len()
     );
-    let world: Vec<_> = world.into_iter().map(|s| (meshes.add(s.mesh), mat_handles[s.material].clone(), mdefs[s.material].lightmapped)).collect();
+    // Lit world surfaces use the game's shader, one material per (material,
+    // primary light) pair.
+    let pages: Vec<Option<(Handle<Image>, Handle<Image>)>> = lightmap_pages.into_iter().map(|p| p.map(|(sec, pri)| (images.add(sec), images.add(pri)))).collect();
+    let mut lit_cache: HashMap<(usize, u8, u8), Handle<world_material::WawWorldMaterial>> = HashMap::new();
+    let world: Vec<_> = world
+        .into_iter()
+        .map(|s| {
+            let m = &mdefs[s.material];
+            let mat = match pages.get(s.lightmap as usize).cloned().flatten() {
+                Some((sec, pri)) if m.lightmapped && !m.unlit => {
+                    let h = lit_cache.entry((s.material, s.primary_light, s.lightmap)).or_insert_with(|| {
+                        use world_material::*;
+                        let color = m.color.as_ref().and_then(|c| image_handles.get(c).cloned());
+                        let normal = m.normal.as_ref().and_then(|c| image_handles.get(c).cloned());
+                        let mut flags = 0;
+                        if color.is_some() {
+                            flags |= FLAG_COLOR;
+                        }
+                        if normal.is_some() {
+                            flags |= FLAG_NORMAL;
+                        }
+                        if m.vertex_tint {
+                            flags |= FLAG_VERTEX_COLOR;
+                        }
+                        if m.blend == Blend::Mask {
+                            flags |= FLAG_ALPHA_TEST;
+                        }
+                        let l = lights.get(s.primary_light as usize).copied().unwrap_or_default();
+                        world_mats.add(WawWorldMaterial {
+                            params: WorldParams {
+                                flags,
+                                light_kind: l.kind as u32,
+                                falloff: l.falloff as u32,
+                                exponent: l.exponent,
+                                light_color: l.color.extend(1.0),
+                                light_pos: l.position.extend(1.0 / l.radius),
+                                light_dir: l.dir.extend(0.0),
+                                spot: Vec4::new(l.cos_outer, l.cos_inner, 0.0, 0.0),
+                            },
+                            color,
+                            normal,
+                            lightmap_secondary: sec.clone(),
+                            lightmap_primary: pri.clone(),
+                            alpha: match m.blend {
+                                Blend::Opaque | Blend::Mask => AlphaMode::Opaque,
+                                Blend::Blend | Blend::Add => AlphaMode::Blend,
+                            },
+                            two_sided: m.two_sided,
+                        })
+                    });
+                    WorldMat::Lit(h.clone())
+                }
+                _ => WorldMat::Plain(mat_handles[s.material].clone()),
+            };
+            (meshes.add(s.mesh), mat)
+        })
+        .collect();
     let submodels: HashMap<usize, Vec<_>> =
         submodels.into_iter().map(|(n, v)| (n, v.into_iter().map(|s| (meshes.add(s.mesh), mat_handles[s.material].clone())).collect())).collect();
     let models: HashMap<String, ModelParts> = models
@@ -395,13 +472,16 @@ fn poll_load(
         models,
         static_models,
         sky_model,
-        lightmap,
+        sky_scale,
         collision: Arc::new(collision),
         nav: Arc::new(nav),
         level,
         scene_entities: entities,
         gameplay_submodels,
         chest,
+        irradiance: irradiance.map(|(img, t)| (images.add(img), t)),
+        fog,
+        film,
         weapon_world_models,
     });
 }
@@ -424,13 +504,17 @@ pub fn spawn_scene(
     mut ambient: ResMut<AmbientLight>,
     mut clear: ResMut<ClearColor>,
 ) {
-    ambient.brightness = 60.0;
-    ambient.color = Color::srgb(0.55, 0.62, 0.85);
+    // All light comes from the map's data (lightmaps, grid, primary lights).
+    ambient.brightness = 0.0;
     clear.0 = Color::srgb(0.01, 0.012, 0.02);
-    for (mesh, mat, lit) in &assets.world {
-        let mut e = commands.spawn((Mesh3d(mesh.clone()), MeshMaterial3d(mat.clone()), SessionEntity));
-        if let (true, Some(lm)) = (*lit, &assets.lightmap) {
-            e.insert(Lightmap { image: lm.clone(), uv_rect: Rect::new(0.0, 0.0, 1.0, 1.0), bicubic_sampling: false });
+    for (mesh, mat) in &assets.world {
+        match mat {
+            WorldMat::Lit(m) => {
+                commands.spawn((Mesh3d(mesh.clone()), MeshMaterial3d(m.clone()), SessionEntity));
+            }
+            WorldMat::Plain(m) => {
+                commands.spawn((Mesh3d(mesh.clone()), MeshMaterial3d(m.clone()), SessionEntity));
+            }
         }
     }
     for (name, t) in &assets.static_models {
@@ -466,30 +550,32 @@ pub fn spawn_scene(
             spawn_model(&mut commands, parts, t, SessionEntity);
         }
     }
-    // The map's own lights, as flickering point lights.
-    for (i, e) in assets.scene_entities.iter().filter(|e| e.classname() == "light").enumerate() {
-        let c = e.vec3("_color").unwrap_or([1.0, 0.75, 0.45]);
-        let radius = e.f32("radius").unwrap_or(400.0) * build::INCH;
-        let base = 90_000.0;
+    // Models: the light grid's baked light with each point's primary light
+    // added (as the game lights models). The world has both in its own
+    // shader. Scaled to the real maps' fixed camera exposure.
+    if let Some((voxels, t)) = &assets.irradiance {
         commands.spawn((
-            PointLight { color: Color::srgb(c[0], c[1], c[2]), intensity: base, range: radius.clamp(4.0, 14.0), shadows_enabled: false, ..default() },
-            Transform::from_translation(to_bevy(e.origin())),
-            Flicker { base, phase: i as f32 * 1.3 },
+            bevy::pbr::LightProbe,
+            bevy::pbr::irradiance_volume::IrradianceVolume {
+                voxels: voxels.clone(),
+                intensity: 1.2 * 2f32.powf(REAL_MAP_EV),
+                affects_lightmapped_meshes: false,
+            },
+            *t,
             SessionEntity,
         ));
     }
-    // Moonlight.
-    commands.spawn((
-        DirectionalLight { color: Color::srgb(0.55, 0.7, 1.0), illuminance: 400.0, shadows_enabled: false, ..default() },
-        Transform::from_xyz(-10.0, 30.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        SessionEntity,
-    ));
     if let Some(parts) = assets.sky_model.as_ref().and_then(|n| assets.models.get(n)) {
-        let e = spawn_model(&mut commands, parts, Transform::default(), (SessionEntity, SkyBox, NotShadowCaster));
+        let e = spawn_model(&mut commands, parts, Transform::from_scale(Vec3::splat(assets.sky_scale)), (SessionEntity, SkyBox, NotShadowCaster));
         commands.entity(e).insert(NotShadowCaster);
     }
     spawn_ambience(&mut commands, &assets);
 }
+
+/// Camera exposure on the real maps. The game's own lighting (world shader,
+/// light grid) is scaled to it, so effects authored for Bevy's units
+/// (muzzle flashes, explosions, glows) keep their brightness.
+pub const REAL_MAP_EV: f32 = 7.5;
 
 /// Spawns the parts of the map that change during a game: window boards,
 /// door blockers and the mystery box.
@@ -711,3 +797,4 @@ fn chest_visuals(
         }
     }
 }
+

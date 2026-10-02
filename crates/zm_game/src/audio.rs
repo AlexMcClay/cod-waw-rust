@@ -221,11 +221,78 @@ impl AssetDir {
             if let Some(wf) = bytes.and_then(|b| WeaponFile::parse_bytes(&b)) {
                 let applied = d.apply_weapon_file(&wf);
                 info!("{}: applied {applied} stats from weapons/sp/{file}", d.name);
+                info!("  {}", weapon_summary(d));
                 n += 1;
+            } else {
+                warn!("{}: no weapons/sp/{file} in the install; using built-in stats", d.name);
             }
         }
         n
     }
+}
+
+/// One log line with a weapon's key numbers.
+pub fn weapon_summary(d: &WeaponDef) -> String {
+    use zm_core::weapons::HitLoc;
+    format!(
+        "{}: {:?} dmg {}-{} ({:.1}-{:.1} m) x{} head {} neck {} torso {}/{} limbs {}/{} | fire {:.3}s{} | clip {} max {} start {} | reload {:.2}s (in at {:.2}) empty {:.2}s (in at {:.2}){} | spread {}-{} ads {} | ads {:.2}s fov {} | move {} | pen {:?}",
+        d.id,
+        d.mode,
+        d.damage,
+        d.min_damage,
+        d.near,
+        d.far,
+        d.pellets,
+        d.location_multiplier(HitLoc::Head),
+        d.location_multiplier(HitLoc::Neck),
+        d.location_multiplier(HitLoc::TorsoUpper),
+        d.location_multiplier(HitLoc::TorsoLower),
+        d.location_multiplier(HitLoc::RightArmUpper),
+        d.location_multiplier(HitLoc::RightLegLower),
+        d.fire_interval,
+        if d.rechamber { format!(" + rechamber {:.2}s", d.rechamber_time) } else { String::new() },
+        d.clip,
+        d.max_ammo,
+        d.start_ammo,
+        d.reload.duration(false),
+        d.reload.ammo_in_at(false),
+        d.reload.duration(true),
+        d.reload.ammo_in_at(true),
+        if d.reload.segmented {
+            format!(" segmented start {:.2}/end {:.2}", d.reload.start_time, d.reload.end_time)
+        } else {
+            String::new()
+        },
+        d.spread.stand.0,
+        d.spread.stand.1,
+        d.spread.ads,
+        d.ads_in_time,
+        d.ads_zoom_fov,
+        d.move_speed_scale,
+        d.penetrate,
+    )
+}
+
+/// Applies the map zone's WeaponDef numbers (what the game itself runs on)
+/// over the weapon files' and logs any that differ.
+pub fn apply_zone_weapon_stats(defs: &mut [WeaponDef], stats: &HashMap<String, Vec<(&'static str, String)>>, flesh: Option<[f32; 4]>) {
+    for d in defs.iter_mut() {
+        let Some(s) = stats.get(d.id) else { continue };
+        let before = weapon_summary(d);
+        let applied = d.apply_weapon_file(&WeaponFile::from_pairs(s.iter().map(|(k, v)| (*k, v.as_str()))));
+        if let Some(t) = flesh {
+            d.flesh_penetration = t[d.penetrate as usize];
+        }
+        let after = weapon_summary(d);
+        if after != before {
+            // E.g. the Ray Gun: fields its file leaves out are 0 (or the
+            // engine defaults) in the zone.
+            info!("{}: {applied} zone WeaponDef stats; changed from the weapon file/built-ins:\n  {before}\n  -> {after}", d.name);
+        } else {
+            info!("{}: {applied} zone WeaponDef stats (same as the weapon file): {after}", d.name);
+        }
+    }
+    info!("Applied zone WeaponDef stats to {} weapons (flesh penetration {:?})", stats.len(), flesh);
 }
 
 #[derive(Resource, Default)]

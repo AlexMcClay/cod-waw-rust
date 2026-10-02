@@ -9,11 +9,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio;
+mod grenades;
 mod hud;
 mod interact;
 mod menu;
 mod nacht;
 mod player;
+mod postfx;
 mod powerups;
 mod round;
 mod settings;
@@ -92,7 +94,9 @@ impl World {
     pub fn rebuild(&mut self, level: &Level) {
         self.player_solids = level.player_colliders();
         self.bullet_solids = level.walls.clone();
-        self.bullet_solids.push(level.crate_box);
+        if level.crate_solid {
+            self.bullet_solids.push(level.crate_box);
+        }
         for (i, d) in level.doors.iter().enumerate() {
             if !self.door_open[i] {
                 self.player_solids.push(d.blocker);
@@ -254,6 +258,7 @@ fn main() {
             world::WorldPlugin,
             player::PlayerPlugin,
             weapons::WeaponsPlugin,
+            grenades::GrenadesPlugin,
             zombies::ZombiesPlugin,
             interact::InteractPlugin,
             powerups::PowerupsPlugin,
@@ -261,6 +266,7 @@ fn main() {
             hud::HudPlugin,
             menu::MenuPlugin,
             nacht::NachtPlugin,
+            postfx::PostFxPlugin,
         ))
         .add_systems(Startup, move |mut next: ResMut<NextState<GameState>>| {
             if start_map.is_some() {

@@ -59,7 +59,9 @@ impl NavGrid {
         let mut blocked = vec![true; w * h];
         let mut solids: Vec<_> = level.walls.iter().filter(|a| a.min.y < 1.0).map(|a| a.inflate_xz(radius)).collect();
         solids.extend(level.window_fills.iter().map(|a| a.inflate_xz(radius)));
-        solids.push(level.crate_box.inflate_xz(radius));
+        if level.crate_solid {
+            solids.push(level.crate_box.inflate_xz(radius));
+        }
         for (i, d) in level.doors.iter().enumerate() {
             if !door_open.get(i).copied().unwrap_or(false) {
                 solids.push(d.blocker.inflate_xz(radius));

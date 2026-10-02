@@ -15,8 +15,10 @@
 //! demand by [`decode`].
 
 pub mod anim;
+pub mod clipmap;
 pub mod decode;
 mod walker;
+pub mod weapondef;
 
 pub use walker::walk;
 
@@ -283,7 +285,28 @@ pub struct WorldSurface {
     pub vertex_layer_data: u32,
     pub material: Option<u32>,
     pub lightmap: u8,
+    /// Index into the map's primary lights of the light drawn on top of
+    /// the lightmap (0 = none, 1 = the sun).
+    pub primary_light: u8,
     pub flags: u8,
+}
+
+/// A light the game draws per pixel on top of the baked lighting
+/// (`ComPrimaryLight` / `GfxLight`). Game units and axes.
+#[derive(Debug, Clone, Default)]
+pub struct PrimaryLight {
+    /// 1 = sun, 2 = spot, 3 = omni.
+    pub kind: u8,
+    pub color: [f32; 3],
+    /// Sun: towards the sun. Spot: towards the light (minus the cone axis).
+    pub dir: [f32; 3],
+    pub origin: [f32; 3],
+    pub radius: f32,
+    pub cos_half_fov_outer: f32,
+    pub cos_half_fov_inner: f32,
+    pub exponent: u8,
+    /// Light definition (falloff curve), e.g. `light_point_linear`.
+    pub def_name: String,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -324,6 +347,131 @@ pub struct WorldInfo {
     pub mins: [f32; 3],
     pub maxs: [f32; 3],
     pub sun_color: [f32; 3],
+    /// The sun as the world draws it (`GfxWorld.sunLight`).
+    pub sun_light: Option<PrimaryLight>,
+    /// Baked light for models (`GfxLightGrid`).
+    pub light_grid: Option<LightGridInfo>,
+}
+
+/// The light grid: points every 32 x 32 x 64 units, each holding the light
+/// arriving from all around as a 4x4x4 block of colours (its 56 surface
+/// cells) and the primary light a model there uses. Rows run along
+/// `row_axis`, columns along `col_axis`, with run-length encoded columns.
+#[derive(Debug, Clone)]
+pub struct LightGridInfo {
+    pub mins: [u16; 3],
+    pub maxs: [u16; 3],
+    pub row_axis: usize,
+    pub col_axis: usize,
+    pub rows: usize,
+    pub row_starts: usize,
+    pub raw_rows: usize,
+    pub raw_rows_len: usize,
+    pub entries: usize,
+    pub entry_count: usize,
+    pub colors: usize,
+    pub color_count: usize,
+}
+
+/// One light grid point: its colour block and primary light.
+#[derive(Debug, Clone, Copy)]
+pub struct GridEntry {
+    pub colors_index: u16,
+    pub primary_light: u8,
+}
+
+/// The 56 surface cells of a 4x4x4 cube in storage order (x fastest, then
+/// y, then z, skipping the 8 inner cells).
+pub fn grid_cube_cells() -> [[u8; 3]; 56] {
+    let mut out = [[0u8; 3]; 56];
+    let mut n = 0;
+    for z in 0..4u8 {
+        for y in 0..4u8 {
+            for x in 0..4u8 {
+                let inner = (1..=2).contains(&x) && (1..=2).contains(&y) && (1..=2).contains(&z);
+                if !inner {
+                    out[n] = [x, y, z];
+                    n += 1;
+                }
+            }
+        }
+    }
+    out
+}
+
+impl LightGridInfo {
+    /// Grid coordinates of the cell containing a game-space point.
+    pub fn coord(p: [f32; 3]) -> [i64; 3] {
+        [(p[0] / 32.0).floor() as i64 + 4096, (p[1] / 32.0).floor() as i64 + 4096, (p[2] / 64.0).floor() as i64 + 2048]
+    }
+
+    /// The entry stored at grid coordinates `g`, if any.
+    pub fn entry_index(&self, data: &[u8], g: [i64; 3]) -> Option<usize> {
+        let (ra, ca) = (self.row_axis, self.col_axis);
+        let row = g[ra] - self.mins[ra] as i64;
+        if row < 0 || row as usize >= self.rows {
+            return None;
+        }
+        let rs = self.row_starts + 2 * row as usize;
+        let start = u16::from_le_bytes([*data.get(rs)?, *data.get(rs + 1)?]);
+        if start == 0xffff {
+            return None;
+        }
+        let raw = data.get(self.raw_rows..self.raw_rows + self.raw_rows_len)?;
+        let o = 4 * start as usize;
+        let rd16 = |i: usize| raw.get(i..i + 2).map(|b| u16::from_le_bytes([b[0], b[1]]));
+        let (cs, cc, zs, zc) = (rd16(o)? as i64, rd16(o + 2)? as i64, rd16(o + 4)? as i64, rd16(o + 6)? as i64);
+        let mut entry = raw.get(o + 8..o + 12).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]))? as i64;
+        let mut col = g[ca] - cs;
+        let zi = g[2] - zs;
+        if !(0..cc).contains(&col) || !(0..zc).contains(&zi) {
+            return None;
+        }
+        let mut p = o + 12;
+        loop {
+            let (n, k) = (*raw.get(p)? as i64, *raw.get(p + 1)? as i64);
+            p += 2;
+            let mut zo = 0;
+            if k > 0 {
+                zo = *raw.get(p)? as i64;
+                p += 1;
+            }
+            if col < n {
+                if k == 0 || !(zo..zo + k).contains(&zi) {
+                    return None;
+                }
+                return Some((entry + col * k + (zi - zo)) as usize);
+            }
+            col -= n;
+            entry += n * k;
+            if n == 0 && k == 0 {
+                return None;
+            }
+        }
+    }
+
+    pub fn entry(&self, data: &[u8], i: usize) -> Option<GridEntry> {
+        if i >= self.entry_count {
+            return None;
+        }
+        let b = data.get(self.entries + 4 * i..self.entries + 4 * i + 4)?;
+        Some(GridEntry { colors_index: u16::from_le_bytes([b[0], b[1]]), primary_light: b[2] })
+    }
+
+    /// The 56 colours (0..1, gamma) of an entry's block, as a 4x4x4 cube
+    /// indexed [x][y][z] (inner cells are zero).
+    pub fn cube(&self, data: &[u8], e: GridEntry) -> Option<[[[[f32; 3]; 4]; 4]; 4]> {
+        let ci = e.colors_index as usize;
+        if ci >= self.color_count {
+            return None;
+        }
+        let b = data.get(self.colors + 168 * ci..self.colors + 168 * (ci + 1))?;
+        let mut cube = [[[[0.0f32; 3]; 4]; 4]; 4];
+        for (i, [x, y, z]) in grid_cube_cells().into_iter().enumerate() {
+            cube[x as usize][y as usize][z as usize] = [b[3 * i] as f32 / 255.0, b[3 * i + 1] as f32 / 255.0, b[3 * i + 2] as f32 / 255.0];
+        }
+        Some(cube)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -381,11 +529,24 @@ pub struct WeaponInfo {
     pub xanims: Vec<String>,
     /// Viewmodel notetrack name -> sound alias it plays.
     pub notetrack_sounds: Vec<(String, String)>,
+    /// The model a thrown/fired projectile uses (`projectileModel`).
+    pub projectile_model: Option<u32>,
+    /// `bounceSound`: an alias per surface type (empty when unset), if any.
+    pub bounce_sounds: Vec<String>,
+    /// Gameplay numbers (damage, timings, ammo, spread, hit-location
+    /// multipliers...) as weapon-file `(key, value)` pairs; see
+    /// [`weapondef::stats`].
+    pub stats: Vec<(&'static str, String)>,
 }
 
 impl WeaponInfo {
     pub fn sound(&self, field: &str) -> Option<&str> {
         self.sounds.iter().find(|(f, _)| *f == field).map(|(_, s)| s.as_str())
+    }
+
+    /// One of [`Self::stats`] by its weapon-file key.
+    pub fn stat(&self, key: &str) -> Option<&str> {
+        self.stats.iter().find(|(f, _)| *f == key).map(|(_, v)| v.as_str())
     }
 }
 
@@ -448,8 +609,15 @@ pub struct ZoneData {
     pub loaded_sounds: Vec<LoadedSoundInfo>,
     pub weapons: Vec<WeaponInfo>,
     pub fonts: Vec<FontInfo>,
+    /// Raw files (scripts, vision sets...): (name, file position, length).
+    pub rawfiles: Vec<(String, usize, usize)>,
+    /// The map's primary lights (`ComWorld`), indexed by
+    /// `WorldSurface::primary_light`.
+    pub primary_lights: Vec<PrimaryLight>,
     pub xanims: Vec<XAnimInfo>,
     pub world: Option<WorldInfo>,
+    /// The map's collision (brushes, terrain, brush models).
+    pub clipmap: Option<clipmap::ClipMapInfo>,
     pub map_ents: Option<String>,
     pub localize: Vec<(String, String)>,
     /// Back-references that could not be resolved (0 for a correct walk).
@@ -511,6 +679,12 @@ impl ZoneData {
         Some(RenderState(u32::from_le_bytes([b[0], b[1], b[2], b[3]])))
     }
 
+    /// A raw file's text (scripts, `.vision` files).
+    pub fn rawfile(&self, name: &str) -> Option<String> {
+        let (_, p, len) = self.rawfiles.iter().find(|(n, ..)| n.eq_ignore_ascii_case(name))?;
+        self.data.get(*p..p + len).map(|b| String::from_utf8_lossy(b).into_owned())
+    }
+
     pub fn font(&self, name: &str) -> Option<&FontInfo> {
         self.fonts.iter().find(|f| f.name.eq_ignore_ascii_case(name))
     }
@@ -562,6 +736,49 @@ mod tests {
         let lod0: usize = m.surfs[m.lod_surfs(0)].iter().map(|s| s.tri_count as usize).sum();
         assert_eq!((m.bones.len(), lod0), (28, 668));
         assert_eq!(zd.weapon("kar98k").and_then(|w| w.sound("fireSound")), Some("weap_kar98k_fire"));
+        // World vertices carry a tangent frame: unit, perpendicular to the
+        // normal, with a +-1 binormal sign.
+        let (mut ok, mut n) = (0, 0);
+        for i in (0..w.vertex_count).step_by(97) {
+            let v = decode::world_vertex(&zd, w, i).unwrap();
+            let dot: f32 = (0..3).map(|k| v.normal[k] * v.tangent[k]).sum();
+            n += 1;
+            if dot.abs() < 0.2 && (v.binormal_sign.abs() - 1.0).abs() < 0.01 {
+                ok += 1;
+            }
+        }
+        assert!(ok * 10 >= n * 9, "{ok}/{n} vertices with a sane tangent frame");
+        // Primary lights: 21 entries (0 = none, 1 = sun, spots, omnis).
+        assert_eq!(zd.primary_lights.len(), 21);
+        assert_eq!(zd.primary_lights[1].kind, 1);
+        let omni20 = &zd.primary_lights[20];
+        assert_eq!((omni20.kind, omni20.radius, omni20.def_name.as_str()), (3, 350.0, "tungsten_lamp"));
+        let sun = w.sun_light.as_ref().unwrap();
+        assert!((sun.color[0] - 0.3536).abs() < 0.001 && (sun.dir[2] - 0.5).abs() < 0.01, "{sun:?}");
+        let lit = w.surfaces.iter().filter(|s| s.primary_light == 1).count();
+        assert_eq!(lit, 1066);
+    }
+
+    /// The zone's WeaponDefs carry the same numbers as the IWD weapon files.
+    #[test]
+    #[ignore]
+    fn reads_weapon_stats() {
+        let root = std::env::var("UNDEAD_WAW").expect("set UNDEAD_WAW");
+        let ff = std::fs::read(std::path::Path::new(&root).join("zone/english/nazi_zombie_prototype.ff")).unwrap();
+        let zd = walk(crate::zone::decompress(&ff).unwrap());
+        let k = zd.weapon("kar98k").unwrap();
+        assert_eq!(k.stat("damage"), Some("100"));
+        assert_eq!(k.stat("fireType"), Some("Single Shot"));
+        assert_eq!(k.stat("fireTime"), Some("0.33"));
+        assert_eq!(k.stat("rechamberTime"), Some("1"));
+        assert_eq!(k.stat("locHead"), Some("3.5"));
+        assert_eq!(k.stat("locHelmet"), Some("1"));
+        assert_eq!(k.stat("maxDamageRange"), Some("1200"));
+        let s = zd.weapon("shotgun").unwrap();
+        assert_eq!((s.stat("shotCount"), s.stat("segmentedReload"), s.stat("weaponClass")), (Some("8"), Some("1"), Some("spread")));
+        let r = zd.weapon("ray_gun").unwrap();
+        assert_eq!((r.stat("weaponType"), r.stat("fireType"), r.stat("explosionInnerDamage")), (Some("projectile"), Some("Full Auto"), Some("1500")));
+        assert_eq!(zd.weapon("thompson").unwrap().stat("penetrateType"), Some("medium"));
     }
 
     /// The game's bitmap fonts come from code_post_gfx.ff.

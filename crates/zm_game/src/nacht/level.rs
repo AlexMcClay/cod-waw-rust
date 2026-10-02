@@ -114,6 +114,8 @@ pub fn build_level(scene: &NachtScene) -> Level {
         doors,
         wall_buys,
         crate_box,
+        // The box model collides through the map's collision mesh.
+        crate_solid: real_box.is_none(),
         areas: Vec::new(),
         player_start: (start.x, start.z),
         player_start_y: start.y,
@@ -121,6 +123,7 @@ pub fn build_level(scene: &NachtScene) -> Level {
         player_yaw: yaw - std::f32::consts::FRAC_PI_2,
         lights: m.lights.iter().map(|l| v3(to_bevy(*l))).collect(),
         spawners: spawners.iter().map(|(p, a)| (v3(*p), *a)).collect(),
+        crate_weapons: Some(zm_core::weapons::NACHT_CRATE),
     }
 }
 

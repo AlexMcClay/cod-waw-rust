@@ -17,7 +17,7 @@ use waw_assets::t4::{self, decode, XModelInfo, ZoneData};
 use waw_assets::zombiemap::ZombieMap;
 use waw_assets::{Install, Iwd};
 use zm_core::geom::V3;
-use zm_core::trimesh::{Tri, TriMesh};
+use zm_core::trimesh::{blocks, Tri, TriMesh};
 
 pub const INCH: f32 = 0.0254;
 
@@ -44,6 +44,8 @@ pub enum Blend {
     Opaque,
     Mask,
     Blend,
+    /// Additive (sky glow layers).
+    Add,
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +56,36 @@ pub struct SceneMaterial {
     pub lightmapped: bool,
     /// Drawn without back-face culling.
     pub two_sided: bool,
+    /// Normal map (loaded raw, not sRGB).
+    pub normal: Option<String>,
+    /// Lit shaders tint by vertex colour; layered ones use it as a blend
+    /// weight instead.
+    pub vertex_tint: bool,
+}
+
+/// A lit world surface group: one material lit by one primary light.
+pub struct SceneWorldMesh {
+    pub mesh: Mesh,
+    pub material: usize,
+    pub primary_light: u8,
+    /// Which lightmap the surfaces use.
+    pub lightmap: u8,
+}
+
+/// A primary light in Bevy space (metres).
+#[derive(Clone, Copy, Default)]
+pub struct SceneLight {
+    /// 0 none, 1 sun, 2 spot, 3 omni.
+    pub kind: u8,
+    pub color: Vec3,
+    pub position: Vec3,
+    pub radius: f32,
+    pub dir: Vec3,
+    pub cos_outer: f32,
+    pub cos_inner: f32,
+    pub exponent: f32,
+    /// 0 linear, 1 tungsten.
+    pub falloff: u8,
 }
 
 pub struct SceneMesh {
@@ -204,6 +236,7 @@ pub const VIEW_ANIM_SLOTS: &[(usize, &str)] = &[
     (1, "idle"),
     (2, "empty_idle"),
     (3, "fire"),
+    (4, "hold_fire"),
     (5, "last_shot"),
     (6, "rechamber"),
     (7, "melee"),
@@ -259,9 +292,18 @@ pub struct SceneModel {
 
 pub struct NachtScene {
     pub images: HashMap<String, Image>,
-    pub lightmap: Option<Image>,
     pub materials: Vec<SceneMaterial>,
-    pub world: Vec<SceneMesh>,
+    pub world: Vec<SceneWorldMesh>,
+    /// Each lightmap's secondary (two halves, RGBA) and primary (shadow of
+    /// each surface's primary light) pages, raw, by lightmap index.
+    pub lightmap_pages: Vec<Option<(Image, Image)>>,
+    /// The light grid as an irradiance volume for models, and where it sits.
+    pub irradiance: Option<(Image, Transform)>,
+    /// Fog and film grade from the map's own art script and vision set.
+    pub fog: Option<waw_assets::look::Fog>,
+    pub film: Option<waw_assets::look::Film>,
+    /// Primary lights by index (0 = none, 1 = the sun).
+    pub lights: Vec<SceneLight>,
     /// Brush submodels by number (`"*N"` in the entities), in local space.
     pub submodels: HashMap<usize, Vec<SceneMesh>>,
     /// Local-space bounds of each submodel (Bevy space, metres).
@@ -269,6 +311,9 @@ pub struct NachtScene {
     pub models: HashMap<String, SceneModel>,
     pub static_models: Vec<(String, Transform)>,
     pub sky_model: Option<String>,
+    /// Scale that puts the sky model behind everything (the game draws its
+    /// sky at infinity).
+    pub sky_scale: f32,
     pub collision: TriMesh,
     pub map: ZombieMap,
     pub entities: Vec<mapents::Entity>,
@@ -280,6 +325,11 @@ pub struct NachtScene {
     pub weapon_names: HashMap<String, String>,
     /// Our weapon id -> its third-person (world) model, shown by the box.
     pub weapon_world_models: HashMap<String, String>,
+    /// Our weapon id -> the gameplay numbers of the zone's WeaponDef (what
+    /// the game itself uses), as weapon-file key/value pairs.
+    pub weapon_stats: HashMap<String, Vec<(&'static str, String)>>,
+    /// Flesh penetration depths from common.ff's `info/bullet_penetration_sp`.
+    pub flesh_penetration: Option<[f32; 4]>,
     /// The mystery box as the map builds it.
     pub chest: Option<SceneChest>,
     pub characters: Vec<SceneCharacter>,
@@ -306,6 +356,11 @@ struct Builder<'a> {
 /// Blend mode from a technique-set name such as `wc_l_sm_t0c0n0s0`.
 fn classify(techset: &str) -> (Blend, bool, bool) {
     let t = techset.trim_start_matches(',');
+    // Sky-box model layers: drawn unlit and without depth (so the fog pass
+    // leaves the sky alone, as the game's sky shaders have no fog).
+    if t.starts_with("mc_sky") {
+        return (if t.contains("_add") { Blend::Add } else { Blend::Blend }, true, false);
+    }
     if t.contains("sky") || t.contains("tools") || t.contains("shadowcaster") {
         return (Blend::Opaque, true, false); // caller skips these
     }
@@ -326,7 +381,7 @@ fn classify(techset: &str) -> (Blend, bool, bool) {
 
 pub fn skip_material(techset: &str, name: &str) -> bool {
     let t = techset.trim_start_matches(',');
-    t.contains("sky") || t.contains("tools") || t.contains("shadowcaster") || t.contains("water") || name.contains("caulk") || name.contains("clip")
+    (t.contains("sky") && !t.starts_with("mc_sky")) || t.contains("tools") || t.contains("shadowcaster") || t.contains("water") || name.contains("caulk") || name.contains("clip")
 }
 
 fn sampler(repeat: bool, mips: bool) -> ImageSampler {
@@ -343,6 +398,19 @@ fn sampler(repeat: bool, mips: bool) -> ImageSampler {
 }
 
 impl<'a> Builder<'a> {
+    /// An image loaded without sRGB decoding (normal maps), keyed `name#raw`.
+    fn image_raw(&mut self, name: &str) -> Option<String> {
+        let name = name.trim_start_matches(',').to_ascii_lowercase();
+        let key = format!("{name}#raw");
+        if self.images.contains_key(&key) {
+            return Some(key);
+        }
+        let bytes = self.iwd.read_image(&name)?;
+        let iwi = Iwi::parse(&bytes).ok()?;
+        self.images.insert(key.clone(), crate::waw::iwi_to_image(&iwi, false, true, self.bc));
+        Some(key)
+    }
+
     fn image(&mut self, name: &str) -> Option<String> {
         let name = name.trim_start_matches(',').to_ascii_lowercase();
         if self.images.contains_key(&name) {
@@ -388,8 +456,13 @@ impl<'a> Builder<'a> {
         let two_sided = state.is_some_and(|s| s.two_sided()) || blend != Blend::Opaque;
         let color_name = info.color_map().map(|i| self.zones[zi].image_name(i).to_string());
         let color = color_name.and_then(|n| self.image(&n));
+        let normal_name = info.texture(t4::NORMAL_MAP).map(|i| self.zones[zi].image_name(i).to_string());
+        let normal = normal_name.and_then(|n| self.image_raw(&n));
+        // Layered techsets ("..._b1c1...") blend a second layer by vertex
+        // colour rather than tinting.
+        let vertex_tint = !t.split('_').any(|part| part.len() >= 2 && part.as_bytes()[1] == b'1' && part.as_bytes()[0].is_ascii_lowercase());
         let m = self.materials.len();
-        self.materials.push(SceneMaterial { color, blend, unlit, lightmapped, two_sided });
+        self.materials.push(SceneMaterial { color, blend, unlit, lightmapped, two_sided, normal, vertex_tint });
         self.mat_index.insert(key, m);
         Some(m)
     }
@@ -533,6 +606,8 @@ fn world_mesh(zone: &ZoneData, w: &t4::WorldInfo, surfs: &[usize], lightmap: boo
     let mut nor = Vec::new();
     let mut uv0 = Vec::new();
     let mut uv1 = Vec::new();
+    let mut col: Vec<[f32; 4]> = Vec::new();
+    let mut tan: Vec<[f32; 4]> = Vec::new();
     let mut idx: Vec<u32> = Vec::new();
     let mut remap: HashMap<u32, u32> = HashMap::new();
     for &si in surfs {
@@ -541,11 +616,15 @@ fn world_mesh(zone: &ZoneData, w: &t4::WorldInfo, surfs: &[usize], lightmap: boo
         for tri in decode::world_triangles(zone, w, s) {
             for &v in &[tri[0], tri[2], tri[1]] {
                 let i = *remap.entry(v).or_insert_with(|| {
-                    let vx = decode::world_vertex(zone, w, v).unwrap_or(decode::Vertex { pos: [0.0; 3], normal: [0.0, 0.0, 1.0], uv: [0.0; 2], color: [255; 4] });
+                    let vx = decode::world_vertex(zone, w, v).unwrap_or(decode::Vertex { pos: [0.0; 3], normal: [0.0, 0.0, 1.0], tangent: [1.0, 0.0, 0.0], binormal_sign: 1.0, uv: [0.0; 2], color: [255; 4] });
                     pos.push(to_bevy(vx.pos).to_array());
                     nor.push(dir_to_bevy(vx.normal).normalize_or_zero().to_array());
                     uv0.push(vx.uv);
                     uv1.push(decode::world_lightmap_uv(zone, w, v).unwrap_or([0.0; 2]));
+                    // D3DCOLOR: bytes B, G, R, A (kept as raw gamma values).
+                    col.push([vx.color[2] as f32 / 255.0, vx.color[1] as f32 / 255.0, vx.color[0] as f32 / 255.0, vx.color[3] as f32 / 255.0]);
+                    let t = dir_to_bevy(vx.tangent).normalize_or_zero();
+                    tan.push([t.x, t.y, t.z, if vx.binormal_sign < 0.0 { -1.0 } else { 1.0 }]);
                     pos.len() as u32 - 1
                 });
                 idx.push(i);
@@ -561,67 +640,312 @@ fn world_mesh(zone: &ZoneData, w: &t4::WorldInfo, surfs: &[usize], lightmap: boo
     mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uv0);
     if lightmap {
         mesh.insert_attribute(Mesh::ATTRIBUTE_UV_1, uv1);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, col);
+        mesh.insert_attribute(Mesh::ATTRIBUTE_TANGENT, tan);
     }
     mesh.insert_indices(Indices::U32(idx));
     Some(mesh)
 }
 
-/// f32 to IEEE binary16 bits (round toward zero; fine for light values).
-fn f16_bits(v: f32) -> u16 {
-    let b = v.to_bits();
-    let sign = ((b >> 16) & 0x8000) as u16;
-    let exp = ((b >> 23) & 0xff) as i32 - 127 + 15;
-    let man = b & 0x7f_ffff;
-    if exp <= 0 {
-        sign
-    } else if exp >= 31 {
-        sign | 0x7bff
-    } else {
-        sign | ((exp as u16) << 10) | (man >> 13) as u16
-    }
+
+/// The map's fog and vision set, from its own data: the art script
+/// `maps/createart/<map>_art.gsc` names the fog and the vision set, which
+/// is `vision/<name>.vision` in any loaded zone or the IWDs.
+fn map_look(zones: &[&ZoneData], iwd: &Iwd, world: &t4::WorldInfo) -> (Option<waw_assets::look::Fog>, Option<waw_assets::look::Film>) {
+    use waw_assets::look;
+    let base = world.name.rsplit('/').next().unwrap_or(&world.name).trim_end_matches(".d3dbsp").to_string();
+    let raw = |name: &str| zones.iter().find_map(|z| z.rawfile(name)).or_else(|| iwd.read(name).map(|b| String::from_utf8_lossy(&b).into_owned()));
+    let Some(script) = raw(&format!("maps/createart/{base}_art.gsc")) else {
+        warn!("No art script for {base}: no fog or vision set");
+        return (None, None);
+    };
+    let fog = look::fog_from_script(&script);
+    let vision = look::vision_name_from_script(&script).and_then(|n| raw(&format!("vision/{n}.vision")).map(|t| (n, look::parse_vision(&t))));
+    info!("Map look for {base}: fog {fog:?}, vision {:?}", vision.as_ref().map(|v| &v.0));
+    (fog, vision.map(|v| v.1.film))
 }
 
-/// Bakes the map's two lightmap pages into one HDR lightmap: the secondary
-/// page's two halves hold indirect colour, the primary page masks the sun.
-fn bake_lightmap(zone: &ZoneData, sun: Vec3) -> Option<Image> {
-    let find = |suffix: &str| zone.images.iter().find(|i| i.name.ends_with(suffix)).and_then(|i| i.inline.clone());
-    let primary = find("lightmap0_primary")?;
-    let secondary = find("lightmap0_secondary")?;
-    let (pw, ph) = (primary.dims[0] as usize, primary.dims[1] as usize);
-    let (sw, sh) = (secondary.dims[0] as usize, secondary.dims[1] as usize);
-    if primary.len < pw * ph || secondary.len < sw * sh * 4 || sh < 2 {
-        return None;
+/// RGB9E5 shared-exponent packing (for the irradiance volume).
+fn rgb9e5(c: [f32; 3]) -> u32 {
+    let clamp = |v: f32| if v.is_finite() { v.clamp(0.0, 65408.0) } else { 0.0 };
+    let (r, g, b) = (clamp(c[0]), clamp(c[1]), clamp(c[2]));
+    let max = r.max(g).max(b);
+    if max <= 0.0 {
+        return 0;
     }
-    let p = &zone.data[primary.fpos..primary.fpos + pw * ph];
-    let s = &zone.data[secondary.fpos..secondary.fpos + sw * sh * 4];
-    let half = sh / 2;
-    let mut out = Vec::with_capacity(pw * ph * 8);
-    for y in 0..ph {
-        for x in 0..pw {
-            let sx = x * sw / pw;
-            let sy = y * half / ph;
-            let px = |row: usize| {
-                let o = (row * sw + sx) * 4;
-                Vec3::new(s[o + 2] as f32, s[o + 1] as f32, s[o] as f32) / 255.0
-            };
-            let indirect = (px(sy) + px(sy + half)) * 0.5;
-            let shadow = p[y * pw + x] as f32 / 255.0;
-            let c = indirect * 2.0 + sun * shadow;
-            for v in [c.x, c.y, c.z, 1.0] {
-                out.extend_from_slice(&f16_bits(v).to_le_bytes());
+    let mut exp = (max.log2().floor() as i32).max(-16) + 1 + 15;
+    let mut denom = 2f32.powi(exp - 15 - 9);
+    if (max / denom + 0.5).floor() >= 512.0 {
+        denom *= 2.0;
+        exp += 1;
+    }
+    let q = |v: f32| ((v / denom + 0.5).floor() as u32).min(511);
+    q(r) | (q(g) << 9) | (q(b) << 18) | ((exp.clamp(0, 31) as u32) << 27)
+}
+
+/// The light grid as a Bevy irradiance volume: each grid point's 4x4x4
+/// block of incoming light becomes an ambient cube (the centre of each
+/// face, which is what the game's model shader reads for that direction),
+/// with the game's x2 model overbright, converted from gamma to linear.
+/// Empty points borrow from their neighbours so models near walls don't go
+/// black.
+fn irradiance_volume(zone: &ZoneData, world: &t4::WorldInfo, lights: &[SceneLight], collision: &TriMesh) -> Option<(Image, Transform)> {
+    let grid = world.light_grid.as_ref()?;
+    let d = &zone.data;
+    let curves = FalloffCurves::read(zone);
+    let (mn, mx) = (grid.mins, grid.maxs);
+    // Bevy axes: X = game X, Y = game Z (up), Z = -game Y.
+    let (rx, ry, rz) = ((mx[0] - mn[0] + 1) as usize, (mx[2] - mn[2] + 1) as usize, (mx[1] - mn[1] + 1) as usize);
+    // Per voxel: +X, -X, +Y(up), -Y, +Z(-game Y), -Z(+game Y).
+    let mut faces: Vec<Option<[[f32; 3]; 6]>> = vec![None; rx * ry * rz];
+    let face = |cube: &[[[[f32; 3]; 4]; 4]; 4], axis: usize, hi: bool| -> [f32; 3] {
+        let k = if hi { 3 } else { 0 };
+        let mut acc = [0.0f32; 3];
+        for a in 1..3 {
+            for b in 1..3 {
+                let c = match axis {
+                    0 => cube[k][a][b],
+                    1 => cube[a][k][b],
+                    _ => cube[a][b][k],
+                };
+                for i in 0..3 {
+                    acc[i] += c[i] * 0.25;
+                }
+            }
+        }
+        // The game's x2 model overbright (gamma; linearised after adding the
+        // primary light).
+        acc.map(|v| 2.0 * v)
+    };
+    for z in 0..rz {
+        for y in 0..ry {
+            for x in 0..rx {
+                let g = [mn[0] as i64 + x as i64, mx[1] as i64 - z as i64, mn[2] as i64 + y as i64];
+                let Some(entry) = grid.entry_index(d, g).and_then(|i| grid.entry(d, i)) else { continue };
+                let Some(cube) = grid.cube(d, entry) else { continue };
+                // Game faces: +X, -X, +Y, -Y, +Z, -Z.
+                let (px, nx) = (face(&cube, 0, true), face(&cube, 0, false));
+                let (py, ny) = (face(&cube, 1, true), face(&cube, 1, false));
+                let (pz, nz) = (face(&cube, 2, true), face(&cube, 2, false));
+                // Bevy order: +X, -X, +Y, -Y, +Z, -Z (still gamma, x2 applied).
+                let mut f = [px, nx, pz, nz, ny, py];
+                // The point's primary light, as the game adds it per pixel to
+                // models (with its falloff, cone and visibility).
+                let p = to_bevy([(g[0] - 4096) as f32 * 32.0, (g[1] - 4096) as f32 * 32.0, (g[2] - 2048) as f32 * 64.0]);
+                if let Some(light) = lights.get(entry.primary_light as usize) {
+                    let normals = [Vec3::X, Vec3::NEG_X, Vec3::Y, Vec3::NEG_Y, Vec3::Z, Vec3::NEG_Z];
+                    if let Some((l, color)) = primary_at(light, p, &curves, collision) {
+                        for (face, n) in f.iter_mut().zip(normals) {
+                            let k = n.dot(l).max(0.0);
+                            for c in 0..3 {
+                                face[c] += color[c] * k;
+                            }
+                        }
+                    }
+                }
+                faces[(z * ry + y) * rx + x] = Some(f.map(|c| c.map(|v| v.max(0.0).powf(2.2))));
             }
         }
     }
-    let mut img = Image::new(
-        Extent3d { width: pw as u32, height: ph as u32, depth_or_array_layers: 1 },
-        TextureDimension::D2,
-        out,
-        TextureFormat::Rgba16Float,
+    // Fill empty points from filled neighbours, a few layers deep.
+    for _ in 0..6 {
+        let prev = faces.clone();
+        for z in 0..rz {
+            for y in 0..ry {
+                for x in 0..rx {
+                    let i = (z * ry + y) * rx + x;
+                    if prev[i].is_some() {
+                        continue;
+                    }
+                    let mut acc = [[0.0f32; 3]; 6];
+                    let mut n = 0.0;
+                    for (dx, dy, dz) in [(-1i64, 0i64, 0i64), (1, 0, 0), (0, -1, 0), (0, 1, 0), (0, 0, -1), (0, 0, 1)] {
+                        let (nx, ny, nz) = (x as i64 + dx, y as i64 + dy, z as i64 + dz);
+                        if nx < 0 || ny < 0 || nz < 0 || nx >= rx as i64 || ny >= ry as i64 || nz >= rz as i64 {
+                            continue;
+                        }
+                        if let Some(f) = prev[(nz as usize * ry + ny as usize) * rx + nx as usize] {
+                            for s in 0..6 {
+                                for c in 0..3 {
+                                    acc[s][c] += f[s][c];
+                                }
+                            }
+                            n += 1.0;
+                        }
+                    }
+                    if n > 0.0 {
+                        faces[i] = Some(acc.map(|f| f.map(|v| v / n)));
+                    }
+                }
+            }
+        }
+    }
+    // Pack (Rx, 2Ry, 3Rz): positive sides in the first Ry rows, negative in
+    // the second; X sides in the first Rz layers, then Y, then Z.
+    let (w, h, depth) = (rx, 2 * ry, 3 * rz);
+    let mut texels = vec![0u32; w * h * depth];
+    for z in 0..rz {
+        for y in 0..ry {
+            for x in 0..rx {
+                let f = faces[(z * ry + y) * rx + x].unwrap_or([[0.0; 3]; 6]);
+                for (axis, (pos, neg)) in [(0usize, (f[0], f[1])), (1, (f[2], f[3])), (2, (f[4], f[5]))] {
+                    let layer = axis * rz + z;
+                    texels[(layer * h + y) * w + x] = rgb9e5(pos);
+                    texels[(layer * h + ry + y) * w + x] = rgb9e5(neg);
+                }
+            }
+        }
+    }
+    let bytes: Vec<u8> = texels.iter().flat_map(|t| t.to_le_bytes()).collect();
+    let mut image = Image::new(
+        Extent3d { width: w as u32, height: h as u32, depth_or_array_layers: depth as u32 },
+        TextureDimension::D3,
+        bytes,
+        TextureFormat::Rgb9e5Ufloat,
         RenderAssetUsages::RENDER_WORLD,
     );
-    img.sampler = sampler(false, false);
-    Some(img)
+    image.sampler = sampler(false, false);
+    // Voxel centres on the grid points: points every 32 x 64 x 32 (Bevy x y z).
+    let cell = Vec3::new(32.0, 64.0, 32.0) * INCH;
+    let size = Vec3::new(rx as f32, ry as f32, rz as f32) * cell;
+    let base = Vec3::new((mn[0] as f32 - 4096.0) * 32.0, (mn[2] as f32 - 2048.0) * 64.0, (4096.0 - mx[1] as f32) * 32.0) * INCH;
+    let transform = Transform::from_translation(base + size * 0.5 - cell * 0.5).with_scale(size);
+    info!("Light grid: {rx}x{ry}x{rz} points as an irradiance volume");
+    Some((image, transform))
 }
+
+/// The light falloff curves the game keeps in row 0 of the first lightmap's
+/// secondary page (linear and tungsten), read raw.
+struct FalloffCurves {
+    linear: Vec<[f32; 3]>,
+    tungsten: Vec<[f32; 3]>,
+}
+
+impl FalloffCurves {
+    fn read(zone: &ZoneData) -> FalloffCurves {
+        let row = zone
+            .images
+            .iter()
+            .find(|i| i.name.ends_with("lightmap0_secondary"))
+            .and_then(|i| i.inline.clone())
+            .and_then(|i| zone.data.get(i.fpos..i.fpos + 4 * i.dims[0] as usize).map(|b| b.to_vec()))
+            .unwrap_or_default();
+        let curve = |start: usize, width: usize| -> Vec<[f32; 3]> {
+            (0..width)
+                .map(|i| {
+                    let o = 4 * (start + i);
+                    match row.get(o..o + 4) {
+                        // BGRA bytes.
+                        Some(b) => [b[2] as f32 / 255.0, b[1] as f32 / 255.0, b[0] as f32 / 255.0],
+                        None => [1.0 - i as f32 / (width - 1) as f32; 3],
+                    }
+                })
+                .collect()
+        };
+        FalloffCurves { linear: curve(1, 16), tungsten: curve(19, 32) }
+    }
+
+    fn sample(&self, tungsten: bool, t: f32) -> [f32; 3] {
+        let c = if tungsten { &self.tungsten } else { &self.linear };
+        let x = t.clamp(0.0, 1.0) * (c.len() - 1) as f32;
+        let (i, f) = (x.floor() as usize, x.fract());
+        let (a, b) = (c[i.min(c.len() - 1)], c[(i + 1).min(c.len() - 1)]);
+        [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]
+    }
+}
+
+/// A primary light's direction and colour (gamma, before N.L) at a point,
+/// if it reaches it: the falloff curve, the spot cone, and visibility.
+fn primary_at(l: &SceneLight, p: Vec3, curves: &FalloffCurves, collision: &TriMesh) -> Option<(Vec3, [f32; 3])> {
+    let v = |a: Vec3| V3::new(a.x, a.y, a.z);
+    match l.kind {
+        1 => {
+            // The sun: blocked by anything along its direction.
+            let o = p + l.dir * 0.1;
+            collision.raycast(v(o), v(l.dir), 400.0).is_none().then_some((l.dir, l.color.to_array()))
+        }
+        2 | 3 => {
+            let to = l.position - p;
+            let dist = to.length();
+            let t = dist / l.radius;
+            if t >= 1.0 || dist < 1e-3 {
+                return None;
+            }
+            let dir = to / dist;
+            let mut k = 1.0;
+            if l.kind == 2 {
+                let x = 1.0 / (l.cos_inner - l.cos_outer).max(1e-4);
+                let s = (dir.dot(l.dir) * x - l.cos_outer * x).clamp(0.0, 1.0);
+                if s <= 0.0 {
+                    return None;
+                }
+                k = s.powf(l.exponent.max(1e-4));
+            }
+            if !collision.line_clear(v(p), v(l.position - dir * 0.15)) {
+                return None;
+            }
+            let f = curves.sample(l.falloff == 1, t);
+            Some((dir, [l.color.x * f[0] * k, l.color.y * f[1] * k, l.color.z * f[2] * k]))
+        }
+        _ => None,
+    }
+}
+
+/// The primary lights in Bevy space. Index 1 is the sun as the world draws
+/// it; spots and omnis come from the map's light table.
+fn scene_lights(zone: &ZoneData, world: &t4::WorldInfo) -> Vec<SceneLight> {
+    zone.primary_lights
+        .iter()
+        .enumerate()
+        .map(|(i, l)| {
+            let src = if i == 1 { world.sun_light.as_ref().unwrap_or(l) } else { l };
+            SceneLight {
+                kind: if i == 0 { 0 } else { l.kind },
+                color: Vec3::from(src.color),
+                position: to_bevy(l.origin),
+                radius: (l.radius * INCH).max(0.01),
+                dir: dir_to_bevy(src.dir).normalize_or_zero(),
+                cos_outer: l.cos_half_fov_outer,
+                cos_inner: l.cos_half_fov_inner,
+                exponent: l.exponent.max(1) as f32,
+                falloff: if l.def_name.contains("tungsten") { 1 } else { 0 },
+            }
+        })
+        .collect()
+}
+
+/// The lightmap pages as the shaders sample them: the secondary page
+/// (BGRA bytes -> RGBA) and the primary L8 page, unfiltered by sRGB.
+fn lightmap_pages(zone: &ZoneData, index: usize) -> Option<(Image, Image)> {
+    let find = |suffix: &str| zone.images.iter().find(|i| i.name.ends_with(suffix)).and_then(|i| i.inline.clone());
+    let primary = find(&format!("lightmap{index}_primary"))?;
+    let secondary = find(&format!("lightmap{index}_secondary"))?;
+    let (pw, ph) = (primary.dims[0] as usize, primary.dims[1] as usize);
+    let (sw, sh) = (secondary.dims[0] as usize, secondary.dims[1] as usize);
+    if primary.len < pw * ph || secondary.len < sw * sh * 4 {
+        return None;
+    }
+    let s = &zone.data[secondary.fpos..secondary.fpos + sw * sh * 4];
+    let rgba: Vec<u8> = s.chunks_exact(4).flat_map(|p| [p[2], p[1], p[0], p[3]]).collect();
+    let mut sec = Image::new(
+        Extent3d { width: sw as u32, height: sh as u32, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        rgba,
+        TextureFormat::Rgba8Unorm,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    sec.sampler = sampler(false, false);
+    let mut pri = Image::new(
+        Extent3d { width: pw as u32, height: ph as u32, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        zone.data[primary.fpos..primary.fpos + pw * ph].to_vec(),
+        TextureFormat::R8Unorm,
+        RenderAssetUsages::RENDER_WORLD,
+    );
+    pri.sampler = sampler(false, false);
+    Some((sec, pri))
+}
+
 
 /// One variant of a sound alias, decoded, with its authored properties.
 pub struct SceneSound {
@@ -700,6 +1024,7 @@ const WEAPON_SOUND_FIELDS: &[&str] = &[
     "reloadEmptySoundPlayer",
     "meleeSwipeSoundPlayer",
     "meleeHitSound",
+    "pullbackSoundPlayer",
 ];
 
 /// A model's collision triangles in its own (Bevy) space, if the game
@@ -722,6 +1047,68 @@ fn model_collision(zones: &[&ZoneData], name: &str) -> Option<Vec<[Vec3; 3]>> {
         }
     }
     (!out.is_empty()).then_some(out)
+}
+
+/// What a clipMap brush or terrain triangle with these contents blocks.
+fn clip_blocks(contents: u32) -> u8 {
+    use waw_assets::t4::clipmap::contents as c;
+    let mut b = 0;
+    if contents & c::PLAYER_SOLID != 0 {
+        b |= blocks::PLAYER;
+    }
+    if contents & c::MONSTER_SOLID != 0 {
+        b |= blocks::AI;
+    }
+    b
+}
+
+/// The map's collision as triangles in Bevy space: the static world's
+/// brushes and terrain, and the brushes of scenery brush models (entities
+/// with a `*N` model, placed by their origin and angles). `skip` lists the
+/// brush models gameplay moves or removes (boards, doors, debris).
+/// Triangles only block the player and/or AI ([`clip_blocks`]), never the
+/// plain solid queries.
+pub fn clip_collision(cm: &t4::clipmap::ClipMapInfo, entities: &[mapents::Entity], skip: &std::collections::HashSet<usize>) -> Vec<Tri> {
+    let mut out = Vec::new();
+    let v3 = |p: Vec3| V3::new(p.x, p.y, p.z);
+    let add = |poly: &[Vec3], b: u8, out: &mut Vec<Tri>| {
+        for k in 1..poly.len().saturating_sub(1) {
+            if let Some(t) = Tri::new(v3(poly[0]), v3(poly[k]), v3(poly[k + 1])) {
+                out.push(t.blocking(b));
+            }
+        }
+    };
+    let by_model = cm.model_brushes();
+    let brushes = |list: &[u16], t: &Transform, out: &mut Vec<Tri>| {
+        for &bi in list {
+            let Some(brush) = cm.brushes.get(bi as usize) else { continue };
+            let b = clip_blocks(brush.contents);
+            if b == 0 {
+                continue;
+            }
+            for f in t4::clipmap::brush_polygons(brush) {
+                let poly: Vec<Vec3> = f.points.iter().map(|&p| t.transform_point(to_bevy(p))).collect();
+                add(&poly, b, out);
+            }
+        }
+    };
+    brushes(&by_model[0], &Transform::IDENTITY, &mut out);
+    for e in entities {
+        let Some(n) = e.submodel() else { continue };
+        if n == 0 || skip.contains(&n) || e.classname().starts_with("trigger") {
+            continue;
+        }
+        let Some(list) = by_model.get(n) else { continue };
+        let t = Transform::from_translation(to_bevy(e.origin())).with_rotation(angles_to_quat(e.angles()));
+        brushes(list, &t, &mut out);
+    }
+    for (tri, m) in cm.world_terrain() {
+        let b = clip_blocks(cm.material_contents(m as i64));
+        if b != 0 {
+            add(&tri.map(to_bevy), b, &mut out);
+        }
+    }
+    out
 }
 
 /// The zone's weapon name for one of our weapon ids.
@@ -852,29 +1239,26 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     let text = nacht.map_ents.as_deref().ok_or("map has no entities")?;
     let entities = mapents::parse(text);
     let map = ZombieMap::from_entities(&entities);
-    let worldspawn = entities.iter().find(|e| e.classname() == "worldspawn");
-    let sun_color = worldspawn.and_then(|e| e.vec3("suncolor")).unwrap_or([0.6, 0.7, 1.0]);
-    let sun_light = worldspawn.and_then(|e| e.f32("sunlight")).unwrap_or(0.75);
 
     let mut b = Builder { zones: zones.clone(), iwd, bc, materials: Vec::new(), mat_index: HashMap::new(), images: HashMap::new() };
 
     // Static world, grouped by material.
-    let mut groups: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut groups: HashMap<(usize, u8, u8), Vec<usize>> = HashMap::new();
     let mut collide: Vec<usize> = Vec::new();
     for i in 0..world.static_surface_count.min(world.surfaces.len() as u32) as usize {
         let s = &world.surfaces[i];
         let Some(m) = s.material.and_then(|m| b.material(0, m)) else { continue };
-        groups.entry(m).or_default().push(i);
+        groups.entry((m, s.primary_light, s.lightmap)).or_default().push(i);
         let mat = &b.materials[m];
         if mat.blend != Blend::Blend && !world.decal_range.contains(&(i as u32)) && !mat.unlit {
             collide.push(i);
         }
     }
     let mut world_meshes = Vec::new();
-    for (m, surfs) in &groups {
+    for ((m, light, lmap), surfs) in &groups {
         let lit = b.materials[*m].lightmapped;
         if let Some(mesh) = world_mesh(&nacht, world, surfs, lit) {
-            world_meshes.push(SceneMesh { mesh, material: *m });
+            world_meshes.push(SceneWorldMesh { mesh, material: *m, primary_light: *light, lightmap: *lmap });
         }
     }
 
@@ -935,6 +1319,15 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     let mut extra: Vec<String> = map.props.iter().map(|p| p.0.clone()).collect();
     extra.extend(map.doors.iter().flat_map(|d| d.props.iter().map(|p| p.0.clone())));
     let sky_model = world.sky_box_model.clone();
+    let sky_scale = sky_model
+        .as_deref()
+        .and_then(|n| b.find_model(n))
+        .map(|(_, info)| {
+            let r = (0..3).map(|k| info.mins[k].abs().max(info.maxs[k].abs())).fold(1.0f32, f32::max) * INCH;
+            // Comfortably beyond the map (the camera's far plane is infinite).
+            (5000.0 / r).max(1.0)
+        })
+        .unwrap_or(1.0);
     extra.extend(sky_model.iter().cloned());
     for n in [
         "char_ger_honorgd_body1_1",
@@ -958,7 +1351,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         extra.push(n.to_string());
     }
     for w in &nacht.weapons {
-        for m in [w.view_model, w.hand_model, w.world_model].into_iter().flatten() {
+        for m in [w.view_model, w.hand_model, w.world_model, w.projectile_model].into_iter().flatten() {
             extra.push(nacht.xmodels[m as usize].name.trim_start_matches(',').to_string());
         }
     }
@@ -970,7 +1363,11 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         }
     }
 
-    // Collision: static world triangles that render opaque.
+    // Collision. The map's own collision (clipMap brushes and terrain, with
+    // player and monster clip) is what the player moves against; the
+    // opaque render triangles stay as the plain solid geometry for bullets,
+    // sight and the zombies. Models collide for everyone.
+    let render_blocks = if nacht.clipmap.is_some() { blocks::SOLID } else { blocks::ALL };
     let mut tris = Vec::new();
     for &si in &collide {
         for t in decode::world_triangles(&nacht, world, &world.surfaces[si]) {
@@ -980,7 +1377,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
                 .map(|v| V3::new(v.x, v.y, v.z))
                 .collect();
             if let Some(tri) = Tri::new(p[0], p[1], p[2]) {
-                tris.push(tri);
+                tris.push(tri.blocking(render_blocks));
             }
         }
     }
@@ -1029,10 +1426,15 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
                     .map(|v| V3::new(v.x, v.y, v.z))
                     .collect();
                 if let Some(tri) = Tri::new(p[0], p[1], p[2]) {
-                    tris.push(tri);
+                    tris.push(tri.blocking(render_blocks));
                 }
             }
         }
+    }
+    if let Some(cm) = &nacht.clipmap {
+        let clip = clip_collision(cm, &entities, &gameplay);
+        info!("clipMap {}: {} brushes, {} collision triangles", cm.name, cm.brushes.len(), clip.len());
+        tris.extend(clip);
     }
     let collision = TriMesh::new(tris, 2.0);
 
@@ -1067,8 +1469,10 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         Some(SceneChest { bounds, lid_model: lid.get("model")?.to_string(), lid: lid_t, weapon })
     });
 
-    let sun = Vec3::from(sun_color) * sun_light * 0.6;
-    let lightmap = bake_lightmap(&nacht, sun);
+    let lightmap_pages = (0..world.surfaces.iter().map(|s| s.lightmap as usize + 1).max().unwrap_or(1)).map(|i| lightmap_pages(&nacht, i)).collect();
+    let lights = scene_lights(&nacht, world);
+    let irradiance = irradiance_volume(&nacht, world, &lights, &collision);
+    let (fog, film) = map_look(&zones, iwd, world);
     let mut view_models = HashMap::new();
     for &id in &wanted.weapon_ids {
         let zname = zone_weapon_name(id);
@@ -1149,12 +1553,38 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
             localized(&w.display_name).filter(|n| !n.trim().is_empty()).map(|n| (id.to_string(), n))
         })
         .collect();
+    let weapon_stats = wanted
+        .weapon_ids
+        .iter()
+        .filter_map(|&id| {
+            let w = zones.iter().find_map(|z| z.weapon(zone_weapon_name(id)))?;
+            (!w.stats.is_empty()).then(|| (id.to_string(), w.stats.clone()))
+        })
+        .collect();
+    let flesh_penetration = zones.iter().find_map(|z| z.rawfile("info/bullet_penetration_sp")).and_then(|t| zm_core::weapons::parse_penetration_table(&t));
+    // One line per weapon, so a weapon the map's zones lack shows up.
+    for &id in &wanted.weapon_ids {
+        let rig = view_rig.as_ref();
+        info!(
+            "weapon {id} ({}): rig gun {}, anims {}, view model {}, sounds {}, world model {}",
+            zone_weapon_name(id),
+            rig.is_some_and(|r| r.guns.contains_key(id)),
+            rig.and_then(|r| r.anims.get(id)).map_or(0, Vec::len),
+            view_models.contains_key(id),
+            weapon_sounds.get(id).map_or(0, |s| s.fields.len() + s.notetracks.len()),
+            weapon_world_models.get(id).map_or("-", String::as_str),
+        );
+    }
     let images = std::mem::take(&mut b.images);
     let materials = std::mem::take(&mut b.materials);
     drop(b);
     Ok(NachtScene {
         images,
-        lightmap,
+        lightmap_pages,
+        irradiance,
+        fog,
+        film,
+        lights,
         materials,
         world: world_meshes,
         submodels,
@@ -1162,6 +1592,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         models,
         static_models,
         sky_model,
+        sky_scale,
         collision,
         map,
         entities,
@@ -1169,6 +1600,8 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         weapon_sounds,
         weapon_names,
         weapon_world_models,
+        weapon_stats,
+        flesh_penetration,
         chest,
         characters,
         zombie_anims,
@@ -1190,15 +1623,46 @@ mod tests {
         assert_eq!(classify("l_sm_r0c0n0s0_sco_b1c1").0, Blend::Opaque);
         assert!(classify("wc_unlit").1);
         assert!(skip_material("wc_sky", "wc/sky_mak1"));
+        // Sky-box model layers draw (unlit, without depth); world sky doesn't.
+        assert!(!skip_material("mc_sky_noncubemap", "mc/mtl_skybox_zombie"));
+        assert_eq!(classify("mc_sky_noncubemap_add").0, Blend::Add);
+        assert_eq!(classify("mc_sky_noncubemap").0, Blend::Blend);
         assert!(skip_material("wc_tools", "wc/caulk_shadow"));
     }
 
+
+    /// Real data: the player's collision from Nacht's clipMap carries the
+    /// player up the stairs to the help room as a continuous ramp.
+    /// `UNDEAD_WAW=<install> cargo test -p zm_game -- --ignored`.
     #[test]
-    fn half_floats() {
-        assert_eq!(f16_bits(1.0), 0x3c00);
-        assert_eq!(f16_bits(0.5), 0x3800);
-        assert_eq!(f16_bits(0.0), 0);
-        assert_eq!(waw_assets::t4::decode::half(f16_bits(2.75)), 2.75);
+    #[ignore]
+    fn nacht_stairs_climb_smoothly() {
+        let root = std::env::var("UNDEAD_WAW").expect("set UNDEAD_WAW");
+        let ff = std::fs::read(std::path::Path::new(&root).join("zone/english/nazi_zombie_prototype.ff")).unwrap();
+        let zd = t4::walk(waw_assets::zone::decompress(&ff).unwrap());
+        let entities = mapents::parse(zd.map_ents.as_deref().unwrap());
+        let tris = clip_collision(zd.clipmap.as_ref().unwrap(), &entities, &Default::default());
+        assert!(tris.len() > 40_000, "{}", tris.len());
+        let mesh = TriMesh::new(tris, 2.0);
+        // Plain queries don't see clip-only collision.
+        assert!(mesh.ground(to_bevy([180.0, 1060.0, 0.0]).x, to_bevy([180.0, 1060.0, 0.0]).z, 1.0, -1.0, 0.7).is_none());
+        let (r, step) = (15.0 * INCH, 18.0 * INCH);
+        let mut feet = to_bevy([0.0, 0.0, 1.0]).y;
+        let mut max_rise = 0.0f32;
+        let mut x = 180.0;
+        while x > -150.0 {
+            let p = to_bevy([x, 1060.0, 0.0]);
+            let g = mesh.support_sphere_mask(p.x, p.z, r, feet + step, feet - step, 0.7, blocks::PLAYER).expect("ground");
+            // (The top tread is one unit above the upper floor.)
+            assert!(g >= feet - 1.1 * INCH, "dropped at x={x}");
+            max_rise = max_rise.max(g - feet);
+            feet = g;
+            x -= 0.5;
+        }
+        // Up 144 units onto the upper floor; a ray would rise 6 units at
+        // once at every riser, the ball at most ~1.5 per half unit moved.
+        assert!((feet / INCH - 144.0).abs() < 1.5, "{}", feet / INCH);
+        assert!(max_rise / INCH < 1.6, "{}", max_rise / INCH);
     }
 
     #[test]
@@ -1210,3 +1674,4 @@ mod tests {
         assert!((q * Vec3::X - Vec3::new(0.0, 0.0, -1.0)).length() < 1e-5);
     }
 }
+

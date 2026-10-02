@@ -224,17 +224,27 @@ fn start_session(
     mut player_q: Query<(&mut Transform, &mut PlayerCtl), With<Player>>,
     mut ambient: ResMut<AmbientLight>,
     mut clear: ResMut<ClearColor>,
+    mut cams: Query<(&mut crate::postfx::WawPost, &mut DistanceFog), With<Player>>,
 ) {
     *boards = Boards(level.0.windows.iter().map(|w| w.boards).collect());
     *world = World::new(&level.0);
     match (active, nacht_assets) {
         (Some(_), Some(n)) => {
+            // The map's own fog and vision set replace Bevy's fog.
+            for (mut post, mut fog) in &mut cams {
+                *post = crate::postfx::WawPost::from_look(n.fog, n.film, 1.0);
+                fog.falloff = FogFalloff::Linear { start: 1.0e5, end: 2.0e5 };
+            }
             world.mesh = Some(n.collision.clone());
             world.graph = Some(n.nav.clone());
             // Routes from the field outside to every window.
             world.window_fields = (0..level.0.windows.len()).map(|wi| zombies::window_field(&world, &level.0, wi)).collect();
         }
         _ => {
+            for (mut post, mut fog) in &mut cams {
+                *post = crate::postfx::WawPost::off(1.0);
+                fog.falloff = FogFalloff::Linear { start: 12.0, end: 48.0 };
+            }
             ambient.color = Color::srgb(0.6, 0.65, 0.8);
             ambient.brightness = 120.0;
             clear.0 = Color::srgb(0.02, 0.025, 0.04);

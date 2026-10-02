@@ -221,8 +221,17 @@ impl Plugin for ZombiesPlugin {
 }
 
 /// Ray vs zombie (head sphere + body box). Returns distance and headshot flag.
+#[allow(dead_code)]
 pub fn hit_test(origin: Vec3, dir: Vec3, t: &Transform, z: &Zombie, max: f32) -> Option<(f32, bool)> {
+    hit_location(origin, dir, t, z, max).map(|(d, loc)| (d, loc.is_head()))
+}
+
+/// Ray vs zombie: distance and the engine hit location (head, neck, upper
+/// or lower torso, arms, hands, legs, feet) from where on the body the ray
+/// lands, so weapons can apply their per-location damage multipliers.
+pub fn hit_location(origin: Vec3, dir: Vec3, t: &Transform, z: &Zombie, max: f32) -> Option<(f32, zm_core::weapons::HitLoc)> {
     use zm_core::geom::{ray_sphere, Aabb, V3};
+    use zm_core::weapons::HitLoc;
     let s = z.scale;
     let p = t.translation;
     let o = V3::new(origin.x, origin.y, origin.z);
@@ -230,12 +239,36 @@ pub fn hit_test(origin: Vec3, dir: Vec3, t: &Transform, z: &Zombie, max: f32) ->
     let head_c = V3::new(p.x, p.y + 1.63 * s, p.z);
     let head = ray_sphere(o, d, head_c, 0.19 * s).filter(|t| *t <= max);
     let body = Aabb::new(V3::new(p.x - 0.3, p.y, p.z - 0.3), V3::new(p.x + 0.3, p.y + 1.47 * s, p.z + 0.3)).ray_hit(o, d, max);
-    match (head, body) {
-        (Some(h), Some(b)) if b < h - 0.05 => Some((b, false)),
-        (Some(h), _) => Some((h, true)),
-        (None, Some(b)) => Some((b, false)),
-        _ => None,
-    }
+    let dist = match (head, body) {
+        (Some(h), Some(b)) if b < h - 0.05 => b,
+        (Some(h), _) => return Some((h, HitLoc::Head)),
+        (None, Some(b)) => b,
+        _ => return None,
+    };
+    // Where on the body: height above the feet (in units of this zombie's
+    // size) and the side, in the zombie's own frame (it faces -Z, so +X is
+    // its right).
+    let local = t.rotation.inverse() * (origin + dir * dist - p);
+    let h = local.y / s.max(0.01);
+    let right = local.x >= 0.0;
+    let side = |r: HitLoc, l: HitLoc| if right { r } else { l };
+    let out = local.x.abs() > 0.19 * s;
+    let loc = if h >= 1.38 {
+        HitLoc::Neck
+    } else if h >= 1.08 {
+        if out { side(HitLoc::RightArmUpper, HitLoc::LeftArmUpper) } else { HitLoc::TorsoUpper }
+    } else if h >= 0.86 {
+        if out { side(HitLoc::RightArmLower, HitLoc::LeftArmLower) } else { HitLoc::TorsoLower }
+    } else if h >= 0.72 && out {
+        side(HitLoc::RightHand, HitLoc::LeftHand)
+    } else if h >= 0.45 {
+        side(HitLoc::RightLegUpper, HitLoc::LeftLegUpper)
+    } else if h >= 0.1 {
+        side(HitLoc::RightLegLower, HitLoc::LeftLegLower)
+    } else {
+        side(HitLoc::RightFoot, HitLoc::LeftFoot)
+    };
+    Some((dist, loc))
 }
 
 /// Apply damage; returns true if this killed the zombie.

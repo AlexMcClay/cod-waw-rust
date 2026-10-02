@@ -950,11 +950,28 @@ impl<'a> Walker<'a> {
     }
 
     fn clipmap(&mut self) -> R<(AssetRef, String)> {
+        use super::clipmap::*;
         use AssetType as T;
         let h = self.read(332)?;
         self.push(VIRTUAL);
         let name = self.xstring(h.u32(0))?.unwrap_or_default();
         let n = |o: usize| h.u32(o) as usize;
+        let z: &'a [u8] = self.z;
+        let u16_at = |p: usize| u16::from_le_bytes([z[p], z[p + 1]]);
+        let u32_at = |p: usize| u32::from_le_bytes([z[p], z[p + 1], z[p + 2], z[p + 3]]);
+        let f32_at = |p: usize| f32::from_bits(u32_at(p));
+        let vec3_at = |p: usize| [f32_at(p), f32_at(p + 4), f32_at(p + 8)];
+        let plane_at = |p: usize| ClipPlane { normal: vec3_at(p), dist: f32_at(p + 12) };
+        let leaf_of = |r: Rec<'a>| ClipLeaf {
+            first_coll_aabb: r.u16(0),
+            coll_aabb_count: r.u16(2),
+            brush_contents: r.u32(4),
+            terrain_contents: r.u32(8),
+            mins: r.vec3(0xc),
+            maxs: r.vec3(0x18),
+            leaf_brush_node: r.i32(0x24),
+        };
+        let mut cm = ClipMapInfo { name: name.clone(), ..Default::default() };
         self.reusable(h.u32(0xc), 4, 20 * n(0x8))?;
         if h.u32(0x14) != 0 {
             self.alloc(4);
@@ -964,12 +981,29 @@ impl<'a> Walker<'a> {
                 self.asset(T::XModel, m.u32(4), m.loc(4))?;
             }
         }
-        self.inline(h.u32(0x1c), 4, 72 * n(0x18))?;
+        if let Some(p) = self.inline(h.u32(0x1c), 4, 72 * n(0x18))? {
+            for i in 0..n(0x18) {
+                let o = p + 72 * i;
+                let end = z[o..o + 64].iter().position(|&b| b == 0).unwrap_or(64);
+                cm.materials.push(ClipMaterial {
+                    name: String::from_utf8_lossy(&z[o..o + end]).into_owned(),
+                    surface_flags: u32_at(o + 0x40),
+                    contents: u32_at(o + 0x44),
+                });
+            }
+        }
+        // Brush sides, resolved to their planes; brushes find theirs by the
+        // file position their `sides` pointer resolves to.
+        let mut sides: Vec<ClipSide> = Vec::new();
+        let mut sides_fpos = None;
         if h.u32(0x24) != 0 {
             self.alloc(4);
+            sides_fpos = Some(self.pos);
             let arr = self.read(12 * n(0x20))?;
             for i in 0..n(0x20) {
-                self.cbrushside(arr.elem(i, 12))?;
+                let s = arr.elem(i, 12);
+                let plane = self.reusable(s.u32(0), 4, 20)?.map(plane_at);
+                sides.push(ClipSide { plane: plane.unwrap_or(ClipPlane { normal: [0.0; 3], dist: 0.0 }), material: s.u32(4) });
             }
         }
         self.inline(h.u32(0x2c), 1, n(0x28))?;
@@ -980,7 +1014,10 @@ impl<'a> Walker<'a> {
                 self.reusable(arr.elem(i, 8).u32(0), 4, 20)?;
             }
         }
-        self.inline(h.u32(0x3c), 4, 44 * n(0x38))?;
+        if let Some(p) = self.inline(h.u32(0x3c), 4, 44 * n(0x38))? {
+            let arr = Rec { d: &z[p..p + 44 * n(0x38)], blk: RAW, boff: 0 };
+            cm.leafs = (0..n(0x38)).map(|i| leaf_of(arr.elem(i, 44))).collect();
+        }
         self.inline(h.u32(0x4c), 2, 2 * n(0x48))?;
         if h.u32(0x44) != 0 {
             self.alloc(4);
@@ -988,34 +1025,102 @@ impl<'a> Walker<'a> {
             for i in 0..n(0x40) {
                 let node = arr.elem(i, 20);
                 let count = node.i16(2);
+                let mut brushes = Vec::new();
                 if count > 0 {
-                    self.reusable(node.u32(8), 2, 2 * count as usize)?;
+                    if let Some(p) = self.reusable(node.u32(8), 2, 2 * count as usize)? {
+                        brushes = (0..count as usize).map(|k| u16_at(p + 2 * k)).collect();
+                    }
                 }
+                cm.leaf_brush_nodes.push(LeafBrushNode {
+                    axis: node.u8(0),
+                    leaf_brush_count: count,
+                    contents: node.u32(4),
+                    brushes,
+                    dist: node.f32(8),
+                    range: node.f32(12),
+                    child_offset: [node.u16(16), node.u16(18)],
+                });
             }
         }
         self.inline(h.u32(0x54), 4, 4 * n(0x50))?;
-        self.inline(h.u32(0x5c), 4, 12 * n(0x58))?;
+        if let Some(p) = self.inline(h.u32(0x5c), 4, 12 * n(0x58))? {
+            cm.verts = (0..n(0x58)).map(|i| vec3_at(p + 12 * i)).collect();
+        }
         self.inline(h.u32(0x64), 4, 12 * n(0x60))?;
         self.inline(h.u32(0x6c), 2, 2 * n(0x68))?;
         let tri = h.i32(0x70).max(0) as usize;
-        self.inline(h.u32(0x74), 2, 6 * tri)?;
+        if let Some(p) = self.inline(h.u32(0x74), 2, 6 * tri)? {
+            cm.tris = (0..tri).map(|i| [u16_at(p + 6 * i), u16_at(p + 6 * i + 2), u16_at(p + 6 * i + 4)]).collect();
+        }
         self.inline(h.u32(0x78), 1, (3 * tri).div_ceil(32) * 4)?;
         self.inline(h.u32(0x80), 4, 28 * n(0x7c))?;
         if h.u32(0x88) != 0 {
             self.alloc(4);
             let arr = self.read(20 * n(0x84))?;
             for i in 0..n(0x84) {
-                self.reusable(arr.elem(i, 20).u32(0x10), 4, 28)?;
+                let part = arr.elem(i, 20);
+                cm.partitions.push(ClipPartition { first_tri: part.i32(4), tri_count: part.u8(0) });
+                self.reusable(part.u32(0x10), 4, 28)?;
             }
         }
-        self.inline(h.u32(0x90), 16, 32 * n(0x8c))?;
-        self.inline(h.u32(0x98), 4, 72 * n(0x94))?;
+        if let Some(p) = self.inline(h.u32(0x90), 16, 32 * n(0x8c))? {
+            cm.aabb_trees = (0..n(0x8c))
+                .map(|i| {
+                    let o = p + 32 * i;
+                    ClipAabbTree {
+                        origin: vec3_at(o),
+                        material: u16_at(o + 0xc),
+                        child_count: u16_at(o + 0xe),
+                        half_size: vec3_at(o + 0x10),
+                        index: u32_at(o + 0x1c) as i32,
+                    }
+                })
+                .collect();
+        }
+        if let Some(p) = self.inline(h.u32(0x98), 4, 72 * n(0x94))? {
+            let arr = Rec { d: &z[p..p + 72 * n(0x94)], blk: RAW, boff: 0 };
+            cm.models = (0..n(0x94))
+                .map(|i| {
+                    let m = arr.elem(i, 72);
+                    ClipModel { mins: m.vec3(0), maxs: m.vec3(0xc), radius: m.f32(0x18), leaf: leaf_of(m.sub(0x1c, 44)) }
+                })
+                .collect();
+        }
         if h.u32(0xa0) != 0 {
             self.alloc(16);
             let nb = h.u16(0x9c) as usize;
             let arr = self.read(80 * nb)?;
             for i in 0..nb {
-                self.cbrush(arr.elem(i, 80))?;
+                let b = arr.elem(i, 80);
+                let count = b.u32(0x1c) as usize;
+                let side_list: Vec<ClipSide> = match (b.u32(0x20), sides_fpos) {
+                    (0 | FOLLOW, _) | (_, None) => Vec::new(),
+                    (v, Some(base)) => match self.native(v) {
+                        Some(p) if p >= base && (p - base) % 12 == 0 => {
+                            let first = (p - base) / 12;
+                            sides.get(first..first + count).map(|s| s.to_vec()).unwrap_or_default()
+                        }
+                        _ => Vec::new(),
+                    },
+                };
+                let inline_side = if b.u32(0x20) == FOLLOW {
+                    self.alloc(4);
+                    let side = self.read(12)?;
+                    let plane = self.reusable(side.u32(0), 4, 20)?.map(plane_at);
+                    plane.map(|plane| ClipSide { plane, material: side.u32(4) })
+                } else {
+                    None
+                };
+                self.reusable(b.u32(0x30), 1, 1)?;
+                self.reusable(b.u32(0x4c), 4, 12)?;
+                let am = |k: usize| b.i16(0x24 + 2 * k);
+                cm.brushes.push(ClipBrush {
+                    mins: b.vec3(0),
+                    maxs: b.vec3(0x10),
+                    contents: b.u32(0xc),
+                    axial_material: [[am(0), am(1), am(2)], [am(3), am(4), am(5)]],
+                    sides: inline_side.into_iter().chain(side_list).collect(),
+                });
             }
         }
         self.inline(h.u32(0xac), 1, h.i32(0xa4).max(0) as usize * h.i32(0xa8).max(0) as usize)?;
@@ -1052,6 +1157,9 @@ impl<'a> Walker<'a> {
             }
         }
         self.pop();
+        if self.out.clipmap.is_none() {
+            self.out.clipmap = Some(cm);
+        }
         Ok((AssetRef::Other(T::ClipMap), name))
     }
 
@@ -1064,7 +1172,19 @@ impl<'a> Walker<'a> {
             let n = h.u32(8) as usize;
             let arr = self.read(72 * n)?;
             for i in 0..n {
-                self.xstring(arr.elem(i, 72).u32(0x44))?;
+                let l = arr.elem(i, 72);
+                let def_name = self.xstring(l.u32(0x44))?.unwrap_or_default();
+                self.out.primary_lights.push(PrimaryLight {
+                    kind: l.u8(0),
+                    color: l.vec3(0x8),
+                    dir: l.vec3(0x14),
+                    origin: l.vec3(0x20),
+                    radius: l.f32(0x2c),
+                    cos_half_fov_outer: l.f32(0x30),
+                    cos_half_fov_inner: l.f32(0x34),
+                    exponent: l.u8(2),
+                    def_name,
+                });
             }
         }
         self.inline(h.u32(0x24), 4, 8 * h.u32(0x20) as usize)?;
@@ -1178,10 +1298,22 @@ impl<'a> Walker<'a> {
         self.inline(h.u32(0x24), 4, 4 * h.u32(0x20) as usize)?;
         let sky_image = self.asset_idx(T::Image, h.u32(0x28), None)?;
         let sky_box_model = self.xstring(h.u32(0x30))?;
+        let mut sun_light = None;
         if h.u32(0xd8) == FOLLOW {
             self.alloc(4);
             let l = self.read(64)?;
             self.asset(T::LightDef, l.u32(0x3c), l.loc(0x3c))?;
+            sun_light = Some(PrimaryLight {
+                kind: l.u8(0),
+                color: l.vec3(0x4),
+                dir: l.vec3(0x10),
+                origin: l.vec3(0x1c),
+                radius: l.f32(0x28),
+                cos_half_fov_outer: l.f32(0x2c),
+                cos_half_fov_inner: l.f32(0x30),
+                exponent: l.i32(0x34).clamp(0, 255) as u8,
+                def_name: String::new(),
+            });
         }
         if h.u32(0xf8) != 0 {
             self.alloc(4);
@@ -1218,10 +1350,27 @@ impl<'a> Walker<'a> {
         let g = h.sub(0x128, 56);
         let axis = (g.u32(0x14) as usize).min(2);
         let rows = (g.u16(0xe + 2 * axis) as i64 - g.u16(0x8 + 2 * axis) as i64 + 1).max(0) as usize;
-        self.inline(g.u32(0x1c), 2, 2 * rows)?;
-        self.inline(g.u32(0x24), 1, g.u32(0x20) as usize)?;
-        self.inline(g.u32(0x2c), 4, 4 * g.u32(0x28) as usize)?;
-        self.inline(g.u32(0x34), 4, 168 * g.u32(0x30) as usize)?;
+        let row_starts = self.inline(g.u32(0x1c), 2, 2 * rows)?;
+        let raw_rows = self.inline(g.u32(0x24), 1, g.u32(0x20) as usize)?;
+        let entries = self.inline(g.u32(0x2c), 4, 4 * g.u32(0x28) as usize)?;
+        let colors = self.inline(g.u32(0x34), 4, 168 * g.u32(0x30) as usize)?;
+        let light_grid = match (row_starts, raw_rows, entries, colors) {
+            (Some(row_starts), Some(raw_rows), Some(entries), Some(colors)) => Some(LightGridInfo {
+                mins: [g.u16(0x8), g.u16(0xa), g.u16(0xc)],
+                maxs: [g.u16(0xe), g.u16(0x10), g.u16(0x12)],
+                row_axis: axis,
+                col_axis: (g.u32(0x18) as usize).min(2),
+                rows,
+                row_starts,
+                raw_rows,
+                raw_rows_len: g.u32(0x20) as usize,
+                entries,
+                entry_count: g.u32(0x28) as usize,
+                colors,
+                color_count: g.u32(0x30) as usize,
+            }),
+            _ => None,
+        };
         let model_count = h.i32(0x168).max(0) as usize;
         let models_fpos = self.inline(h.u32(0x16c), 4, 56 * model_count)?;
         if h.u32(0x190) != 0 {
@@ -1287,6 +1436,7 @@ impl<'a> Walker<'a> {
                     base_index: s.u32(0xc),
                     material,
                     lightmap: s.u8(0x18),
+                    primary_light: s.u8(0x1a),
                     flags: s.u8(0x1b),
                 });
             }
@@ -1347,6 +1497,8 @@ impl<'a> Walker<'a> {
             mins: h.vec3(0x170),
             maxs: h.vec3(0x17c),
             sun_color: h.vec3(0xdc),
+            sun_light,
+            light_grid,
         });
         Ok((AssetRef::Other(T::GfxWorld), name))
     }
@@ -1411,6 +1563,7 @@ impl<'a> Walker<'a> {
         let h = self.read(2476)?;
         self.push(VIRTUAL);
         let mut w = WeaponInfo { name: self.xstring(h.u32(0))?.unwrap_or_default(), ..Default::default() };
+        w.stats = weapondef::stats(h.d);
         w.display_name = self.xstring(h.u32(4))?.unwrap_or_default();
         self.xstring(h.u32(8))?;
         for i in 0..16 {
@@ -1442,11 +1595,13 @@ impl<'a> Walker<'a> {
                 w.sounds.push((field, s));
             }
         }
+        // bounceSound: one alias per surface type.
         if h.u32(0x270) == FOLLOW {
             self.alloc(4);
             let arr = self.read(4 * 31)?;
             for i in 0..31 {
-                self.snd_alias_custom(arr, 4 * i)?;
+                let s = self.snd_alias_custom(arr, 4 * i)?;
+                w.bounce_sounds.push(s.unwrap_or_default());
             }
         }
         for o in [0x274, 0x278, 0x27c] {
@@ -1475,7 +1630,7 @@ impl<'a> Walker<'a> {
             self.asset(T::Material, h.u32(o), None)?;
         }
         self.xstring(h.u32(0x638))?;
-        self.asset(T::XModel, h.u32(0x680), None)?;
+        w.projectile_model = self.asset_idx(T::XModel, h.u32(0x680), None)?;
         self.asset(T::Fx, h.u32(0x688), None)?;
         self.asset(T::Fx, h.u32(0x690), None)?;
         for (o, field) in [(0x694, "projExplosionSound"), (0x698, "projDudSound"), (0x69c, "mortarShellSound"), (0x6a0, "tankShellSound")] {
@@ -1608,7 +1763,10 @@ impl<'a> Walker<'a> {
         let h = self.read(12)?;
         self.push(VIRTUAL);
         let name = self.xstring(h.u32(0))?.unwrap_or_default();
-        self.inline(h.u32(8), 1, h.i32(4).max(0) as usize + 1)?;
+        let len = h.i32(4).max(0) as usize;
+        if let Some(p) = self.inline(h.u32(8), 1, len + 1)? {
+            self.out.rawfiles.push((name.clone(), p, len));
+        }
         self.pop();
         Ok((AssetRef::Other(AssetType::RawFile), name))
     }

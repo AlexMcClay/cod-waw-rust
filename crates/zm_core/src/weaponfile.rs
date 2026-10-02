@@ -33,6 +33,11 @@ impl WeaponFile {
         Self::parse(&text)
     }
 
+    /// From `(key, value)` pairs, such as the stats of a zone WeaponDef.
+    pub fn from_pairs<'a>(pairs: impl IntoIterator<Item = (&'a str, &'a str)>) -> Self {
+        Self { fields: pairs.into_iter().map(|(k, v)| (k.to_string(), v.to_string())).collect() }
+    }
+
     pub fn get(&self, key: &str) -> Option<&str> {
         self.fields.get(key).map(String::as_str).filter(|s| !s.is_empty())
     }
@@ -58,6 +63,13 @@ mod tests {
         assert_eq!(wf.u32("clipSize"), Some(30));
         assert_eq!(wf.get("empty"), None);
         assert_eq!(wf.get("missing"), None);
+    }
+
+    #[test]
+    fn from_pairs() {
+        let wf = WeaponFile::from_pairs([("damage", "100"), ("fireType", "Single Shot")]);
+        assert_eq!(wf.f32("damage"), Some(100.0));
+        assert_eq!(wf.get("fireType"), Some("Single Shot"));
     }
 
     #[test]
