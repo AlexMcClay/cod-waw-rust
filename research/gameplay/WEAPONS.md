@@ -260,8 +260,10 @@ penetrated here.
 * **Handling** for the player controller: `weapons::HeldWeapon` (resource,
   updated every frame) exposes `moveSpeedScale`, `adsMoveSpeedScale`,
   `sprintDurationScale`, `adsTransInTime`/`OutTime` and `adsZoomFov` (with
-  `ads_fov(base)` = base x zoom / 65, the game's `cg_fov`). `player.rs` does
-  not use them yet.
+  `ads_fov(base)` = base x zoom / 65, the game's `cg_fov`). `player.rs` uses
+  them: aim in/out times, the aimed FOV, sprint length, and speed = hip
+  `moveSpeedScale` lerped to 0.6 x `adsMoveSpeedScale` by the aim amount (the
+  0.6 global aimed slow-down is ASSUMED; the pistol's 1.5 implies one exists).
 
 ## Discrepancies and uncertainties
 

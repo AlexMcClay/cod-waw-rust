@@ -211,19 +211,9 @@ impl HeldWeapon {
     }
 
     /// The aimed field of view for a hip field of view `base` (degrees):
-    /// for the player controller (not wired yet).
-    #[allow(dead_code)]
     /// the game's zoom as a fraction of its own 65.
     pub fn ads_fov(&self, base: f32) -> f32 {
         base * self.ads_zoom_fov / GAME_FOV
-    }
-
-    /// Movement speed multiplier at an aim amount `ads` (0..1): for the
-    /// player controller (not wired yet).
-    #[allow(dead_code)]
-    pub fn speed_scale(&self, ads: f32) -> f32 {
-        let a = ads.clamp(0.0, 1.0);
-        self.move_speed_scale * (1.0 - a) + self.ads_move_speed_scale * a
     }
 }
 
@@ -1188,7 +1178,7 @@ mod tests {
         assert_eq!(h.move_speed_scale, 0.75);
         assert_eq!(h.ads_fov(65.0), 10.0);
         let t = HeldWeapon::of(&def("thompson"));
-        assert!((t.speed_scale(1.0) - 1.3).abs() < 1e-6);
+        assert!((t.ads_move_speed_scale - 1.3).abs() < 1e-6);
         assert!((t.ads_in_time - 0.22).abs() < 1e-6);
     }
 
