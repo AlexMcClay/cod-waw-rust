@@ -51,6 +51,7 @@ pub struct NachtAssets {
     pub models: HashMap<String, ModelParts>,
     pub static_models: Vec<(String, Transform)>,
     pub sky_model: Option<String>,
+    pub sky_scale: f32,
     pub collision: Arc<TriMesh>,
     pub nav: Arc<NavGraph>,
     pub level: Level,
@@ -315,7 +316,7 @@ fn poll_load(
     info!("Nacht nav graph: {} nodes, {} links", nav.nodes.len(), nav.edges.iter().map(Vec::len).sum::<usize>() / 2);
 
     let NachtScene {
-        images: imgs, lightmap_pages, irradiance, fog, film, lights, materials: mdefs, world, submodels, models, static_models, sky_model, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, ..
+        images: imgs, lightmap_pages, irradiance, fog, film, lights, materials: mdefs, world, submodels, models, static_models, sky_model, sky_scale, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, ..
     } = scene;
     let image_handles: HashMap<String, Handle<Image>> = imgs.into_iter().map(|(k, v)| (k, images.add(v))).collect();
     let mat_handles: Vec<Handle<StandardMaterial>> = mdefs
@@ -331,6 +332,7 @@ fn poll_load(
                     Blend::Opaque => AlphaMode::Opaque,
                     Blend::Mask => AlphaMode::Mask(0.5),
                     Blend::Blend => AlphaMode::Blend,
+                    Blend::Add => AlphaMode::Add,
                 },
                 unlit: m.unlit,
                 double_sided: m.two_sided,
@@ -411,7 +413,7 @@ fn poll_load(
                             lightmap_primary: pri.clone(),
                             alpha: match m.blend {
                                 Blend::Opaque | Blend::Mask => AlphaMode::Opaque,
-                                Blend::Blend => AlphaMode::Blend,
+                                Blend::Blend | Blend::Add => AlphaMode::Blend,
                             },
                             two_sided: m.two_sided,
                         })
@@ -470,6 +472,7 @@ fn poll_load(
         models,
         static_models,
         sky_model,
+        sky_scale,
         collision: Arc::new(collision),
         nav: Arc::new(nav),
         level,
@@ -560,7 +563,7 @@ pub fn spawn_scene(
     }
     spawn_primary_lights(&mut commands, &assets.lights);
     if let Some(parts) = assets.sky_model.as_ref().and_then(|n| assets.models.get(n)) {
-        let e = spawn_model(&mut commands, parts, Transform::default(), (SessionEntity, SkyBox, NotShadowCaster));
+        let e = spawn_model(&mut commands, parts, Transform::from_scale(Vec3::splat(assets.sky_scale)), (SessionEntity, SkyBox, NotShadowCaster));
         commands.entity(e).insert(NotShadowCaster);
     }
     spawn_ambience(&mut commands, &assets);

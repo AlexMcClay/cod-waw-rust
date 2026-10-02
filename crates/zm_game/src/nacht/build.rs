@@ -44,6 +44,8 @@ pub enum Blend {
     Opaque,
     Mask,
     Blend,
+    /// Additive (sky glow layers).
+    Add,
 }
 
 #[derive(Debug, Clone)]
@@ -309,6 +311,9 @@ pub struct NachtScene {
     pub models: HashMap<String, SceneModel>,
     pub static_models: Vec<(String, Transform)>,
     pub sky_model: Option<String>,
+    /// Scale that puts the sky model behind everything (the game draws its
+    /// sky at infinity).
+    pub sky_scale: f32,
     pub collision: TriMesh,
     pub map: ZombieMap,
     pub entities: Vec<mapents::Entity>,
@@ -346,6 +351,11 @@ struct Builder<'a> {
 /// Blend mode from a technique-set name such as `wc_l_sm_t0c0n0s0`.
 fn classify(techset: &str) -> (Blend, bool, bool) {
     let t = techset.trim_start_matches(',');
+    // Sky-box model layers: drawn unlit and without depth (so the fog pass
+    // leaves the sky alone, as the game's sky shaders have no fog).
+    if t.starts_with("mc_sky") {
+        return (if t.contains("_add") { Blend::Add } else { Blend::Blend }, true, false);
+    }
     if t.contains("sky") || t.contains("tools") || t.contains("shadowcaster") {
         return (Blend::Opaque, true, false); // caller skips these
     }
@@ -366,7 +376,7 @@ fn classify(techset: &str) -> (Blend, bool, bool) {
 
 pub fn skip_material(techset: &str, name: &str) -> bool {
     let t = techset.trim_start_matches(',');
-    t.contains("sky") || t.contains("tools") || t.contains("shadowcaster") || t.contains("water") || name.contains("caulk") || name.contains("clip")
+    (t.contains("sky") && !t.starts_with("mc_sky")) || t.contains("tools") || t.contains("shadowcaster") || t.contains("water") || name.contains("caulk") || name.contains("clip")
 }
 
 fn sampler(repeat: bool, mips: bool) -> ImageSampler {
@@ -1145,6 +1155,15 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     let mut extra: Vec<String> = map.props.iter().map(|p| p.0.clone()).collect();
     extra.extend(map.doors.iter().flat_map(|d| d.props.iter().map(|p| p.0.clone())));
     let sky_model = world.sky_box_model.clone();
+    let sky_scale = sky_model
+        .as_deref()
+        .and_then(|n| b.find_model(n))
+        .map(|(_, info)| {
+            let r = (0..3).map(|k| info.mins[k].abs().max(info.maxs[k].abs())).fold(1.0f32, f32::max) * INCH;
+            // Comfortably beyond the map (the camera's far plane is infinite).
+            (5000.0 / r).max(1.0)
+        })
+        .unwrap_or(1.0);
     extra.extend(sky_model.iter().cloned());
     for n in [
         "char_ger_honorgd_body1_1",
@@ -1391,6 +1410,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         models,
         static_models,
         sky_model,
+        sky_scale,
         collision,
         map,
         entities,
@@ -1419,6 +1439,10 @@ mod tests {
         assert_eq!(classify("l_sm_r0c0n0s0_sco_b1c1").0, Blend::Opaque);
         assert!(classify("wc_unlit").1);
         assert!(skip_material("wc_sky", "wc/sky_mak1"));
+        // Sky-box model layers draw (unlit, without depth); world sky doesn't.
+        assert!(!skip_material("mc_sky_noncubemap", "mc/mtl_skybox_zombie"));
+        assert_eq!(classify("mc_sky_noncubemap_add").0, Blend::Add);
+        assert_eq!(classify("mc_sky_noncubemap").0, Blend::Blend);
         assert!(skip_material("wc_tools", "wc/caulk_shadow"));
     }
 
