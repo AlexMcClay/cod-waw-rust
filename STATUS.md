@@ -55,7 +55,7 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
 ## Next (queued)
 
 - Zombie pathfinding rewrite (in progress): Chase zombies can oscillate between two path nodes.
-- Wire the weapon's ADS time/zoom and move-speed scale into the player; Ray Gun self-damage.
+- Ray Gun self-damage.
 - Not yet from the rules: crawlers from explosive gibs, burning damage, the stuck-zombie cleanup.
 - FX gaps: trails drawn as sprites, no particle collision, IWI format 9 textures (light beams).
 - Perks/power (Verrückt and later maps), co-op.
