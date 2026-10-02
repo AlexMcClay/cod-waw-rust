@@ -50,6 +50,8 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
   length, smooth stairs. Dev switches: `UNDEAD_TEST_ZOMBIE_PATH`, `UNDEAD_TEST_OPEN_DOORS`,
   `UNDEAD_TEST_ZOMBIE_SPEED=walk|run|sprint`.
 - Player aim time, zoom, move speed and sprint length come from the held weapon.
+- Test runs (`UNDEAD_CAPTURE`, `UNDEAD_TEST_*`) hand control to the player on their first input.
+  `UNDEAD_COLLISION_MAP=<file.ppm>` maps what stops the player around the start.
 - `build_release.bat` → `undead_rounds\dist\UndeadRounds\UndeadRounds.exe`.
 
 ## Open
@@ -62,5 +64,7 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
 - About 20 small outdoor path-node clusters are not linked to the rest (no spawner uses them).
 - Ray Gun self-damage.
 - Not yet from the rules: crawlers from explosive gibs, burning damage, the stuck-zombie cleanup.
-- FX gaps: trails drawn as sprites, no particle collision, IWI format 9 textures (light beams).
+- FX gaps: trails drawn as sprites, no particle collision, IWI format 9 textures (light beams),
+  distortion (heat haze) elements and character blood decals are not drawn.
+- Reported: occasional (black) flicker while moving; not reproduced in captures yet.
 - Perks/power (Verrückt and later maps), co-op.
