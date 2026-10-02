@@ -158,7 +158,19 @@ pub fn build_nav(scene: &NachtScene, level: &Level, mesh: &TriMesh) -> NavGraph 
         })
         .collect();
     let up = V3::new(0.0, 0.8, 0.0);
-    let gate_of = |a: V3, b: V3| level.doors.iter().position(|d| seg_hits(&d.blocker, a.add(up), b.add(up))).map(|i| i as u16);
+    // A link is behind a door when a zombie's body (feet to head, its
+    // width around the line) would touch the door's blocker anywhere on
+    // the way: debris on a staircase sits above the lower node's height.
+    let gate_of = |a: V3, b: V3| {
+        level
+            .doors
+            .iter()
+            .position(|d| {
+                let bx = d.blocker.inflate_xz(navgraph::BODY + 0.05);
+                [0.3f32, 0.9, 1.5].iter().any(|h| seg_hits(&bx, a.add(V3::new(0.0, *h, 0.0)), b.add(V3::new(0.0, *h, 0.0))))
+            })
+            .map(|i| i as u16)
+    };
     let through_window = |a: V3, b: V3| level.window_fills.iter().any(|w| seg_hits(w, a.add(up), b.add(up)));
     let mut graph = NavGraph::build(nodes, MAX_LINK, |a, b| {
         if (a.y - b.y).abs() > MAX_LINK * 0.75 || through_window(a, b) || !navgraph::walkable(mesh, a, b) {
@@ -311,5 +323,14 @@ mod tests {
         assert_ne!(inside, outside, "inside leaks to the outside");
         // Upstairs (by the stairs' top) and the help room are inside.
         assert!(g.nodes.iter().enumerate().any(|(i, n)| comps[i] == inside && n.y > 3.0));
+        // With every door and debris pile closed, the start room reaches
+        // neither upstairs nor the help room (behind door 1, x > 8).
+        let start = g.by_distance(V3::new(sx, m.level.player_start_y, sz))[0].1;
+        let closed = g.field(start, &vec![false; m.level.doors.len()]);
+        let leaks: Vec<usize> = (0..g.nodes.len()).filter(|&i| closed[i].is_finite() && (g.nodes[i].y > 3.3 || g.nodes[i].x > 8.0)).collect();
+        println!("reachable with doors closed: {}", closed.iter().filter(|c| c.is_finite()).count());
+        assert!(leaks.is_empty(), "past closed doors: {:?}", leaks.iter().map(|&i| (i, g.nodes[i])).collect::<Vec<_>>());
+        let open = g.field(start, &vec![true; m.level.doors.len()]);
+        assert!((0..g.nodes.len()).all(|i| comps[i] != inside || open[i].is_finite()));
     }
 }

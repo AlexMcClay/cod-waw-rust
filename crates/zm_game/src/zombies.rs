@@ -976,14 +976,17 @@ fn ai(
                     let m = &mut z.mover;
                     let target = steer(ctx, m, feet, goal, field, dt);
                     let dir = walk_to(ctx, m, &mut pos, target, speed, dt);
-                    if check_stuck(ctx, m, &mut pos, true, dt) && debug {
+                    // (Queueing behind others at the window is not being stuck.)
+                    let queueing = flat(goal - pos) < 2.0;
+                    if check_stuck(ctx, m, &mut pos, !queueing, dt) && debug {
                         info!("[zpath] approach rescue: back to node {:?} at {pos:?}", m.last_node);
                     }
                     t.translation = pos;
                     face(&mut t, dir, dt, 8.0);
-                    // Taking far too long (no route to this window): appear at it.
+                    // Lost (rescued off dead ends again and again) or taking
+                    // far too long: appear at the window.
                     z.timer += dt;
-                    if z.timer > 45.0 {
+                    if (z.timer > 30.0 && z.mover.rescues >= 3) || z.timer > 150.0 {
                         if debug {
                             info!("[zpath] approach timeout: placed at window {} from {:?}", z.window, t.translation);
                         }
@@ -1208,7 +1211,11 @@ fn debug_paths(
     }
     for (e, t, z) in &zq {
         let tr = tracks.entry(e).or_insert_with(|| Track { last_y: t.translation.y, ..default() });
-        let walking = matches!(z.state, ZState::Chase | ZState::Approach) && tr.last_state == Some(z.state);
+        // (Rescues and the approach timeout move a zombie on purpose.)
+        let moved_on_purpose = (t.translation - Vec3::new(t.translation.x, tr.last_y, t.translation.z)).length() > 0.0
+            && z.mover.stuck_count == 0
+            && z.mover.stuck_at == t.translation;
+        let walking = matches!(z.state, ZState::Chase | ZState::Approach) && tr.last_state == Some(z.state) && !moved_on_purpose;
         let dy = t.translation.y - tr.last_y;
         if walking {
             // Faster than the eased climb allows (a snap), unless falling.
@@ -1228,7 +1235,7 @@ fn debug_paths(
             if close && !tr.reached {
                 tr.reached = true;
                 info!("[zpath] REACHED {e} after {:.1}s of chase, climbed {:.2} m, max dy/frame {:.3}, max vy {:.2} m/s, rescues {}", tr.chase_for, tr.climbed, tr.max_dy, tr.max_vy, z.mover.rescues);
-            } else if !close {
+            } else if flat(goal - z.mover.feet(t.translation)) > 2.5 {
                 tr.reached = false;
             }
         }
@@ -1257,12 +1264,11 @@ fn open_doors_for_test(
     mut world: ResMut<World>,
     level: Res<LevelRes>,
     debris: Query<Entity, With<crate::world::Debris>>,
-    mut done: Local<bool>,
 ) {
-    if *done || world.graph.is_none() {
+    // (Again after a restart, which closes them.)
+    if world.graph.is_none() || world.door_open.iter().all(|d| *d) {
         return;
     }
-    *done = true;
     world.door_open.iter_mut().for_each(|d| *d = true);
     world.rebuild(&level.0);
     for e in &debris {
