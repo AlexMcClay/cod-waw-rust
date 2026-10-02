@@ -1,22 +1,34 @@
 //! Player weapons: loadout, hitscan firing, reloading, knifing, and the
 //! procedural first-person viewmodel.
+//!
+//! Every number comes from the weapon's definition ([`WeaponDef`], read from
+//! the game's weapon files): damage falloff and per-hit-location
+//! multipliers, bullet penetration through bodies, fire and rechamber
+//! times, reloads that add the magazine part-way through (round by round
+//! for the shotgun and the scoped Kar98k), the aim-spread model, and the
+//! raise/drop times.
 
 use crate::audio::{PlayAlias, PlaySfx, Sfx, ZoneSounds};
-use crate::player::{Player, PlayerCtl};
+use crate::player::{Player, PlayerCtl, Stance};
 use crate::world::Mats;
 use crate::zombies::{self, Zombie};
-use crate::{cursor_locked, earn, ActivePowerups, Defs, Dynamic, GameState, PointsEvent, Score, World, ZombieKilled};
+use crate::{cursor_locked, earn, ActivePowerups, Defs, Dynamic, GameState, PointsEvent, Round, Score, World, ZombieKilled};
 use bevy::input::mouse::AccumulatedMouseScroll;
 use bevy::pbr::NotShadowCaster;
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use zm_core::geom::V3;
 use zm_core::rules::{self, KillKind};
-use zm_core::weapons::{FireMode, Kind, WeaponDef, START_PISTOL};
+use zm_core::weapons::{FireMode, HitLoc, Kind, SpreadStance, WeaponDef, START_PISTOL, UNITS_TO_M};
 
 pub const MAX_SLOTS: usize = 2;
-const KNIFE_DAMAGE: f32 = 150.0;
 const KNIFE_RANGE: f32 = 1.9;
+/// How far a bullet is traced (metres).
+const BULLET_RANGE: f32 = 120.0;
+/// The game's run speed (`g_speed` 190), for the moving part of the spread.
+const RUN_SPEED: f32 = 190.0 * UNITS_TO_M;
+/// The game's default `cg_fov`, which `adsZoomFov` is relative to.
+pub const GAME_FOV: f32 = 65.0;
 
 #[derive(Debug, Clone)]
 pub struct Slot {
@@ -32,9 +44,11 @@ pub struct Loadout {
 }
 
 impl Loadout {
+    /// The spawn loadout: the starting pistol with its `startAmmo` (8 + 32
+    /// for the zombie Colt).
     pub fn starting(defs: &[WeaponDef]) -> Self {
-        let d = &defs[START_PISTOL];
-        Loadout { slots: vec![Slot { def: START_PISTOL, clip: d.clip, reserve: d.clip * 4 }], cur: 0 }
+        let (clip, reserve) = defs[START_PISTOL].start_ammo_split();
+        Loadout { slots: vec![Slot { def: START_PISTOL, clip, reserve }], cur: 0 }
     }
 
     pub fn current(&self) -> &Slot {
@@ -46,10 +60,11 @@ impl Loadout {
     }
 
     /// Give a weapon: refills if already owned, fills an empty slot, or
-    /// replaces the one in hand.
+    /// replaces the one in hand. Like the scripts' `GiveWeapon` +
+    /// `GiveMaxAmmo`: a full clip and a full reserve (`maxAmmo`).
     pub fn give(&mut self, defs: &[WeaponDef], def: usize) {
-        let d = &defs[def];
-        let full = Slot { def, clip: d.clip, reserve: d.max_ammo.saturating_sub(d.clip) };
+        let (clip, reserve) = defs[def].full_ammo();
+        let full = Slot { def, clip, reserve };
         if let Some(i) = self.has(def) {
             self.slots[i] = full;
             self.cur = i;
@@ -61,19 +76,88 @@ impl Loadout {
         }
     }
 
+    /// Max Ammo: every weapon's reserve to `maxAmmo` (`GiveMaxAmmo`; the
+    /// clip is left as it is).
     pub fn refill_all(&mut self, defs: &[WeaponDef]) {
         for s in &mut self.slots {
-            let d = &defs[s.def];
-            s.reserve = d.max_ammo.saturating_sub(s.clip);
+            s.reserve = defs[s.def].max_ammo;
+        }
+    }
+}
+
+/// Which part of a reload is running.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReloadPhase {
+    /// A whole-magazine reload (normal or empty).
+    Full,
+    /// Segmented reload: getting ready (may load rounds itself).
+    Start,
+    /// Segmented reload: one round (or `reloadAmmoAdd` rounds) in.
+    Loop,
+    /// Segmented reload: closing up (the pump/bolt).
+    End,
+}
+
+/// A reload in progress.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ReloadState {
+    pub phase: ReloadPhase,
+    /// Seconds into this phase, and its length.
+    pub t: f32,
+    pub dur: f32,
+    /// When in this phase the rounds go in (`None` once they have).
+    pub add_at: Option<f32>,
+    /// Fire was pressed during a segmented reload: stop after this phase.
+    pub interrupt: bool,
+}
+
+impl ReloadState {
+    fn new(phase: ReloadPhase, dur: f32, add_at: Option<f32>) -> Self {
+        ReloadState { phase, t: 0.0, dur: dur.max(0.0), add_at, interrupt: false }
+    }
+
+    /// The first phase of a reload of `def` (`empty`: the clip is empty).
+    pub fn begin(def: &WeaponDef, empty: bool) -> Self {
+        let r = &def.reload;
+        if !r.segmented {
+            return Self::new(ReloadPhase::Full, r.duration(empty), Some(r.ammo_in_at(empty)));
+        }
+        if r.start_time > 0.0 {
+            let at = (r.start_add > 0).then(|| if r.start_add_time > 0.0 { r.start_add_time.min(r.start_time) } else { r.start_time });
+            Self::new(ReloadPhase::Start, r.start_time, at)
+        } else {
+            Self::looping(def)
+        }
+    }
+
+    fn looping(def: &WeaponDef) -> Self {
+        let r = &def.reload;
+        let at = if r.add_time > 0.0 { r.add_time.min(r.time) } else { r.time };
+        Self::new(ReloadPhase::Loop, r.time, Some(at))
+    }
+
+    fn end(def: &WeaponDef) -> Self {
+        Self::new(ReloadPhase::End, def.reload.end_time, None)
+    }
+
+    /// 0..1 through the current phase.
+    pub fn progress(&self) -> f32 {
+        if self.dur > 0.0 {
+            (self.t / self.dur).clamp(0.0, 1.0)
+        } else {
+            1.0
         }
     }
 }
 
 #[derive(Resource, Default)]
 pub struct Gun {
+    /// Seconds until the next shot may be fired.
     pub cooldown: f32,
-    pub reload: Option<f32>,
+    pub reload: Option<ReloadState>,
+    /// Seconds of weapon switch (drop + raise) left, and its total.
     pub switch: f32,
+    pub switch_total: f32,
     pub knife_cd: f32,
     pub knife_anim: f32,
     pub kick: f32,
@@ -84,6 +168,63 @@ pub struct Gun {
     pub since_shot: Option<f32>,
     /// The running reload started with an empty magazine.
     pub reload_empty: bool,
+    /// The engine's aim-spread scale (0..1) and the resulting cone
+    /// half-angle in degrees.
+    pub spread_scale: f32,
+    pub spread: f32,
+    /// Rounds left in the current burst (burst-fire weapons).
+    pub burst_left: u32,
+}
+
+/// The handling numbers of the weapon in hand, for the player controller
+/// (movement speed, sprint and aiming): `moveSpeedScale` and friends.
+#[derive(Resource, Debug, Clone, Copy, PartialEq)]
+pub struct HeldWeapon {
+    /// Multiplies the run speed (hip) / while aimed.
+    pub move_speed_scale: f32,
+    pub ads_move_speed_scale: f32,
+    /// Multiplies how long a sprint lasts.
+    pub sprint_duration_scale: f32,
+    /// Seconds to aim down the sights / to lower them.
+    pub ads_in_time: f32,
+    pub ads_out_time: f32,
+    /// Field of view while aimed, relative to the game's 65 degrees.
+    pub ads_zoom_fov: f32,
+}
+
+impl Default for HeldWeapon {
+    fn default() -> Self {
+        HeldWeapon { move_speed_scale: 1.0, ads_move_speed_scale: 1.0, sprint_duration_scale: 1.0, ads_in_time: 0.25, ads_out_time: 0.25, ads_zoom_fov: GAME_FOV }
+    }
+}
+
+impl HeldWeapon {
+    pub fn of(def: &WeaponDef) -> Self {
+        HeldWeapon {
+            move_speed_scale: def.move_speed_scale,
+            ads_move_speed_scale: def.ads_move_speed_scale,
+            sprint_duration_scale: def.sprint_duration_scale,
+            ads_in_time: def.ads_in_time,
+            ads_out_time: def.ads_out_time,
+            ads_zoom_fov: def.ads_zoom_fov,
+        }
+    }
+
+    /// The aimed field of view for a hip field of view `base` (degrees):
+    /// for the player controller (not wired yet).
+    #[allow(dead_code)]
+    /// the game's zoom as a fraction of its own 65.
+    pub fn ads_fov(&self, base: f32) -> f32 {
+        base * self.ads_zoom_fov / GAME_FOV
+    }
+
+    /// Movement speed multiplier at an aim amount `ads` (0..1): for the
+    /// player controller (not wired yet).
+    #[allow(dead_code)]
+    pub fn speed_scale(&self, ads: f32) -> f32 {
+        let a = ads.clamp(0.0, 1.0);
+        self.move_speed_scale * (1.0 - a) + self.ads_move_speed_scale * a
+    }
 }
 
 /// The first-person rig (arms + gun) spawned for the weapon in hand.
@@ -127,10 +268,11 @@ impl Plugin for WeaponsPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Gun>()
             .init_resource::<Tracers>()
+            .init_resource::<HeldWeapon>()
             .add_systems(Startup, spawn_viewmodel.after(crate::player::spawn_player))
             .add_systems(
                 Update,
-                (switch_weapons, reload, fire, knife).chain().run_if(in_state(GameState::Playing)),
+                (switch_weapons, reload, aim_spread, fire, knife).chain().run_if(in_state(GameState::Playing)),
             )
             .add_systems(Update, ((update_viewmodel, animate_view_rig).chain(), update_fx, draw_tracers));
     }
@@ -142,7 +284,18 @@ fn switch_weapons(
     mut loadout: ResMut<Loadout>,
     mut gun: ResMut<Gun>,
     (defs, zs, mut alias): (Res<Defs>, Res<ZoneSounds>, EventWriter<PlayAlias>),
+    mut held: Local<Option<usize>>,
 ) {
+    // A weapon that arrived without a switch (bought, from the box) comes
+    // up with its first-raise animation.
+    let now = loadout.current().def;
+    if held.is_some_and(|h| h != now) && gun.switch <= 0.0 {
+        gun.switch = defs.0[now].first_raise_time;
+        gun.switch_total = gun.switch;
+        gun.cooldown = 0.0;
+        gun.burst_left = 0;
+    }
+    *held = Some(now);
     let n = loadout.slots.len();
     if n < 2 {
         return;
@@ -156,15 +309,27 @@ fn switch_weapons(
         target = Some((loadout.cur + 1) % n);
     }
     if let Some(t) = target.filter(|t| *t != loadout.cur && *t < n) {
+        // Put the old weapon away, then raise the new one.
+        let old = &defs.0[loadout.slots[loadout.cur].def];
+        let new = &defs.0[loadout.slots[t].def];
         loadout.cur = t;
-        gun.switch = 0.45;
+        *held = Some(loadout.slots[t].def);
+        gun.switch = old.drop_time + new.raise_time;
+        gun.switch_total = gun.switch;
         gun.reload = None;
         gun.cooldown = 0.0;
-        let id = defs.0[loadout.slots[t].def].id;
-        if let Some(a) = weapon_sound(&zs, id, "raiseSoundPlayer", Sfx::Reload) {
+        gun.burst_left = 0;
+        if let Some(a) = weapon_sound(&zs, new.id, "raiseSoundPlayer", Sfx::Reload) {
             alias.write(a.volume(0.6));
         }
     }
+}
+
+/// Moves up to `n` rounds from the reserve into the clip.
+fn load_rounds(slot: &mut Slot, clip_size: u32, n: u32) {
+    let take = n.min(clip_size.saturating_sub(slot.clip)).min(slot.reserve);
+    slot.clip += take;
+    slot.reserve -= take;
 }
 
 fn reload(
@@ -180,32 +345,61 @@ fn reload(
     gun.switch = (gun.switch - dt).max(0.0);
     let cur = loadout.cur;
     let def = &defs.0[loadout.slots[cur].def];
-    if let Some(left) = gun.reload.as_mut() {
-        *left -= dt;
-        if *left <= 0.0 {
-            gun.reload = None;
-            let slot = &mut loadout.slots[cur];
-            let need = def.clip - slot.clip;
-            let take = need.min(slot.reserve);
-            slot.clip += take;
-            slot.reserve -= take;
-            // With game data the reload anim's notetracks make the sounds.
-            if !zs.weapons.contains_key(def.id) {
-                alias.write(PlayAlias::local("").or(Sfx::Reload).volume(0.7));
-            }
+    if let Some(r) = gun.reload {
+        let (next, magazine_in) = step_reload(r, def, &mut loadout.slots[cur], dt);
+        gun.reload = next;
+        // With game data the reload anim's notetracks make the sounds.
+        if magazine_in && !zs.weapons.contains_key(def.id) {
+            alias.write(PlayAlias::local("").or(Sfx::Reload).volume(0.7));
         }
         return;
     }
     let slot = &loadout.slots[cur];
     let wants = keys.just_pressed(KeyCode::KeyR) || slot.clip == 0;
-    if wants && slot.clip < def.clip && slot.reserve > 0 && gun.switch <= 0.0 {
-        gun.reload = Some(def.reload_time);
+    if wants && def.can_reload(slot.clip, slot.reserve) && gun.switch <= 0.0 && gun.knife_anim <= 0.0 && gun.cooldown <= 0.0 {
         gun.reload_empty = slot.clip == 0;
-        let field = if gun.reload_empty { "reloadEmptySoundPlayer" } else { "reloadSoundPlayer" };
+        gun.reload = Some(ReloadState::begin(def, gun.reload_empty));
+        gun.burst_left = 0;
+        let field = if def.reload.segmented {
+            "reloadStartSoundPlayer"
+        } else if gun.reload_empty {
+            "reloadEmptySoundPlayer"
+        } else {
+            "reloadSoundPlayer"
+        };
         if let Some(a) = weapon_sound(&zs, def.id, field, Sfx::Reload) {
             alias.write(a.volume(0.5));
         }
     }
+}
+
+/// Advances a reload by `dt`, loading rounds into `slot` as they go in.
+/// Returns the next state (`None` when done) and whether a whole magazine
+/// just went in.
+pub fn step_reload(mut r: ReloadState, def: &WeaponDef, slot: &mut Slot, dt: f32) -> (Option<ReloadState>, bool) {
+    r.t += dt;
+    let mut magazine_in = false;
+    if r.add_at.is_some_and(|at| r.t >= at) {
+        r.add_at = None;
+        let n = match r.phase {
+            ReloadPhase::Full => def.clip,
+            ReloadPhase::Start => def.reload.start_add,
+            ReloadPhase::Loop => def.reload.ammo_add,
+            ReloadPhase::End => 0,
+        };
+        load_rounds(slot, def.clip, n);
+        magazine_in = r.phase == ReloadPhase::Full;
+    }
+    if r.t < r.dur {
+        return (Some(r), magazine_in);
+    }
+    let more = slot.clip < def.clip && slot.reserve > 0 && !r.interrupt;
+    let next = match r.phase {
+        ReloadPhase::Full | ReloadPhase::End => None,
+        ReloadPhase::Start | ReloadPhase::Loop if more => Some(ReloadState::looping(def)),
+        ReloadPhase::Start | ReloadPhase::Loop => Some(ReloadState::end(def)),
+    };
+    (next, magazine_in)
 }
 
 /// A sound a weapon definition names (`field`), or the procedural stand-in
@@ -218,12 +412,14 @@ pub fn weapon_sound(zs: &ZoneSounds, weapon: &str, field: &str, fallback: Sfx) -
     }
 }
 
-/// Uniformly random direction inside a cone around `dir`.
+/// Random direction inside a cone around `dir` the way the engine picks it:
+/// a random angle and a uniformly random radius (so shots bunch towards
+/// the centre).
 fn spread_dir(dir: Vec3, right: Vec3, up: Vec3, half_angle_deg: f32) -> Vec3 {
     if half_angle_deg <= 0.0 {
         return dir;
     }
-    let r = half_angle_deg.to_radians().tan() * fastrand::f32().sqrt();
+    let r = half_angle_deg.to_radians().tan() * fastrand::f32();
     let a = fastrand::f32() * std::f32::consts::TAU;
     (dir + right * (a.cos() * r) + up * (a.sin() * r)).normalize()
 }
@@ -242,10 +438,59 @@ pub fn wall_distance(world: &World, origin: Vec3, dir: Vec3, max: f32) -> f32 {
     }
 }
 
+fn spread_stance(s: Stance) -> SpreadStance {
+    match s {
+        Stance::Stand => SpreadStance::Stand,
+        Stance::Crouch => SpreadStance::Ducked,
+        Stance::Prone => SpreadStance::Prone,
+    }
+}
+
+/// Inches of flesh a bullet passes through at a hit location (used up from
+/// the weapon's `penetrateType` depth to go on to the next body).
+fn flesh_thickness(loc: HitLoc) -> f32 {
+    match loc {
+        HitLoc::TorsoUpper | HitLoc::TorsoLower => 12.0,
+        HitLoc::Head | HitLoc::Helmet => 8.0,
+        HitLoc::RightLegUpper | HitLoc::LeftLegUpper => 7.0,
+        _ => 4.0,
+    }
+}
+
+/// The engine's aim-spread scale (grows while moving, decays at rest) and
+/// the handling numbers of the weapon in hand.
+fn aim_spread(
+    time: Res<Time>,
+    defs: Res<Defs>,
+    loadout: Res<Loadout>,
+    mut gun: ResMut<Gun>,
+    mut held: ResMut<HeldWeapon>,
+    player: Query<&PlayerCtl, With<Player>>,
+    mut last_yaw: Local<Option<f32>>,
+) {
+    let dt = time.delta_secs();
+    let def = &defs.0[loadout.current().def];
+    let h = HeldWeapon::of(def);
+    if *held != h {
+        *held = h;
+    }
+    let Ok(ctl) = player.single() else { return };
+    let stance = spread_stance(ctl.stance);
+    let moving = if ctl.on_ground { (ctl.vel.length() / RUN_SPEED).clamp(0.0, 1.0) } else { 1.0 };
+    // Turning: a fraction of a quick (180 deg/s) turn.
+    let turning = match *last_yaw {
+        Some(y) if dt > 0.0 => ((ctl.yaw - y).abs() / dt / std::f32::consts::PI).clamp(0.0, 1.0),
+        _ => 0.0,
+    };
+    *last_yaw = Some(ctl.yaw);
+    gun.spread_scale = def.spread.update_scale(gun.spread_scale, stance, moving, turning, dt);
+    gun.spread = def.spread.cone(stance, gun.spread_scale, ctl.ads);
+}
+
 #[allow(clippy::type_complexity)]
 fn fire(
     (mouse, time, windows): (Res<ButtonInput<MouseButton>>, Res<Time>, Query<&Window, With<PrimaryWindow>>),
-    (defs, world, pu): (Res<Defs>, Res<World>, Res<ActivePowerups>),
+    (defs, world, pu, round): (Res<Defs>, Res<World>, Res<ActivePowerups>, Res<Round>),
     (mut loadout, mut gun, mut score, mut tracers): (ResMut<Loadout>, ResMut<Gun>, ResMut<Score>, ResMut<Tracers>),
     mut player: Query<(&Transform, &mut PlayerCtl), With<Player>>,
     mut zq: Query<(Entity, &Transform, &mut Zombie), Without<Player>>,
@@ -263,19 +508,35 @@ fn fire(
     gun.flash = (gun.flash - dt).max(0.0);
     gun.hitmarker = (gun.hitmarker - dt).max(0.0);
 
-    if !cursor_locked(&windows) || gun.switch > 0.0 || gun.reload.is_some() || gun.knife_anim > 0.0 {
+    if !cursor_locked(&windows) || gun.switch > 0.0 || gun.knife_anim > 0.0 {
+        gun.burst_left = 0;
         return;
     }
     let cur = loadout.cur;
     let def = defs.0[loadout.slots[cur].def].clone();
+    if let Some(r) = gun.reload.as_mut() {
+        // A shot cuts a round-by-round reload short (after the closing
+        // pump/bolt); a magazine reload has to finish.
+        if mouse.just_pressed(MouseButton::Left) && loadout.slots[cur].clip > 0 && matches!(r.phase, ReloadPhase::Start | ReloadPhase::Loop) {
+            gun.reload = Some(ReloadState { interrupt: true, ..ReloadState::end(&def) });
+        }
+        return;
+    }
     let trigger = match def.mode {
         FireMode::Auto => mouse.pressed(MouseButton::Left),
         FireMode::Semi => mouse.just_pressed(MouseButton::Left),
+        FireMode::Burst(n) => {
+            if mouse.just_pressed(MouseButton::Left) && gun.burst_left == 0 {
+                gun.burst_left = n;
+            }
+            gun.burst_left > 0
+        }
     };
     if !trigger || gun.cooldown > 0.0 {
         return;
     }
     if loadout.slots[cur].clip == 0 {
+        gun.burst_left = 0;
         if mouse.just_pressed(MouseButton::Left) {
             if let Some(a) = weapon_sound(&zs, def.id, "emptyFireSoundPlayer", Sfx::DryFire) {
                 alias.write(a.volume(0.6));
@@ -285,13 +546,15 @@ fn fire(
     }
     let Ok((cam, mut ctl)) = player.single_mut() else { return };
     loadout.slots[cur].clip -= 1;
-    gun.cooldown = def.fire_interval.max(0.04);
+    let left = loadout.slots[cur].clip;
+    gun.burst_left = gun.burst_left.saturating_sub(1);
+    gun.cooldown = def.shot_cycle(left).max(0.04);
     gun.since_shot = Some(0.0);
     gun.kick = 1.0;
     gun.flash = 0.05;
     ctl.recoil += def.kick * 0.012 * (1.0 - 0.5 * ctl.ads);
     // The last round may have its own sound (the Garand's ping).
-    match zs.weapon_field(def.id, "fireLastSoundPlayer").filter(|_| loadout.slots[cur].clip == 0) {
+    match zs.weapon_field(def.id, "fireLastSoundPlayer").filter(|_| left == 0) {
         Some(last) => {
             alias.write(PlayAlias::local(last));
         }
@@ -305,80 +568,105 @@ fn fire(
     let right = cam.right().as_vec3();
     let up = cam.up().as_vec3();
     let muzzle = origin + right * 0.2 - up * 0.14 + fwd * 0.7;
-    let ads_factor = if def.kind == Kind::Shotgun { 1.0 - 0.3 * ctl.ads } else { 1.0 - 0.75 * ctl.ads };
-    let move_factor = if ctl.moving { 1.6 } else { 1.0 };
+    // The cone for this shot, then the shot itself widens the next one.
+    let cone = gun.spread;
+    gun.spread_scale = (gun.spread_scale + def.spread.fire_add).min(1.0);
     let insta = pu.insta_kill > 0.0;
+    let round_no = round.0.round.max(1);
+    // Pistol-class weapons never gib heads (`head_should_gib`).
+    let gibs = !matches!(def.kind, Kind::Pistol | Kind::Wonder);
     let mut any_hit = false;
     let mut any_head = false;
 
     for _ in 0..def.pellets.max(1) {
-        let dir = spread_dir(fwd, right, up, def.spread * ads_factor * move_factor);
-        let max = 120.0;
+        let dir = spread_dir(fwd, right, up, cone);
+        let max = def.bullet_range(BULLET_RANGE);
         let wall_t = wall_distance(&world, origin, dir, max);
-        let mut best: Option<(f32, bool, Entity)> = None;
-        for (e, t, z) in zq.iter() {
-            if !z.alive() {
-                continue;
+        // Every body along the ray, nearest first: the bullet goes through
+        // as many as its penetration depth allows, losing damage as it goes.
+        let mut hits: Vec<(f32, HitLoc, Entity)> = zq
+            .iter()
+            .filter(|(_, _, z)| z.alive())
+            .filter_map(|(e, t, z)| zombies::hit_location(origin, dir, t, z, wall_t).map(|(d, loc)| (d, loc, e)))
+            .collect();
+        hits.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let mut remaining = 1.0;
+        let mut end_t = wall_t;
+        for (d, loc, e) in hits {
+            let Ok((_, _, mut z)) = zq.get_mut(e) else { continue };
+            any_hit = true;
+            any_head |= loc.is_head();
+            let dmg = def.bullet_damage(d, loc) * remaining;
+            let at = origin + dir * d;
+            let lethal = z.hp <= dmg;
+            let mut dead = zombies::apply_damage(&mut z, dmg, insta);
+            if !dead && def.is_projectile() {
+                // The zombie damage script adds `round * RandomInt(100, 500)`
+                // to projectile hits (RandomInt takes one argument).
+                dead = zombies::apply_damage(&mut z, round_no as f32 * fastrand::u32(0..100) as f32, false);
             }
-            if let Some((d, head)) = zombies::hit_test(origin, dir, t, &z, wall_t) {
-                if best.is_none_or(|b| d < b.0) {
-                    best = Some((d, head, e));
+            if dead {
+                // Kill bonus by hit location: head 100, neck 70, torso 60, limbs 50.
+                let kind = if def.is_projectile() { KillKind::Explosive } else { KillKind::from_hit(loc) };
+                if loc.is_head() {
+                    score.headshots += 1;
                 }
+                if gibs && loc.gibs_head() {
+                    // The head pops.
+                    alias.write(PlayAlias::at("zombie_head_gib", at).or(Sfx::Headshot).volume(0.8));
+                }
+                earn(&mut score, &mut points, &pu, rules::kill_points_with(kind, insta, lethal));
+                killed.write(ZombieKilled { pos: at, drop_allowed: true });
+                spawn_burst(&mut commands, &mats, at, &mats.blood, 10, 2.5);
+            } else {
+                earn(&mut score, &mut points, &pu, rules::POINTS_HIT);
+                spawn_burst(&mut commands, &mats, at, &mats.blood, 4, 1.5);
+            }
+            remaining -= if def.flesh_penetration > 0.0 { flesh_thickness(loc) / def.flesh_penetration } else { 1.0 };
+            if def.is_projectile() || remaining <= 0.0 {
+                end_t = d;
+                break;
             }
         }
-        let hit = best.and_then(|(d, head, e)| zq.get_mut(e).ok().map(|(_, _, z)| (d, head, z)));
-
-        let end_t = hit.as_ref().map(|h| h.0).unwrap_or(wall_t);
         let end = origin + dir * end_t;
         let color = if def.kind == Kind::Wonder { Color::srgb(0.3, 1.0, 0.4) } else { Color::srgba(1.0, 0.9, 0.6, 0.6) };
         tracers.0.push((muzzle, end, if def.kind == Kind::Wonder { 0.12 } else { 0.035 }, color));
-
-        if let Some((d, head, mut z)) = hit {
-            any_hit = true;
-            any_head |= head;
-            let mut dmg = def.damage_at(d) * if head { def.head_mult } else { 1.0 };
-            if def.kind == Kind::Wonder {
-                dmg = def.damage;
-            }
-            let was_alive = z.alive();
-            if zombies::apply_damage(&mut z, dmg, insta) && was_alive {
-                let kind = if def.kind == Kind::Wonder { KillKind::Explosive } else if head { KillKind::Head } else { KillKind::Body };
-                if head {
-                    score.headshots += 1;
-                    // The head pops.
-                    alias.write(PlayAlias::at("zombie_head_gib", end).or(Sfx::Headshot).volume(0.8));
-                }
-                earn(&mut score, &mut points, &pu, rules::kill_points(kind));
-                killed.write(ZombieKilled { pos: end, drop_allowed: true });
-                spawn_burst(&mut commands, &mats, end, &mats.blood, 10, 2.5);
-            } else {
-                earn(&mut score, &mut points, &pu, rules::POINTS_HIT);
-                spawn_burst(&mut commands, &mats, end, &mats.blood, 4, 1.5);
-            }
-        } else if end_t < max {
+        if end_t >= wall_t && end_t < max {
             spawn_burst(&mut commands, &mats, end - dir * 0.05, &mats.spark, 3, 2.0);
         }
 
-        // Splash damage (Ray Pistol).
+        // The explosion where a projectile lands (Ray Gun): from the inner
+        // damage at the centre to the outer at the edge of the radius, to
+        // every body in view of it.
         if def.splash_radius > 0.0 {
-            spawn_burst(&mut commands, &mats, end, &mats.glow_green, 14, 4.0);
+            let at = end - dir * 0.05;
+            spawn_burst(&mut commands, &mats, at, &mats.glow_green, 14, 4.0);
             for (_, t, mut z) in zq.iter_mut() {
                 if !z.alive() {
                     continue;
                 }
-                let c = t.translation + Vec3::Y * 1.0;
-                let dist = c.distance(end);
-                if dist < def.splash_radius {
-                    let falloff = 1.0 - dist / def.splash_radius;
-                    let dmg = def.splash_damage * (0.5 + 0.5 * falloff);
-                    if zombies::apply_damage(&mut z, dmg, insta) {
-                        earn(&mut score, &mut points, &pu, rules::kill_points(KillKind::Explosive));
-                        killed.write(ZombieKilled { pos: t.translation, drop_allowed: true });
-                    } else {
-                        earn(&mut score, &mut points, &pu, rules::POINTS_HIT);
+                let feet = t.translation;
+                let head = feet + Vec3::Y * 1.63 * z.scale;
+                let near = closest_on_segment(at, feet, head);
+                let dist = near.distance(at);
+                let Some(dmg) = def.splash_at(dist) else { continue };
+                if dist > 0.05 {
+                    let to = (near - at) / dist;
+                    if wall_distance(&world, at, to, dist) < dist - 0.05 {
+                        continue;
                     }
-                    any_hit = true;
                 }
+                let mut dead = zombies::apply_damage(&mut z, dmg, insta);
+                if !dead {
+                    dead = zombies::apply_damage(&mut z, round_no as f32 * fastrand::u32(0..100) as f32, false);
+                }
+                if dead {
+                    earn(&mut score, &mut points, &pu, rules::kill_points(KillKind::Explosive));
+                    killed.write(ZombieKilled { pos: feet, drop_allowed: true });
+                } else {
+                    earn(&mut score, &mut points, &pu, rules::POINTS_HIT);
+                }
+                any_hit = true;
             }
         }
     }
@@ -390,6 +678,12 @@ fn fire(
             sfx.write(PlaySfx::at(if any_head { Sfx::Headshot } else { Sfx::Hit }, 0.5));
         }
     }
+}
+
+fn closest_on_segment(p: Vec3, a: Vec3, b: Vec3) -> Vec3 {
+    let ab = b - a;
+    let t = ((p - a).dot(ab) / ab.length_squared().max(1e-6)).clamp(0.0, 1.0);
+    a + ab * t
 }
 
 #[allow(clippy::type_complexity)]
@@ -414,10 +708,14 @@ fn knife(
         return;
     }
     let Ok(cam) = player.single() else { return };
-    gun.knife_cd = 0.65;
+    let held_def = loadout.map(|l| &defs.0[l.current().def]);
+    // `meleeTime` (0.5 s for every weapon on Nacht) until the next swing.
+    gun.knife_cd = held_def.map_or(0.65, |d| d.melee_time.max(0.35));
     gun.knife_anim = 0.35;
     gun.reload = None;
-    let held = loadout.map(|l| defs.0[l.current().def].id).unwrap_or("");
+    gun.burst_left = 0;
+    let melee_damage = held_def.map_or(150.0, |d| d.melee_damage);
+    let held = held_def.map_or("", |d| d.id);
     if let Some(a) = weapon_sound(&zs, held, "meleeSwipeSoundPlayer", Sfx::Knife) {
         alias.write(a.volume(0.8));
     }
@@ -437,8 +735,9 @@ fn knife(
     if let Some((_, pos, mut z)) = target {
         let hit_point = pos + Vec3::Y * 1.2;
         alias.write(PlayAlias::at("melee_hit", hit_point));
-        if zombies::apply_damage(&mut z, KNIFE_DAMAGE, pu.insta_kill > 0.0) {
-            earn(&mut score, &mut points, &pu, rules::kill_points(KillKind::Melee));
+        let lethal = z.hp <= melee_damage;
+        if zombies::apply_damage(&mut z, melee_damage, pu.insta_kill > 0.0) {
+            earn(&mut score, &mut points, &pu, rules::kill_points_with(KillKind::Melee, pu.insta_kill > 0.0, lethal));
             killed.write(ZombieKilled { pos, drop_allowed: true });
             spawn_burst(&mut commands, &mats, hit_point, &mats.blood, 10, 2.5);
         } else {
@@ -667,14 +966,18 @@ fn update_viewmodel(
         pos += Vec3::new(-0.05, -0.06, 0.05);
         rot *= Quat::from_euler(EulerRot::XYZ, -0.3, 0.5, 0.2);
     }
-    if let Some(left) = gun.reload {
-        let def = &defs.0[def_idx];
-        let k = (std::f32::consts::PI * (1.0 - left / def.reload_time.max(0.01))).sin();
+    if let Some(r) = gun.reload {
+        let k = match r.phase {
+            ReloadPhase::Full => (std::f32::consts::PI * r.progress()).sin(),
+            ReloadPhase::Start => (std::f32::consts::FRAC_PI_2 * r.progress()).sin(),
+            ReloadPhase::Loop => 1.0,
+            ReloadPhase::End => (std::f32::consts::FRAC_PI_2 * (1.0 - r.progress())).sin(),
+        };
         pos.y -= 0.12 * k;
         rot *= Quat::from_euler(EulerRot::XYZ, -0.6 * k, 0.0, 0.5 * k);
     }
     if gun.switch > 0.0 {
-        pos.y -= gun.switch * 0.6;
+        pos.y -= (gun.switch / gun.switch_total.max(gun.switch).max(0.01)) * 0.27;
     }
     if gun.knife_anim > 0.0 {
         pos += Vec3::new(0.1, -0.15, 0.1);
@@ -733,10 +1036,20 @@ fn animate_view_rig(
     let choice = if gun.knife_anim > 0.0 {
         knife.map(|k| (k.clone(), 1.0 - gun.knife_anim / 0.35))
     } else if gun.switch > 0.0 {
-        get("raise").map(|c| (c, 1.0 - gun.switch / 0.45))
-    } else if let Some(left) = gun.reload {
-        let c = if gun.reload_empty { get("reload_empty").or_else(|| get("reload")) } else { get("reload") };
-        c.map(|c| (c, 1.0 - left / def.reload_time.max(0.01)))
+        // The new weapon comes up over the last `raiseTime` of the switch
+        // (the first part is the old one going down).
+        let total = gun.switch_total.max(gun.switch).max(0.01);
+        let raise = def.raise_time.min(total).max(0.01);
+        let elapsed = total - gun.switch;
+        get("raise").map(|c| (c, ((elapsed - (total - raise)) / raise).clamp(0.0, 1.0)))
+    } else if let Some(r) = gun.reload {
+        let c = match r.phase {
+            ReloadPhase::Full if gun.reload_empty => get("reload_empty").or_else(|| get("reload")),
+            ReloadPhase::Full | ReloadPhase::Loop => get("reload"),
+            ReloadPhase::Start => get("reload_start"),
+            ReloadPhase::End => get("reload_end"),
+        };
+        c.map(|c| (c, r.progress()))
     } else {
         // The shot that empties the clip has its own animation (the
         // Garand's clip flies out).
@@ -789,5 +1102,122 @@ fn animate_view_rig(
     if let Some(ads) = get("ads_up") {
         let map = crate::nacht::track_map(&ads, &rig.joints);
         crate::nacht::pose_mapped(&ads, ctl.ads.clamp(0.0, 1.0) * ads.numframes, &rig.joints, &map, &mut tq, Some("tag_torso"));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use zm_core::weapons::{default_weapons, find};
+
+    fn def(id: &str) -> WeaponDef {
+        let defs = default_weapons();
+        defs[find(&defs, id).unwrap()].clone()
+    }
+
+    /// Runs a reload to the end in `dt` steps; returns (seconds, clip after
+    /// each step).
+    fn run(def: &WeaponDef, slot: &mut Slot, dt: f32) -> (f32, Vec<u32>) {
+        let mut r = Some(ReloadState::begin(def, slot.clip == 0));
+        let (mut t, mut clips) = (0.0, Vec::new());
+        while let Some(s) = r {
+            r = step_reload(s, def, slot, dt).0;
+            t += dt;
+            clips.push(slot.clip);
+            assert!(t < 30.0);
+        }
+        (t, clips)
+    }
+
+    #[test]
+    fn magazine_goes_in_at_the_add_time() {
+        let mp40 = def("mp40");
+        let mut slot = Slot { def: 0, clip: 10, reserve: 100 };
+        let (t, clips) = run(&mp40, &mut slot, 0.05);
+        assert!((t - 2.3).abs() < 0.06, "{t}");
+        // 1.85 s in (step 37) the clip is full; before, it is not.
+        assert_eq!(clips[35], 10);
+        assert_eq!(clips[37], 32);
+        assert_eq!((slot.clip, slot.reserve), (32, 78));
+        // Empty: 2.9 s.
+        let mut slot = Slot { def: 0, clip: 0, reserve: 10 };
+        let (t, _) = run(&mp40, &mut slot, 0.05);
+        assert!((t - 2.9).abs() < 0.06, "{t}");
+        assert_eq!((slot.clip, slot.reserve), (10, 0));
+    }
+
+    #[test]
+    fn shotgun_loads_shell_by_shell() {
+        let s = def("trenchgun");
+        let mut slot = Slot { def: 0, clip: 3, reserve: 10 };
+        let (t, _) = run(&s, &mut slot, 0.01);
+        // Start 0.9 (one shell in), two loops of 0.6, end 0.95.
+        assert!((t - (0.9 + 1.2 + 0.95)).abs() < 0.05, "{t}");
+        assert_eq!((slot.clip, slot.reserve), (6, 7));
+        // Firing during the loop goes to the end phase.
+        let mut slot = Slot { def: 0, clip: 0, reserve: 10 };
+        let r = ReloadState::begin(&s, true);
+        let (r, _) = step_reload(r, &s, &mut slot, 0.95);
+        assert_eq!((r.unwrap().phase, slot.clip), (ReloadPhase::Loop, 1));
+        let end = ReloadState { interrupt: true, ..ReloadState::end(&s) };
+        assert_eq!(end.phase, ReloadPhase::End);
+        assert!((end.dur - 0.95).abs() < 1e-5);
+    }
+
+    #[test]
+    fn reload_stops_when_reserve_runs_out() {
+        let k = def("kar98k_scoped_zombie");
+        let mut slot = Slot { def: 0, clip: 1, reserve: 2 };
+        run(&k, &mut slot, 0.02);
+        assert_eq!((slot.clip, slot.reserve), (3, 0));
+    }
+
+    #[test]
+    fn handling_numbers() {
+        let h = HeldWeapon::of(&def("ptrs41_zombie"));
+        assert_eq!(h.move_speed_scale, 0.75);
+        assert_eq!(h.ads_fov(65.0), 10.0);
+        let t = HeldWeapon::of(&def("thompson"));
+        assert!((t.speed_scale(1.0) - 1.3).abs() < 1e-6);
+        assert!((t.ads_in_time - 0.22).abs() < 1e-6);
+    }
+
+    #[test]
+    fn spawn_and_box_ammo() {
+        let defs = default_weapons();
+        let mut l = Loadout::starting(&defs);
+        assert_eq!((l.current().clip, l.current().reserve), (8, 32));
+        let t = find(&defs, "thompson").unwrap();
+        l.give(&defs, t);
+        assert_eq!((l.current().clip, l.current().reserve), (20, 200));
+        l.slots[l.cur].reserve = 3;
+        l.refill_all(&defs);
+        assert_eq!(l.current().reserve, 200);
+    }
+
+    /// Every weapon reads its own file from a real install:
+    /// `UNDEAD_WAW=<install> cargo test -p zm_game -- --ignored`.
+    #[test]
+    #[ignore]
+    fn reads_real_weapon_files() {
+        let root = std::env::var("UNDEAD_WAW").expect("set UNDEAD_WAW");
+        let iwd = waw_assets::Iwd::open(&std::path::Path::new(&root).join("main")).unwrap();
+        let mut defs = default_weapons();
+        let builtin = defs.clone();
+        for d in defs.iter_mut() {
+            let file = d.weapon_file.unwrap();
+            let bytes = iwd.read(&format!("weapons/sp/{file}")).unwrap_or_else(|| panic!("{file}"));
+            let wf = zm_core::weaponfile::WeaponFile::parse_bytes(&bytes).unwrap();
+            assert!(d.apply_weapon_file(&wf) > 30, "{file}");
+        }
+        // The built-in table holds the same numbers as the files.
+        for (a, b) in defs.iter().zip(&builtin) {
+            assert_eq!(crate::audio::weapon_summary(a), crate::audio::weapon_summary(b));
+        }
+        let d = |id: &str| &defs[find(&defs, id).unwrap()];
+        assert_eq!((d("trenchgun").damage, d("trenchgun").pellets), (160.0, 8));
+        assert_eq!(d("kar98k").location_multiplier(HitLoc::Head), 3.5);
+        assert_eq!(d("raypistol").mode, FireMode::Auto);
+        assert_eq!(d("ptrs41_zombie").damage, 1000.0);
     }
 }

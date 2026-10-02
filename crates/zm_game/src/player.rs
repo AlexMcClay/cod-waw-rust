@@ -11,6 +11,7 @@ use bevy::render::camera::Exposure;
 use bevy::window::PrimaryWindow;
 use zm_core::geom::V3;
 use zm_core::rules;
+use zm_core::trimesh::blocks;
 
 /// Game units (inches) to metres.
 const U: f32 = 0.0254;
@@ -33,6 +34,14 @@ const FRICTION: f32 = 6.0;
 const STOP_SPEED: f32 = 100.0 * U;
 /// Seconds of sprint before the player is winded.
 const SPRINT_TIME: f32 = 4.0;
+/// Highest step the player walks up without jumping (`jump_stepSize`).
+const STEP: f32 = 18.0 * U;
+/// Walkable surfaces: normal.y of at least this (as the game's 0.7).
+const MIN_WALK_NORMAL: f32 = 0.7;
+/// Time constant of the view easing over steps (seconds).
+const STEP_SMOOTH: f32 = 0.1;
+/// How far ahead and behind the ground slope is probed for the view.
+const SLOPE_PROBE: f32 = 12.0 * U;
 
 #[derive(Component)]
 pub struct Player;
@@ -91,6 +100,9 @@ pub struct PlayerCtl {
     pub ads: f32,
     /// Extra pitch from recoil, recovers over time.
     pub recoil: f32,
+    /// View offset left over from stepping up or down; eases back to 0 so
+    /// steps and stairs never jerk the camera.
+    pub step_offset: f32,
 }
 
 impl PlayerCtl {
@@ -128,9 +140,17 @@ impl Plugin for PlayerPlugin {
             .add_systems(Startup, spawn_player)
             .add_systems(
                 Update,
-                (look, movement, regen, breathing, tweak_settings).chain().run_if(in_state(GameState::Playing)),
+                (look, test_walk_setup, movement, regen, breathing, tweak_settings).chain().run_if(in_state(GameState::Playing)),
             )
             .add_systems(Update, apply_exposure);
+        if let Some(walk) = TestWalk::from_env() {
+            app.insert_resource(walk);
+        }
+        // Developer aid: `UNDEAD_TEST_DT=<seconds>` advances the game clock by
+        // a fixed step every frame, so test runs don't depend on machine load.
+        if let Some(dt) = std::env::var("UNDEAD_TEST_DT").ok().and_then(|s| s.parse::<f32>().ok()).filter(|d| *d > 0.0) {
+            app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(std::time::Duration::from_secs_f32(dt)));
+        }
     }
 }
 
@@ -191,15 +211,19 @@ fn look(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn movement(
     keys: Res<ButtonInput<KeyCode>>,
     mouse: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
     world: Res<World>,
+    mut walk: Option<ResMut<TestWalk>>,
     mut q: Query<(&mut Transform, &mut PlayerCtl), With<Player>>,
 ) {
     let Ok((mut t, mut c)) = q.single_mut() else { return };
+    let cpu = std::time::Instant::now();
     let dt = time.delta_secs().min(0.05);
+    let driven = walk.as_ref().is_some_and(|w| w.active());
 
     let mut wish = Vec2::ZERO;
     if keys.pressed(KeyCode::KeyW) {
@@ -224,7 +248,9 @@ fn movement(
     let fits = |s: Stance, c: &PlayerCtl| -> bool {
         let (x, z) = here;
         let top = c.feet_y + s.height();
-        let mesh_ok = world.mesh.as_ref().is_none_or(|m| m.raycast(V3::new(x, c.feet_y + 0.3, z), V3::new(0.0, 1.0, 0.0), top - c.feet_y - 0.3).is_none());
+        let mesh_ok = world.mesh.as_ref().is_none_or(|m| {
+            m.raycast_mask(V3::new(x, c.feet_y + 0.3, z), V3::new(0.0, 1.0, 0.0), top - c.feet_y - 0.3, blocks::PLAYER, |_| true).is_none()
+        });
         let solids_ok = !world.player_solids.iter().any(|b| b.min.y < top && b.max.y > c.feet_y + 0.3 && b.push_circle(x, z, RADIUS * 0.5).is_some());
         mesh_ok && solids_ok
     };
@@ -238,6 +264,9 @@ fn movement(
     let up_pressed = keys.just_pressed(KeyCode::Space) || (keys.just_pressed(KeyCode::ShiftLeft) && wish.y > 0.5);
     if up_pressed && c.stance != Stance::Stand {
         want = if c.stance == Stance::Prone { Stance::Crouch } else { Stance::Stand };
+    }
+    if driven {
+        want = c.stance;
     }
     let standing_up = want != c.stance;
     if standing_up && (want.height() <= c.stance.height() || fits(want, &c)) && c.on_ground {
@@ -257,10 +286,14 @@ fn movement(
     let (s, co) = c.yaw.sin_cos();
     let forward = Vec2::new(-s, -co);
     let right = Vec2::new(co, -s);
-    c.moving = wish != Vec2::ZERO;
-    let dir_scale = if wish.y < -0.1 { BACK_SCALE } else if wish.y.abs() < 0.1 && wish.x != 0.0 { STRAFE_SCALE } else { 1.0 };
+    let mut dir_scale = if wish.y < -0.1 { BACK_SCALE } else if wish.y.abs() < 0.1 && wish.x != 0.0 { STRAFE_SCALE } else { 1.0 };
+    let mut wish_dir = (forward * wish.y + right * wish.x).normalize_or_zero();
+    if let Some(w) = walk.as_mut().filter(|w| w.active()) {
+        wish_dir = w.steer(Vec2::new(t.translation.x, t.translation.z));
+        dir_scale = 1.0;
+    }
+    c.moving = wish_dir != Vec2::ZERO;
     let wish_speed = RUN_SPEED * c.stance.speed_scale() * dir_scale * if c.sprinting { SPRINT_SCALE } else { 1.0 } * (1.0 - (1.0 - ADS_SCALE) * c.ads);
-    let wish_dir = (forward * wish.y + right * wish.x).normalize_or_zero();
 
     // Quake-style friction and acceleration (the game's movement code is
     // derived from it): quick but not instant starts and stops.
@@ -271,10 +304,14 @@ fn movement(
             c.vel *= ((speed - drop).max(0.0)) / speed;
         }
     }
+    // Unlike Quake, the game scales acceleration by at least the stop
+    // speed. Without that, a slow wish speed (prone: 28.5 u/s) adds less per
+    // frame than friction takes away (stop speed 100 u/s) and the player
+    // barely creeps.
     let accel = if c.on_ground { ACCELERATE } else { AIR_ACCELERATE };
     let add = wish_speed - c.vel.dot(wish_dir);
     if add > 0.0 {
-        c.vel += wish_dir * (accel * wish_speed * dt).min(add);
+        c.vel += wish_dir * (accel * wish_speed.max(STOP_SPEED) * dt).min(add);
     }
 
     let start = Vec2::new(t.translation.x, t.translation.z);
@@ -282,17 +319,11 @@ fn movement(
     let mut z = start.y + c.vel.y * dt;
     let height = c.stance.height();
     if let Some(mesh) = &world.mesh {
-        // Walls of the real map: spheres above step height, ignoring floors.
-        let heights: &[f32] = match c.stance {
-            Stance::Stand => &[0.6, 1.1, 1.5],
-            Stance::Crouch => &[0.6, 1.0],
-            Stance::Prone => &[0.45],
-        };
-        for &h in heights {
-            let (p, _) = mesh.push_sphere(V3::new(x, c.feet_y + h, z), RADIUS, 3, |t| t.n.y.abs() < 0.7);
-            x = p.x;
-            z = p.z;
-        }
+        // Walls of the map's own player collision, against the body above
+        // step height: anything lower is stepped onto (see the ground below).
+        let (nx, nz, _) = mesh.push_cylinder_mask(x, z, RADIUS, c.feet_y + STEP, c.feet_y + height, 4, blocks::PLAYER, |t| t.n.y.abs() < MIN_WALK_NORMAL);
+        x = nx;
+        z = nz;
     }
     let (feet, head) = (c.feet_y + 0.3, c.feet_y + height);
     for _ in 0..3 {
@@ -311,18 +342,29 @@ fn movement(
         }
     }
 
-    if c.on_ground && keys.just_pressed(KeyCode::Space) && c.stance == Stance::Stand && !standing_up {
+    if c.on_ground && keys.just_pressed(KeyCode::Space) && c.stance == Stance::Stand && !standing_up && !driven {
         c.vel_y = (2.0 * GRAVITY * JUMP_HEIGHT).sqrt();
         c.on_ground = false;
     }
+    let (was_on_ground, old_feet) = (c.on_ground, c.feet_y);
     c.vel_y -= GRAVITY * dt;
     c.feet_y += c.vel_y * dt;
+    if let (Some(mesh), true) = (&world.mesh, c.vel_y > 0.0) {
+        // Head against a ceiling.
+        let from = old_feet + 0.1;
+        if let Some(h) = mesh.raycast_mask(V3::new(x, from, z), V3::new(0.0, 1.0, 0.0), c.feet_y + height - from, blocks::PLAYER, |t| t.n.y.abs() >= MIN_WALK_NORMAL) {
+            c.feet_y = (from + h.t - height).clamp(old_feet, c.feet_y);
+            c.vel_y = 0.0;
+        }
+    }
+    // The ground: where a ball as wide as the player comes to rest. It rides
+    // smoothly over step edges, so stairs climb like a ramp.
     let ground = match &world.mesh {
-        Some(mesh) => mesh.ground(x, z, c.feet_y + 0.55 - c.vel_y.min(0.0) * dt, c.feet_y - 6.0, 0.6),
+        Some(mesh) => mesh.support_sphere_mask(x, z, RADIUS, c.feet_y + STEP - c.vel_y.min(0.0) * dt, c.feet_y - 6.0, MIN_WALK_NORMAL, blocks::PLAYER),
         None => Some(0.0),
     };
     match ground {
-        Some(g) if c.feet_y <= g || (c.on_ground && c.vel_y <= 0.0 && c.feet_y - g < 0.45) => {
+        Some(g) if c.feet_y <= g || (c.on_ground && c.vel_y <= 0.0 && c.feet_y - g < STEP) => {
             c.feet_y = g;
             c.vel_y = 0.0;
             c.on_ground = true;
@@ -334,6 +376,25 @@ fn movement(
         c.feet_y = 0.0;
         c.vel_y = 0.0;
     }
+    // The view climbs at the slope of the ground around the player (probed
+    // ahead and behind along the motion): exact on ramps, a straight ramp
+    // over stairs. Whatever the feet do beyond that (a step's edge) goes
+    // into an offset that eases out, as the game smooths steps.
+    if was_on_ground && c.on_ground {
+        let dy = c.feet_y - old_feet;
+        let mv = Vec2::new(x, z) - start;
+        let moved = mv.length();
+        let mut expected = 0.0;
+        if let (Some(mesh), true) = (&world.mesh, moved > 1e-5) {
+            let d = mv / moved;
+            let probe = |s: f32| mesh.support_sphere_mask(x + d.x * s, z + d.y * s, RADIUS, c.feet_y + STEP, c.feet_y - STEP, MIN_WALK_NORMAL, blocks::PLAYER);
+            if let (Some(ahead), Some(behind)) = (probe(SLOPE_PROBE), probe(-SLOPE_PROBE)) {
+                expected = ((ahead - behind) / (2.0 * SLOPE_PROBE)).clamp(-1.2, 1.2) * moved;
+            }
+        }
+        c.step_offset -= dy - expected;
+    }
+    c.step_offset = (c.step_offset * (-dt / STEP_SMOOTH).exp()).clamp(-STEP, STEP);
 
     // Eye height eases to the stance's.
     let target_eye = c.stance.eye();
@@ -345,7 +406,146 @@ fn movement(
         c.bob += dt * (6.0 + 5.0 * speed_frac);
     }
     let bob = (c.bob).sin() * 0.022 * speed_frac.min(1.0) * if c.on_ground { 1.0 } else { 0.0 };
-    t.translation = Vec3::new(x, c.feet_y + c.eye + bob, z);
+    t.translation = Vec3::new(x, c.feet_y + c.eye + bob + c.step_offset, z);
+    if let Some(w) = walk.as_mut().filter(|w| w.started && !w.logged_done) {
+        w.log(dt, &c, t.translation, cpu.elapsed());
+    }
+}
+
+/// Developer aid: `UNDEAD_TEST_WALK="<stand|crouch|prone> x y z  x y  x y ..."`
+/// (game units: a start point with its floor height, then waypoints) puts
+/// the player at the start in that stance a second into the game, opens
+/// every door and walks the path, logging feet and eye heights and the
+/// speed every frame (`[walk]` lines in the log).
+#[derive(Resource)]
+pub struct TestWalk {
+    stance: Stance,
+    start: Vec3,
+    path: Vec<Vec2>,
+    next: usize,
+    wait: f32,
+    started: bool,
+    done: bool,
+    logged_done: bool,
+    t: f32,
+    dist: f32,
+    last: Option<(f32, f32, Vec2)>,
+    max_eye_step: f32,
+    max_feet_step: f32,
+}
+
+impl TestWalk {
+    fn from_env() -> Option<TestWalk> {
+        let spec = std::env::var("UNDEAD_TEST_WALK").ok()?;
+        let mut it = spec.split_whitespace();
+        let stance = match it.next()? {
+            "crouch" => Stance::Crouch,
+            "prone" => Stance::Prone,
+            _ => Stance::Stand,
+        };
+        let v: Vec<f32> = it.filter_map(|s| s.parse().ok()).collect();
+        if v.len() < 5 {
+            return None;
+        }
+        let game = |x: f32, y: f32| Vec2::new(x * U, -y * U);
+        let start = Vec3::new(v[0] * U, v[2] * U, -v[1] * U);
+        let path = v[3..].as_chunks::<2>().0.iter().map(|p| game(p[0], p[1])).collect();
+        Some(TestWalk {
+            stance,
+            start,
+            path,
+            next: 0,
+            wait: 0.0,
+            started: false,
+            done: false,
+            logged_done: false,
+            t: 0.0,
+            dist: 0.0,
+            last: None,
+            max_eye_step: 0.0,
+            max_feet_step: 0.0,
+        })
+    }
+
+    fn active(&self) -> bool {
+        self.started && !self.done
+    }
+
+    /// Direction towards the next waypoint (zero when the path is done).
+    fn steer(&mut self, pos: Vec2) -> Vec2 {
+        while let Some(&p) = self.path.get(self.next) {
+            if p.distance(pos) > 0.05 {
+                return (p - pos).normalize_or_zero();
+            }
+            self.next += 1;
+        }
+        self.done = true;
+        Vec2::ZERO
+    }
+
+    fn log(&mut self, dt: f32, c: &PlayerCtl, eye: Vec3, cpu: std::time::Duration) {
+        let pos = Vec2::new(eye.x, eye.z);
+        if let Some((feet, eye_y, last)) = self.last {
+            self.max_eye_step = self.max_eye_step.max((eye.y - eye_y).abs());
+            self.max_feet_step = self.max_feet_step.max((c.feet_y - feet).abs());
+            self.dist += pos.distance(last);
+        }
+        self.last = Some((c.feet_y, eye.y, pos));
+        self.t += dt;
+        info!(
+            "[walk] t={:.3} stance={:?} x={:.1} y={:.1} feet={:.2} eye={:.2} speed={:.3} m/s cpu={}us",
+            self.t,
+            c.stance,
+            eye.x / U,
+            -eye.z / U,
+            c.feet_y / U,
+            eye.y / U,
+            c.vel.length(),
+            cpu.as_micros()
+        );
+        if self.done {
+            self.logged_done = true;
+            info!(
+                "[walk] done: {:.2} s, {:.2} m, average {:.3} m/s; largest change in one frame: feet {:.2} in, eye {:.2} in",
+                self.t,
+                self.dist,
+                self.dist / self.t.max(1e-3),
+                self.max_feet_step / U,
+                self.max_eye_step / U
+            );
+        }
+    }
+}
+
+/// Starts a [`TestWalk`]: opens the doors and places the player.
+fn test_walk_setup(
+    time: Res<Time>,
+    walk: Option<ResMut<TestWalk>>,
+    level: Res<LevelRes>,
+    mut world: ResMut<World>,
+    mut q: Query<(&mut Transform, &mut PlayerCtl), With<Player>>,
+) {
+    let Some(mut w) = walk else { return };
+    if w.started {
+        return;
+    }
+    w.wait += time.delta_secs();
+    if w.wait < 1.0 {
+        return;
+    }
+    let Ok((mut t, mut c)) = q.single_mut() else { return };
+    world.door_open.iter_mut().for_each(|d| *d = true);
+    world.rebuild(&level.0);
+    c.stance = w.stance;
+    c.eye = w.stance.eye();
+    c.feet_y = w.start.y;
+    c.vel = Vec2::ZERO;
+    c.vel_y = 0.0;
+    c.on_ground = true;
+    c.step_offset = 0.0;
+    t.translation = w.start + Vec3::Y * c.eye;
+    w.started = true;
+    info!("[walk] start {:?} at {:?}, {} waypoints", w.stance, w.start / U, w.path.len());
 }
 
 /// Heavy breathing while badly hurt, a relieved breath on recovery.
@@ -417,9 +617,9 @@ fn tweak_settings(keys: Res<ButtonInput<KeyCode>>, mut settings: ResMut<UserSett
     }
 }
 
-/// The brightness setting. On the real maps everything is lit in the
-/// game's own units (exposure fixed at 1) and brightness is a display gamma
-/// in the post pass; the prototype map uses camera exposure.
+/// The brightness setting. On the real maps the exposure is fixed (the
+/// game's lighting is scaled to it) and brightness is a display gamma in
+/// the post pass; the prototype map uses camera exposure.
 fn apply_exposure(
     settings: Res<UserSettings>,
     real_map: Option<Res<crate::nacht::NachtActive>>,
@@ -429,7 +629,7 @@ fn apply_exposure(
     let (ev, gamma) = if real_map.is_some() {
         // Exposure factor 1 / (1.2 * 2^ev) = 1.
         let brightness = 15.0 - settings.exposure_ev;
-        ((1.0f32 / 1.2).log2(), (1.0 + (brightness - 7.5) * 0.08).clamp(0.4, 2.0))
+        (crate::nacht::REAL_MAP_EV, (1.0 + (brightness - 7.5) * 0.08).clamp(0.4, 2.0))
     } else {
         (settings.exposure_ev, 1.0)
     };

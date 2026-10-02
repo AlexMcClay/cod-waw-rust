@@ -649,9 +649,34 @@ pub fn body_location(height: f32, scale: f32) -> KillKind {
     }
 }
 
+impl KillKind {
+    /// The kill bonus class of a bullet's hit location
+    /// (`player_add_points_kill_bonus`).
+    pub fn from_hit(loc: crate::weapons::HitLoc) -> Self {
+        use crate::weapons::HitLoc as H;
+        match loc {
+            H::Head | H::Helmet => KillKind::Head,
+            H::Neck => KillKind::Neck,
+            H::TorsoUpper | H::TorsoLower => KillKind::Torso,
+            _ => KillKind::Body,
+        }
+    }
+}
+
 /// Points for killing a zombie (excluding the per-hit points), Nacht.
 pub fn kill_points(kind: KillKind) -> u32 {
     ZombieRules::nacht().kill_points(kind)
+}
+
+/// Points for a kill, Insta-Kill included: under Insta-Kill a hit that
+/// would not have killed by itself scores 10 + 50 whatever the location.
+pub fn kill_points_with(kind: KillKind, insta_kill: bool, lethal_anyway: bool) -> u32 {
+    let r = ZombieRules::nacht();
+    if insta_kill {
+        r.insta_kill_points(kind, lethal_anyway)
+    } else {
+        r.kill_points(kind)
+    }
 }
 
 /// Apply the double-points multiplier.
@@ -1166,6 +1191,13 @@ mod tests {
         assert_eq!(r.insta_kill_points(KillKind::Melee, true), 130);
         assert_eq!(round_up_to_ten(6), 10);
         assert_eq!(round_up_to_ten(50), 50);
+        use crate::weapons::HitLoc;
+        assert_eq!(kill_points(KillKind::from_hit(HitLoc::Neck)), 70);
+        assert_eq!(kill_points(KillKind::from_hit(HitLoc::TorsoLower)), 60);
+        assert_eq!(kill_points(KillKind::from_hit(HitLoc::Helmet)), 100);
+        assert_eq!(kill_points(KillKind::from_hit(HitLoc::RightLegUpper)), 50);
+        assert_eq!(kill_points_with(KillKind::Neck, true, false), 60);
+        assert_eq!(kill_points_with(KillKind::Neck, true, true), 70);
         assert_eq!(body_location(1.0, 1.0), KillKind::Torso);
         assert_eq!(body_location(0.5, 1.0), KillKind::Body);
     }

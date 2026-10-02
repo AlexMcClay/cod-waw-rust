@@ -17,7 +17,7 @@ use waw_assets::t4::{self, decode, XModelInfo, ZoneData};
 use waw_assets::zombiemap::ZombieMap;
 use waw_assets::{Install, Iwd};
 use zm_core::geom::V3;
-use zm_core::trimesh::{Tri, TriMesh};
+use zm_core::trimesh::{blocks, Tri, TriMesh};
 
 pub const INCH: f32 = 0.0254;
 
@@ -44,6 +44,8 @@ pub enum Blend {
     Opaque,
     Mask,
     Blend,
+    /// Additive (sky glow layers).
+    Add,
 }
 
 #[derive(Debug, Clone)]
@@ -309,6 +311,9 @@ pub struct NachtScene {
     pub models: HashMap<String, SceneModel>,
     pub static_models: Vec<(String, Transform)>,
     pub sky_model: Option<String>,
+    /// Scale that puts the sky model behind everything (the game draws its
+    /// sky at infinity).
+    pub sky_scale: f32,
     pub collision: TriMesh,
     pub map: ZombieMap,
     pub entities: Vec<mapents::Entity>,
@@ -320,6 +325,11 @@ pub struct NachtScene {
     pub weapon_names: HashMap<String, String>,
     /// Our weapon id -> its third-person (world) model, shown by the box.
     pub weapon_world_models: HashMap<String, String>,
+    /// Our weapon id -> the gameplay numbers of the zone's WeaponDef (what
+    /// the game itself uses), as weapon-file key/value pairs.
+    pub weapon_stats: HashMap<String, Vec<(&'static str, String)>>,
+    /// Flesh penetration depths from common.ff's `info/bullet_penetration_sp`.
+    pub flesh_penetration: Option<[f32; 4]>,
     /// The mystery box as the map builds it.
     pub chest: Option<SceneChest>,
     pub characters: Vec<SceneCharacter>,
@@ -348,6 +358,11 @@ struct Builder<'a> {
 /// Blend mode from a technique-set name such as `wc_l_sm_t0c0n0s0`.
 fn classify(techset: &str) -> (Blend, bool, bool) {
     let t = techset.trim_start_matches(',');
+    // Sky-box model layers: drawn unlit and without depth (so the fog pass
+    // leaves the sky alone, as the game's sky shaders have no fog).
+    if t.starts_with("mc_sky") {
+        return (if t.contains("_add") { Blend::Add } else { Blend::Blend }, true, false);
+    }
     if t.contains("sky") || t.contains("tools") || t.contains("shadowcaster") {
         return (Blend::Opaque, true, false); // caller skips these
     }
@@ -368,7 +383,7 @@ fn classify(techset: &str) -> (Blend, bool, bool) {
 
 pub fn skip_material(techset: &str, name: &str) -> bool {
     let t = techset.trim_start_matches(',');
-    t.contains("sky") || t.contains("tools") || t.contains("shadowcaster") || t.contains("water") || name.contains("caulk") || name.contains("clip")
+    (t.contains("sky") && !t.starts_with("mc_sky")) || t.contains("tools") || t.contains("shadowcaster") || t.contains("water") || name.contains("caulk") || name.contains("clip")
 }
 
 fn sampler(repeat: bool, mips: bool) -> ImageSampler {
@@ -676,9 +691,10 @@ fn rgb9e5(c: [f32; 3]) -> u32 {
 /// with the game's x2 model overbright, converted from gamma to linear.
 /// Empty points borrow from their neighbours so models near walls don't go
 /// black.
-fn irradiance_volume(zone: &ZoneData, world: &t4::WorldInfo) -> Option<(Image, Transform)> {
+fn irradiance_volume(zone: &ZoneData, world: &t4::WorldInfo, lights: &[SceneLight], collision: &TriMesh) -> Option<(Image, Transform)> {
     let grid = world.light_grid.as_ref()?;
     let d = &zone.data;
+    let curves = FalloffCurves::read(zone);
     let (mn, mx) = (grid.mins, grid.maxs);
     // Bevy axes: X = game X, Y = game Z (up), Z = -game Y.
     let (rx, ry, rz) = ((mx[0] - mn[0] + 1) as usize, (mx[2] - mn[2] + 1) as usize, (mx[1] - mn[1] + 1) as usize);
@@ -699,18 +715,37 @@ fn irradiance_volume(zone: &ZoneData, world: &t4::WorldInfo) -> Option<(Image, T
                 }
             }
         }
-        acc.map(|v| (2.0 * v).powf(2.2))
+        // The game's x2 model overbright (gamma; linearised after adding the
+        // primary light).
+        acc.map(|v| 2.0 * v)
     };
     for z in 0..rz {
         for y in 0..ry {
             for x in 0..rx {
                 let g = [mn[0] as i64 + x as i64, mx[1] as i64 - z as i64, mn[2] as i64 + y as i64];
-                let Some(cube) = grid.entry_index(d, g).and_then(|i| grid.entry(d, i)).and_then(|e| grid.cube(d, e)) else { continue };
+                let Some(entry) = grid.entry_index(d, g).and_then(|i| grid.entry(d, i)) else { continue };
+                let Some(cube) = grid.cube(d, entry) else { continue };
                 // Game faces: +X, -X, +Y, -Y, +Z, -Z.
                 let (px, nx) = (face(&cube, 0, true), face(&cube, 0, false));
                 let (py, ny) = (face(&cube, 1, true), face(&cube, 1, false));
                 let (pz, nz) = (face(&cube, 2, true), face(&cube, 2, false));
-                faces[(z * ry + y) * rx + x] = Some([px, nx, pz, nz, ny, py]);
+                // Bevy order: +X, -X, +Y, -Y, +Z, -Z (still gamma, x2 applied).
+                let mut f = [px, nx, pz, nz, ny, py];
+                // The point's primary light, as the game adds it per pixel to
+                // models (with its falloff, cone and visibility).
+                let p = to_bevy([(g[0] - 4096) as f32 * 32.0, (g[1] - 4096) as f32 * 32.0, (g[2] - 2048) as f32 * 64.0]);
+                if let Some(light) = lights.get(entry.primary_light as usize) {
+                    let normals = [Vec3::X, Vec3::NEG_X, Vec3::Y, Vec3::NEG_Y, Vec3::Z, Vec3::NEG_Z];
+                    if let Some((l, color)) = primary_at(light, p, &curves, collision) {
+                        for (face, n) in f.iter_mut().zip(normals) {
+                            let k = n.dot(l).max(0.0);
+                            for c in 0..3 {
+                                face[c] += color[c] * k;
+                            }
+                        }
+                    }
+                }
+                faces[(z * ry + y) * rx + x] = Some(f.map(|c| c.map(|v| v.max(0.0).powf(2.2))));
             }
         }
     }
@@ -779,6 +814,83 @@ fn irradiance_volume(zone: &ZoneData, world: &t4::WorldInfo) -> Option<(Image, T
     let transform = Transform::from_translation(base + size * 0.5 - cell * 0.5).with_scale(size);
     info!("Light grid: {rx}x{ry}x{rz} points as an irradiance volume");
     Some((image, transform))
+}
+
+/// The light falloff curves the game keeps in row 0 of the first lightmap's
+/// secondary page (linear and tungsten), read raw.
+struct FalloffCurves {
+    linear: Vec<[f32; 3]>,
+    tungsten: Vec<[f32; 3]>,
+}
+
+impl FalloffCurves {
+    fn read(zone: &ZoneData) -> FalloffCurves {
+        let row = zone
+            .images
+            .iter()
+            .find(|i| i.name.ends_with("lightmap0_secondary"))
+            .and_then(|i| i.inline.clone())
+            .and_then(|i| zone.data.get(i.fpos..i.fpos + 4 * i.dims[0] as usize).map(|b| b.to_vec()))
+            .unwrap_or_default();
+        let curve = |start: usize, width: usize| -> Vec<[f32; 3]> {
+            (0..width)
+                .map(|i| {
+                    let o = 4 * (start + i);
+                    match row.get(o..o + 4) {
+                        // BGRA bytes.
+                        Some(b) => [b[2] as f32 / 255.0, b[1] as f32 / 255.0, b[0] as f32 / 255.0],
+                        None => [1.0 - i as f32 / (width - 1) as f32; 3],
+                    }
+                })
+                .collect()
+        };
+        FalloffCurves { linear: curve(1, 16), tungsten: curve(19, 32) }
+    }
+
+    fn sample(&self, tungsten: bool, t: f32) -> [f32; 3] {
+        let c = if tungsten { &self.tungsten } else { &self.linear };
+        let x = t.clamp(0.0, 1.0) * (c.len() - 1) as f32;
+        let (i, f) = (x.floor() as usize, x.fract());
+        let (a, b) = (c[i.min(c.len() - 1)], c[(i + 1).min(c.len() - 1)]);
+        [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]
+    }
+}
+
+/// A primary light's direction and colour (gamma, before N.L) at a point,
+/// if it reaches it: the falloff curve, the spot cone, and visibility.
+fn primary_at(l: &SceneLight, p: Vec3, curves: &FalloffCurves, collision: &TriMesh) -> Option<(Vec3, [f32; 3])> {
+    let v = |a: Vec3| V3::new(a.x, a.y, a.z);
+    match l.kind {
+        1 => {
+            // The sun: blocked by anything along its direction.
+            let o = p + l.dir * 0.1;
+            collision.raycast(v(o), v(l.dir), 400.0).is_none().then_some((l.dir, l.color.to_array()))
+        }
+        2 | 3 => {
+            let to = l.position - p;
+            let dist = to.length();
+            let t = dist / l.radius;
+            if t >= 1.0 || dist < 1e-3 {
+                return None;
+            }
+            let dir = to / dist;
+            let mut k = 1.0;
+            if l.kind == 2 {
+                let x = 1.0 / (l.cos_inner - l.cos_outer).max(1e-4);
+                let s = (dir.dot(l.dir) * x - l.cos_outer * x).clamp(0.0, 1.0);
+                if s <= 0.0 {
+                    return None;
+                }
+                k = s.powf(l.exponent.max(1e-4));
+            }
+            if !collision.line_clear(v(p), v(l.position - dir * 0.15)) {
+                return None;
+            }
+            let f = curves.sample(l.falloff == 1, t);
+            Some((dir, [l.color.x * f[0] * k, l.color.y * f[1] * k, l.color.z * f[2] * k]))
+        }
+        _ => None,
+    }
 }
 
 /// The primary lights in Bevy space. Index 1 is the sun as the world draws
@@ -937,6 +1049,68 @@ fn model_collision(zones: &[&ZoneData], name: &str) -> Option<Vec<[Vec3; 3]>> {
         }
     }
     (!out.is_empty()).then_some(out)
+}
+
+/// What a clipMap brush or terrain triangle with these contents blocks.
+fn clip_blocks(contents: u32) -> u8 {
+    use waw_assets::t4::clipmap::contents as c;
+    let mut b = 0;
+    if contents & c::PLAYER_SOLID != 0 {
+        b |= blocks::PLAYER;
+    }
+    if contents & c::MONSTER_SOLID != 0 {
+        b |= blocks::AI;
+    }
+    b
+}
+
+/// The map's collision as triangles in Bevy space: the static world's
+/// brushes and terrain, and the brushes of scenery brush models (entities
+/// with a `*N` model, placed by their origin and angles). `skip` lists the
+/// brush models gameplay moves or removes (boards, doors, debris).
+/// Triangles only block the player and/or AI ([`clip_blocks`]), never the
+/// plain solid queries.
+pub fn clip_collision(cm: &t4::clipmap::ClipMapInfo, entities: &[mapents::Entity], skip: &std::collections::HashSet<usize>) -> Vec<Tri> {
+    let mut out = Vec::new();
+    let v3 = |p: Vec3| V3::new(p.x, p.y, p.z);
+    let add = |poly: &[Vec3], b: u8, out: &mut Vec<Tri>| {
+        for k in 1..poly.len().saturating_sub(1) {
+            if let Some(t) = Tri::new(v3(poly[0]), v3(poly[k]), v3(poly[k + 1])) {
+                out.push(t.blocking(b));
+            }
+        }
+    };
+    let by_model = cm.model_brushes();
+    let brushes = |list: &[u16], t: &Transform, out: &mut Vec<Tri>| {
+        for &bi in list {
+            let Some(brush) = cm.brushes.get(bi as usize) else { continue };
+            let b = clip_blocks(brush.contents);
+            if b == 0 {
+                continue;
+            }
+            for f in t4::clipmap::brush_polygons(brush) {
+                let poly: Vec<Vec3> = f.points.iter().map(|&p| t.transform_point(to_bevy(p))).collect();
+                add(&poly, b, out);
+            }
+        }
+    };
+    brushes(&by_model[0], &Transform::IDENTITY, &mut out);
+    for e in entities {
+        let Some(n) = e.submodel() else { continue };
+        if n == 0 || skip.contains(&n) || e.classname().starts_with("trigger") {
+            continue;
+        }
+        let Some(list) = by_model.get(n) else { continue };
+        let t = Transform::from_translation(to_bevy(e.origin())).with_rotation(angles_to_quat(e.angles()));
+        brushes(list, &t, &mut out);
+    }
+    for (tri, m) in cm.world_terrain() {
+        let b = clip_blocks(cm.material_contents(m as i64));
+        if b != 0 {
+            add(&tri.map(to_bevy), b, &mut out);
+        }
+    }
+    out
 }
 
 /// The zone's weapon name for one of our weapon ids.
@@ -1154,6 +1328,15 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     let mut extra: Vec<String> = map.props.iter().map(|p| p.0.clone()).collect();
     extra.extend(map.doors.iter().flat_map(|d| d.props.iter().map(|p| p.0.clone())));
     let sky_model = world.sky_box_model.clone();
+    let sky_scale = sky_model
+        .as_deref()
+        .and_then(|n| b.find_model(n))
+        .map(|(_, info)| {
+            let r = (0..3).map(|k| info.mins[k].abs().max(info.maxs[k].abs())).fold(1.0f32, f32::max) * INCH;
+            // Comfortably beyond the map (the camera's far plane is infinite).
+            (5000.0 / r).max(1.0)
+        })
+        .unwrap_or(1.0);
     extra.extend(sky_model.iter().cloned());
     for n in [
         "char_ger_honorgd_body1_1",
@@ -1189,7 +1372,11 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         }
     }
 
-    // Collision: static world triangles that render opaque.
+    // Collision. The map's own collision (clipMap brushes and terrain, with
+    // player and monster clip) is what the player moves against; the
+    // opaque render triangles stay as the plain solid geometry for bullets,
+    // sight and the zombies. Models collide for everyone.
+    let render_blocks = if nacht.clipmap.is_some() { blocks::SOLID } else { blocks::ALL };
     let mut tris = Vec::new();
     for &si in &collide {
         for t in decode::world_triangles(&nacht, world, &world.surfaces[si]) {
@@ -1199,7 +1386,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
                 .map(|v| V3::new(v.x, v.y, v.z))
                 .collect();
             if let Some(tri) = Tri::new(p[0], p[1], p[2]) {
-                tris.push(tri);
+                tris.push(tri.blocking(render_blocks));
             }
         }
     }
@@ -1248,10 +1435,15 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
                     .map(|v| V3::new(v.x, v.y, v.z))
                     .collect();
                 if let Some(tri) = Tri::new(p[0], p[1], p[2]) {
-                    tris.push(tri);
+                    tris.push(tri.blocking(render_blocks));
                 }
             }
         }
+    }
+    if let Some(cm) = &nacht.clipmap {
+        let clip = clip_collision(cm, &entities, &gameplay);
+        info!("clipMap {}: {} brushes, {} collision triangles", cm.name, cm.brushes.len(), clip.len());
+        tris.extend(clip);
     }
     let collision = TriMesh::new(tris, 2.0);
 
@@ -1288,7 +1480,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
 
     let lightmap_pages = (0..world.surfaces.iter().map(|s| s.lightmap as usize + 1).max().unwrap_or(1)).map(|i| lightmap_pages(&nacht, i)).collect();
     let lights = scene_lights(&nacht, world);
-    let irradiance = irradiance_volume(&nacht, world);
+    let irradiance = irradiance_volume(&nacht, world, &lights, &collision);
     let (fog, film) = map_look(&zones, iwd, world);
     let mut view_models = HashMap::new();
     for &id in &wanted.weapon_ids {
@@ -1370,6 +1562,15 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
             localized(&w.display_name).filter(|n| !n.trim().is_empty()).map(|n| (id.to_string(), n))
         })
         .collect();
+    let weapon_stats = wanted
+        .weapon_ids
+        .iter()
+        .filter_map(|&id| {
+            let w = zones.iter().find_map(|z| z.weapon(zone_weapon_name(id)))?;
+            (!w.stats.is_empty()).then(|| (id.to_string(), w.stats.clone()))
+        })
+        .collect();
+    let flesh_penetration = zones.iter().find_map(|z| z.rawfile("info/bullet_penetration_sp")).and_then(|t| zm_core::weapons::parse_penetration_table(&t));
     // One line per weapon, so a weapon the map's zones lack shows up.
     for &id in &wanted.weapon_ids {
         let rig = view_rig.as_ref();
@@ -1400,6 +1601,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         models,
         static_models,
         sky_model,
+        sky_scale,
         collision,
         map,
         entities,
@@ -1407,6 +1609,8 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         weapon_sounds,
         weapon_names,
         weapon_world_models,
+        weapon_stats,
+        flesh_penetration,
         chest,
         characters,
         zombie_anims,
@@ -1466,9 +1670,47 @@ mod tests {
         assert_eq!(classify("l_sm_r0c0n0s0_sco_b1c1").0, Blend::Opaque);
         assert!(classify("wc_unlit").1);
         assert!(skip_material("wc_sky", "wc/sky_mak1"));
+        // Sky-box model layers draw (unlit, without depth); world sky doesn't.
+        assert!(!skip_material("mc_sky_noncubemap", "mc/mtl_skybox_zombie"));
+        assert_eq!(classify("mc_sky_noncubemap_add").0, Blend::Add);
+        assert_eq!(classify("mc_sky_noncubemap").0, Blend::Blend);
         assert!(skip_material("wc_tools", "wc/caulk_shadow"));
     }
 
+
+    /// Real data: the player's collision from Nacht's clipMap carries the
+    /// player up the stairs to the help room as a continuous ramp.
+    /// `UNDEAD_WAW=<install> cargo test -p zm_game -- --ignored`.
+    #[test]
+    #[ignore]
+    fn nacht_stairs_climb_smoothly() {
+        let root = std::env::var("UNDEAD_WAW").expect("set UNDEAD_WAW");
+        let ff = std::fs::read(std::path::Path::new(&root).join("zone/english/nazi_zombie_prototype.ff")).unwrap();
+        let zd = t4::walk(waw_assets::zone::decompress(&ff).unwrap());
+        let entities = mapents::parse(zd.map_ents.as_deref().unwrap());
+        let tris = clip_collision(zd.clipmap.as_ref().unwrap(), &entities, &Default::default());
+        assert!(tris.len() > 40_000, "{}", tris.len());
+        let mesh = TriMesh::new(tris, 2.0);
+        // Plain queries don't see clip-only collision.
+        assert!(mesh.ground(to_bevy([180.0, 1060.0, 0.0]).x, to_bevy([180.0, 1060.0, 0.0]).z, 1.0, -1.0, 0.7).is_none());
+        let (r, step) = (15.0 * INCH, 18.0 * INCH);
+        let mut feet = to_bevy([0.0, 0.0, 1.0]).y;
+        let mut max_rise = 0.0f32;
+        let mut x = 180.0;
+        while x > -150.0 {
+            let p = to_bevy([x, 1060.0, 0.0]);
+            let g = mesh.support_sphere_mask(p.x, p.z, r, feet + step, feet - step, 0.7, blocks::PLAYER).expect("ground");
+            // (The top tread is one unit above the upper floor.)
+            assert!(g >= feet - 1.1 * INCH, "dropped at x={x}");
+            max_rise = max_rise.max(g - feet);
+            feet = g;
+            x -= 0.5;
+        }
+        // Up 144 units onto the upper floor; a ray would rise 6 units at
+        // once at every riser, the ball at most ~1.5 per half unit moved.
+        assert!((feet / INCH - 144.0).abs() < 1.5, "{}", feet / INCH);
+        assert!(max_rise / INCH < 1.6, "{}", max_rise / INCH);
+    }
 
     #[test]
     fn coordinate_conversion() {

@@ -219,8 +219,8 @@ Hardened/Veteran (for reference): delay 1.2 s, cutoff 0.3/0.5, invulnerability 0
 | regen | 60 hp/s after 3.5 s | full after 2.4 s; at ≤20% wait 5 s then 0.5 s; 0.3–0.5 s invulnerability |
 | tear time | 1.3/1.0/0.8 s per board by gait | tear anim: board at 1.1–1.27 s, 2.3–3.0 s per board |
 | repair | 0.7 s per board, 10 (×2 DP), no cap | 0.4 s then 1 s per board, 10/20, cap min(50 × round, 500) per round |
-| kill points | 50/100/130 | + torso 60, neck 70 (`KillKind::Torso/Neck`, `body_location`) |
-| Insta-Kill points | normal kill points | `insta_kill_points`: 60 (helper; weapons code to call it) |
+| kill points | 50/100/130 | by hit location: limbs 50, torso 60, neck 70, head 100, melee 130 (`KillKind::from_hit`, used by `weapons.rs`) |
+| Insta-Kill points | normal kill points | 60 for a hit that would not have killed by itself (`kill_points_with`, bullets and knife) |
 | Double Points | ×2, re-grab resets timer | ×2, re-grab ×4 (stacks), repairs/nuke unaffected |
 | nuke | 400 points, nuked zombies never drop | 0 points, nuked zombies roll for drops |
 | drops | 2.5% per kill, random kind, max 4 | score trigger (2000 × 1.14^n) or 3%, shuffled cycle, max 4 |
@@ -231,7 +231,5 @@ Hardened/Veteran (for reference): delay 1.2 s, cutoff 0.3/0.5, invulnerability 0
 
 * Crawlers, head-pop bleed-out, fire damage, failsafe kill, playable-area check for drops — rules documented above, need
   code outside `rules.rs` (zombies/weapons/level).
-* `insta_kill_points`, `KillKind::Torso/Neck` and `body_location` exist in `rules.rs`, but `weapons.rs` still awards
-  `Body`/`Head` kills (owned by the weapons work).
 * Difficulty: Regular assumed. A setting could switch `regen_delay`/`very_hurt_ratio`/invulnerability to Hardened/Veteran.
 * AI melee damage (60) and `ai_meleeRange` are engine-side; confirmed only by outcome (two hits down).

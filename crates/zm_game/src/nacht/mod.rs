@@ -51,6 +51,7 @@ pub struct NachtAssets {
     pub models: HashMap<String, ModelParts>,
     pub static_models: Vec<(String, Transform)>,
     pub sky_model: Option<String>,
+    pub sky_scale: f32,
     pub collision: Arc<TriMesh>,
     pub nav: Arc<NavGraph>,
     pub level: Level,
@@ -60,8 +61,6 @@ pub struct NachtAssets {
     pub chest: Option<build::SceneChest>,
     /// The light grid as an irradiance volume for models.
     pub irradiance: Option<(Handle<Image>, Transform)>,
-    /// The map's primary lights (models get them as real lights).
-    pub lights: Vec<build::SceneLight>,
     /// Fog and film grade from the map's own data.
     pub fog: Option<waw_assets::look::Fog>,
     pub film: Option<waw_assets::look::Film>,
@@ -278,6 +277,7 @@ fn poll_load(
     mut mats: ResMut<Mats>,
     mut zone_sounds: ResMut<crate::audio::ZoneSounds>,
     mut world_mats: ResMut<Assets<world_material::WawWorldMaterial>>,
+    mut defs: ResMut<crate::Defs>,
 ) {
     if let Some(e) = &error.0 {
         if let Ok(mut t) = status.single_mut() {
@@ -316,8 +316,9 @@ fn poll_load(
 
     commands.insert_resource(crate::MapRules(scene.rules.clone()));
     let NachtScene {
-        images: imgs, lightmap_pages, irradiance, fog, film, lights, materials: mdefs, world, submodels, models, static_models, sky_model, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, ..
+        images: imgs, lightmap_pages, irradiance, fog, film, lights, materials: mdefs, world, submodels, models, static_models, sky_model, sky_scale, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, weapon_stats, flesh_penetration, ..
     } = scene;
+    crate::audio::apply_zone_weapon_stats(&mut defs.0, &weapon_stats, flesh_penetration);
     let image_handles: HashMap<String, Handle<Image>> = imgs.into_iter().map(|(k, v)| (k, images.add(v))).collect();
     let mat_handles: Vec<Handle<StandardMaterial>> = mdefs
         .iter()
@@ -332,6 +333,7 @@ fn poll_load(
                     Blend::Opaque => AlphaMode::Opaque,
                     Blend::Mask => AlphaMode::Mask(0.5),
                     Blend::Blend => AlphaMode::Blend,
+                    Blend::Add => AlphaMode::Add,
                 },
                 unlit: m.unlit,
                 double_sided: m.two_sided,
@@ -412,7 +414,7 @@ fn poll_load(
                             lightmap_primary: pri.clone(),
                             alpha: match m.blend {
                                 Blend::Opaque | Blend::Mask => AlphaMode::Opaque,
-                                Blend::Blend => AlphaMode::Blend,
+                                Blend::Blend | Blend::Add => AlphaMode::Blend,
                             },
                             two_sided: m.two_sided,
                         })
@@ -471,6 +473,7 @@ fn poll_load(
         models,
         static_models,
         sky_model,
+        sky_scale,
         collision: Arc::new(collision),
         nav: Arc::new(nav),
         level,
@@ -478,7 +481,6 @@ fn poll_load(
         gameplay_submodels,
         chest,
         irradiance: irradiance.map(|(img, t)| (images.add(img), t)),
-        lights: lights.clone(),
         fog,
         film,
         weapon_world_models,
@@ -549,83 +551,32 @@ pub fn spawn_scene(
             spawn_model(&mut commands, parts, t, SessionEntity);
         }
     }
-    // Models: the light grid's baked light, plus the map's primary lights as
-    // real lights (the world already has both in its own shader).
+    // Models: the light grid's baked light with each point's primary light
+    // added (as the game lights models). The world has both in its own
+    // shader. Scaled to the real maps' fixed camera exposure.
     if let Some((voxels, t)) = &assets.irradiance {
         commands.spawn((
             bevy::pbr::LightProbe,
-            bevy::pbr::irradiance_volume::IrradianceVolume { voxels: voxels.clone(), intensity: 1.0, affects_lightmapped_meshes: false },
+            bevy::pbr::irradiance_volume::IrradianceVolume {
+                voxels: voxels.clone(),
+                intensity: 1.2 * 2f32.powf(REAL_MAP_EV),
+                affects_lightmapped_meshes: false,
+            },
             *t,
             SessionEntity,
         ));
     }
-    spawn_primary_lights(&mut commands, &assets.lights);
     if let Some(parts) = assets.sky_model.as_ref().and_then(|n| assets.models.get(n)) {
-        let e = spawn_model(&mut commands, parts, Transform::default(), (SessionEntity, SkyBox, NotShadowCaster));
+        let e = spawn_model(&mut commands, parts, Transform::from_scale(Vec3::splat(assets.sky_scale)), (SessionEntity, SkyBox, NotShadowCaster));
         commands.entity(e).insert(NotShadowCaster);
     }
     spawn_ambience(&mut commands, &assets);
 }
 
-/// Brightness scale of a primary light's term on models: the game adds
-/// `colour * falloff * N.L` in gamma space; Bevy lights are linear with
-/// inverse-square falloff, so these are matched a third of the way out.
-const MODEL_LIGHT_SCALE: f32 = 23.2;
-
-/// The map's primary lights as Bevy lights, for models only (exposure is 1
-/// on real maps, so a light's radiance equals its linear colour). The sun
-/// casts shadows so indoor models stay dark.
-fn spawn_primary_lights(commands: &mut Commands, lights: &[build::SceneLight]) {
-    for l in lights {
-        let c = l.color.max(Vec3::ZERO);
-        let color = Color::srgb(c.x.min(1.0), c.y.min(1.0), c.z.min(1.0));
-        match l.kind {
-            1 => {
-                commands.spawn((
-                    DirectionalLight {
-                        color,
-                        // E / (pi * 1.2) = 1 at exposure 1.
-                        illuminance: std::f32::consts::PI * 1.2,
-                        shadows_enabled: true,
-                        affects_lightmapped_mesh_diffuse: false,
-                        ..default()
-                    },
-                    Transform::from_translation(Vec3::ZERO).looking_to(-l.dir, Vec3::Y),
-                    SessionEntity,
-                ));
-            }
-            2 | 3 => {
-                let third = l.radius / 3.0;
-                let intensity = MODEL_LIGHT_SCALE * third * third;
-                if l.kind == 2 {
-                    let outer = l.cos_outer.clamp(-1.0, 1.0).acos();
-                    let inner = l.cos_inner.clamp(-1.0, 1.0).acos().min(outer);
-                    commands.spawn((
-                        SpotLight {
-                            color,
-                            intensity,
-                            range: l.radius,
-                            outer_angle: outer,
-                            inner_angle: inner,
-                            shadows_enabled: false,
-                            affects_lightmapped_mesh_diffuse: false,
-                            ..default()
-                        },
-                        Transform::from_translation(l.position).looking_to(-l.dir, if l.dir.y.abs() > 0.99 { Vec3::X } else { Vec3::Y }),
-                        SessionEntity,
-                    ));
-                } else {
-                    commands.spawn((
-                        PointLight { color, intensity, range: l.radius, shadows_enabled: false, affects_lightmapped_mesh_diffuse: false, ..default() },
-                        Transform::from_translation(l.position),
-                        SessionEntity,
-                    ));
-                }
-            }
-            _ => {}
-        }
-    }
-}
+/// Camera exposure on the real maps. The game's own lighting (world shader,
+/// light grid) is scaled to it, so effects authored for Bevy's units
+/// (muzzle flashes, explosions, glows) keep their brightness.
+pub const REAL_MAP_EV: f32 = 7.5;
 
 /// Spawns the parts of the map that change during a game: window boards,
 /// door blockers and the mystery box.
