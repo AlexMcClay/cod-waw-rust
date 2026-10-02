@@ -1149,6 +1149,19 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
             localized(&w.display_name).filter(|n| !n.trim().is_empty()).map(|n| (id.to_string(), n))
         })
         .collect();
+    // One line per weapon, so a weapon the map's zones lack shows up.
+    for &id in &wanted.weapon_ids {
+        let rig = view_rig.as_ref();
+        info!(
+            "weapon {id} ({}): rig gun {}, anims {}, view model {}, sounds {}, world model {}",
+            zone_weapon_name(id),
+            rig.is_some_and(|r| r.guns.contains_key(id)),
+            rig.and_then(|r| r.anims.get(id)).map_or(0, Vec::len),
+            view_models.contains_key(id),
+            weapon_sounds.get(id).map_or(0, |s| s.fields.len() + s.notetracks.len()),
+            weapon_world_models.get(id).map_or("-", String::as_str),
+        );
+    }
     let images = std::mem::take(&mut b.images);
     let materials = std::mem::take(&mut b.materials);
     drop(b);

@@ -104,6 +104,8 @@ pub struct Level {
     /// Zombie spawn points with the area that must be open to use them.
     /// Empty for the bunker, which spawns outside each window instead.
     pub spawners: Vec<(V3, usize)>,
+    /// The map's own box list (game weapon names); `None` offers every weapon.
+    pub crate_weapons: Option<&'static [&'static str]>,
 }
 
 #[derive(Clone, Copy)]
@@ -200,6 +202,7 @@ impl Level {
             player_start_y: 0.0,
             player_yaw: 0.0,
             spawners: Vec::new(),
+            crate_weapons: None,
             lights: vec![
                 V3::new(-5.0, 3.6, 0.0),
                 V3::new(5.0, 3.6, 0.0),

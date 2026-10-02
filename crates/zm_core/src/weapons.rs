@@ -274,13 +274,57 @@ pub fn find(defs: &[WeaponDef], id: &str) -> Option<usize> {
     defs.iter().position(|d| d.id == id)
 }
 
-/// Weapons the mystery crate can roll, with relative weights.
-pub fn crate_pool(defs: &[WeaponDef]) -> Vec<(usize, u32)> {
-    defs.iter()
-        .enumerate()
-        .filter(|(i, _)| *i != START_PISTOL)
-        .map(|(i, d)| (i, if d.kind == Kind::Wonder { 2 } else { 10 }))
-        .collect()
+/// What Nacht der Untoten's box offers, by the game's weapon names: the
+/// `include_weapons()` list of `nazi_zombie_prototype.gsc` that
+/// `_zombiemode_weapons.gsc` registers (`m7_launcher` is included but never
+/// added, so it is not here). The script picks uniformly among them. The
+/// PPSh is not on Nacht (nor in its zone); it arrived with later maps.
+pub const NACHT_CRATE: &[&str] = &[
+    "sw_357",
+    "m1carbine",
+    "m1garand",
+    "gewehr43",
+    "stg44",
+    "thompson",
+    "mp40",
+    "kar98k",
+    "springfield",
+    "ptrs41_zombie",
+    "kar98k_scoped_zombie",
+    "molotov",
+    "stielhandgranate",
+    "m1garand_gl",
+    "m2_flamethrower_zombie",
+    "doublebarrel",
+    "doublebarrel_sawed_grip",
+    "shotgun",
+    "fg42_bipod",
+    "mg42_bipod",
+    "30cal_bipod",
+    "bar",
+    "panzerschrek",
+    "ray_gun",
+];
+
+/// Weapons the mystery crate can roll, with relative weights. With a map's
+/// list (`only`), its weapons we have, each equally likely as in the map's
+/// script; without one, every weapon but the starting pistol, the wonder
+/// weapon rarer.
+pub fn crate_pool(defs: &[WeaponDef], only: Option<&[&str]>) -> Vec<(usize, u32)> {
+    match only {
+        Some(names) => {
+            let mut pool: Vec<(usize, u32)> = names.iter().filter_map(|n| find(defs, n)).filter(|i| *i != START_PISTOL).map(|i| (i, 1)).collect();
+            pool.sort_unstable();
+            pool.dedup();
+            pool
+        }
+        None => defs
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| *i != START_PISTOL)
+            .map(|(i, d)| (i, if d.kind == Kind::Wonder { 2 } else { 10 }))
+            .collect(),
+    }
 }
 
 #[cfg(test)]
@@ -326,8 +370,21 @@ mod tests {
     #[test]
     fn crate_pool_excludes_start_pistol() {
         let defs = default_weapons();
-        let pool = crate_pool(&defs);
+        let pool = crate_pool(&defs, None);
         assert!(pool.iter().all(|(i, _)| *i != START_PISTOL));
         assert!(find(&defs, "raypistol").is_some());
+    }
+
+    #[test]
+    fn nacht_crate_matches_its_script() {
+        let defs = default_weapons();
+        let pool = crate_pool(&defs, Some(NACHT_CRATE));
+        let ids: Vec<&str> = pool.iter().map(|(i, _)| defs[*i].id).collect();
+        // Not on Nacht: the PPSh (later maps) and the starting pistol.
+        assert!(!ids.contains(&"ppsh") && !ids.contains(&"m1911"));
+        for id in ["raypistol", "trenchgun", "mp40", "thompson", "doublebarrel_sawed_grip", "kar98k_scoped_zombie"] {
+            assert!(ids.contains(&id), "{id}");
+        }
+        assert!(pool.iter().all(|(_, w)| *w == 1));
     }
 }

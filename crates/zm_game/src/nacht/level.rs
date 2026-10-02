@@ -123,6 +123,7 @@ pub fn build_level(scene: &NachtScene) -> Level {
         player_yaw: yaw - std::f32::consts::FRAC_PI_2,
         lights: m.lights.iter().map(|l| v3(to_bevy(*l))).collect(),
         spawners: spawners.iter().map(|(p, a)| (v3(*p), *a)).collect(),
+        crate_weapons: Some(zm_core::weapons::NACHT_CRATE),
     }
 }
 
