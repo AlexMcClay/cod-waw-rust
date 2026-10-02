@@ -393,6 +393,14 @@ impl Gather<'_> {
         if let Some(&i) = self.mat_index.get(&name) {
             return (i != usize::MAX).then_some(i);
         }
+        let techset = m.techset.as_deref().unwrap_or("");
+        if techset.contains("distortion") {
+            // Heat haze: its colour is distortion strength (e.g. the blue
+            // ring of the shotgun flash), not something to draw. We have no
+            // refraction pass, so these elements are left out.
+            self.mat_index.insert(name, usize::MAX);
+            return None;
+        }
         let image_name = m.color_map().map(|t| zones[mz].image_name(t).to_string());
         let image = image_name.and_then(|n| self.image(&n));
         if image.is_none() {
@@ -402,7 +410,6 @@ impl Gather<'_> {
             self.mat_index.insert(name, usize::MAX);
             return None;
         }
-        let techset = m.techset.as_deref().unwrap_or("");
         let blend = Blend::from_techset(techset);
         let soft = techset.contains("zfeather");
         let i = self.out.materials.len();
