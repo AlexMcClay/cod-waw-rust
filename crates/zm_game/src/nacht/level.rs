@@ -145,14 +145,15 @@ const MAX_LINK: f32 = 7.0;
 /// instead); edges through a door or debris are gated by it.
 pub fn build_nav(scene: &NachtScene, level: &Level, mesh: &TriMesh) -> NavGraph {
     let t0 = std::time::Instant::now();
-    // Nodes sit a little above the floor in the map; put them on it.
+    // Nodes sit above the floor in the map (outdoors up to a metre or
+    // more); put them on it.
     let nodes: Vec<V3> = scene
         .map
         .path_nodes
         .iter()
         .map(|p| {
             let n = v3(to_bevy(*p));
-            let g = mesh.ground(n.x, n.z, n.y + 0.6, n.y - 1.0, 0.6);
+            let g = navgraph::ground(mesh, n.x, n.z, n.y + 0.6, n.y - 2.5);
             V3::new(n.x, g.unwrap_or(n.y), n.z)
         })
         .collect();
@@ -181,7 +182,7 @@ pub fn build_nav(scene: &NachtScene, level: &Level, mesh: &TriMesh) -> NavGraph 
             .take(8)
             .find(|(d, j)| {
                 let o = graph.nodes[*j];
-                *d < 3.0 && (o.y - me.y).abs() <= navgraph::STEP && !through_window(me, o) && mesh.line_clear(me.add(up), o.add(up))
+                *d < 3.0 && (o.y - me.y).abs() <= navgraph::STEP && !through_window(me, o) && navgraph::clear(mesh, me.add(up), o.add(up))
             });
         if let Some((_, j)) = near {
             extra.push((i, j));

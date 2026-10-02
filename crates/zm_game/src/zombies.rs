@@ -319,11 +319,15 @@ pub fn spawn_zombie(
         let open: Vec<&(zm_core::geom::V3, usize)> = level.spawners.iter().filter(|s| world.area_open(level, s.1)).collect();
         let sp = open.get(fastrand::usize(..open.len().max(1)))?.0;
         let p = Vec3::new(sp.x, sp.y, sp.z);
-        let wi = *windows.iter().min_by(|a, b| {
-            let da = outside_of(level, **a).distance(p);
-            let db = outside_of(level, **b).distance(p);
-            da.total_cmp(&db)
-        })?;
+        let routed = NavCtx::of(world).and_then(|ctx| pick_window(&ctx, &world.window_fields, &windows, p));
+        let wi = match routed {
+            Some(wi) => wi,
+            None => *windows.iter().min_by(|a, b| {
+                let da = outside_of(level, **a).distance(p);
+                let db = outside_of(level, **b).distance(p);
+                da.total_cmp(&db)
+            })?,
+        };
         let jitter = Vec3::new(fastrand::f32() - 0.5, 0.0, fastrand::f32() - 0.5) * 2.0;
         let q = p + jitter;
         (wi, Vec3::new(q.x, ground_y(world, q.x, q.z, p.y + 1.0), q.z))
@@ -429,7 +433,7 @@ pub fn path_debug() -> bool {
 /// (so a jump doesn't lift the goal off the floor).
 fn player_goal(world: &World, feet: Vec3) -> Vec3 {
     match &world.mesh {
-        Some(m) => Vec3::new(feet.x, m.ground(feet.x, feet.z, feet.y + 0.3, feet.y - 3.0, 0.6).unwrap_or(feet.y), feet.z),
+        Some(m) => Vec3::new(feet.x, navgraph::ground(m, feet.x, feet.z, feet.y + 0.3, feet.y - 3.0).unwrap_or(feet.y), feet.z),
         None => feet,
     }
 }
@@ -466,7 +470,7 @@ pub fn outside_of(level: &zm_core::level::Level, wi: usize) -> Vec3 {
 /// Ground height under a point (0 on the flat bunker).
 pub fn ground_y(world: &World, x: f32, z: f32, from: f32) -> f32 {
     match &world.mesh {
-        Some(m) => m.ground(x, z, from + 0.6, from - 4.0, 0.6).unwrap_or(from - 0.6),
+        Some(m) => navgraph::ground(m, x, z, from + 0.6, from - 4.0).unwrap_or(from - 0.6),
         None => 0.0,
     }
 }
@@ -600,6 +604,23 @@ pub fn window_field(world: &World, level: &zm_core::level::Level, wi: usize) -> 
     let o = outside_of(level, wi);
     let goal = Vec3::new(o.x, ground_y(world, o.x, o.z, o.y + 1.0), o.z);
     player_field(&ctx, goal, &mut Vec::new())
+}
+
+/// The window a zombie spawned at `p` heads for: like the original (the
+/// closest entrances, a random one within 500 units of the best), but by
+/// route length over the graph, so an entrance it can't walk to (an
+/// upstairs window above a walled-in trench) is never chosen.
+pub fn pick_window(ctx: &NavCtx, fields: &[Vec<f32>], windows: &[usize], p: Vec3) -> Option<usize> {
+    let here = v3c(p);
+    let near: Vec<(f32, usize)> = ctx.graph.by_distance(here).into_iter().take(6).collect();
+    let cost = |wi: usize| {
+        let f = fields.get(wi)?;
+        near.iter().filter_map(|&(d, n)| f.get(n).filter(|c| c.is_finite()).map(|c| d + c)).min_by(f32::total_cmp)
+    };
+    let costs: Vec<(f32, usize)> = windows.iter().filter_map(|&wi| cost(wi).map(|c| (c, wi))).collect();
+    let best = costs.iter().map(|c| c.0).min_by(f32::total_cmp)?;
+    let close: Vec<usize> = costs.iter().filter(|c| c.0 <= best + 500.0 * 0.0254).map(|c| c.1).collect();
+    close.get(fastrand::usize(..close.len())).copied()
 }
 
 /// Picks how to head for `goal`: straight at it when a zombie can walk
@@ -748,7 +769,7 @@ pub fn walk_to(ctx: &NavCtx, m: &mut Mover, pos: &mut Vec3, target: Vec3, speed:
 /// and kerbs are walked onto, not pushed off) and the gameplay solids.
 pub fn collide(ctx: &NavCtx, m: &Mover, pos: &mut Vec3) {
     for h in navgraph::BODY_HEIGHTS {
-        let (q, _) = ctx.mesh.push_sphere(V3::new(pos.x, m.ground + h, pos.z), navgraph::BODY, 2, |t| t.n.y.abs() < 0.7);
+        let (q, _) = navgraph::push_body(ctx.mesh, V3::new(pos.x, m.ground + h, pos.z), navgraph::BODY, 2);
         pos.x = q.x;
         pos.z = q.z;
     }
@@ -766,7 +787,7 @@ pub fn settle(ctx: &NavCtx, m: &mut Mover, pos: &mut Vec3, dir: Vec3, target_y: 
     let step = navgraph::STEP;
     // Steps up only toward the height of where it is heading.
     let climb = navgraph::climb_limit(m.ground, target_y) + 0.05;
-    match ctx.mesh.ground(pos.x, pos.z, m.ground + climb, m.ground - 6.0, 0.6) {
+    match navgraph::ground(ctx.mesh, pos.x, pos.z, m.ground + climb, m.ground - 6.0) {
         Some(g) if g < m.ground - step => {
             m.fall += 9.8 * dt;
             m.ground = (m.ground - m.fall * dt).max(g);
@@ -781,7 +802,7 @@ pub fn settle(ctx: &NavCtx, m: &mut Mover, pos: &mut Vec3, dir: Vec3, target_y: 
     let mut n = 1.0;
     if m.fall == 0.0 && dir != Vec3::ZERO {
         for s in [-0.3f32, 0.3] {
-            if let Some(g) = ctx.mesh.ground(pos.x + dir.x * s, pos.z + dir.z * s, m.ground + step + 0.1, m.ground - step - 0.1, 0.6) {
+            if let Some(g) = navgraph::ground(ctx.mesh, pos.x + dir.x * s, pos.z + dir.z * s, m.ground + step + 0.1, m.ground - step - 0.1) {
                 sum += g;
                 n += 1.0;
             }
@@ -1147,8 +1168,10 @@ fn debug_paths(
         let walking = matches!(z.state, ZState::Chase | ZState::Approach) && tr.last_state == Some(z.state);
         let dy = t.translation.y - tr.last_y;
         if walking {
-            if dy.abs() > 0.06 {
-                info!("[zpath] JUMP {e} {:?} dy {dy:.3} at {:?} ground {:.2}", z.state, t.translation, z.mover.ground);
+            // Faster than the eased climb allows (a snap), unless falling.
+            let cap = (1.2 * z.speed + 1.0) * dt.min(0.05) + 0.01;
+            if dy.abs() > cap && z.mover.fall == 0.0 {
+                info!("[zpath] JUMP {e} {:?} dy {dy:.3} in {dt:.3}s at {:?} ground {:.2}", z.state, t.translation, z.mover.ground);
             }
             tr.max_dy = tr.max_dy.max(dy.abs());
             tr.max_vy = tr.max_vy.max(dy.abs() / dt);
@@ -1350,26 +1373,32 @@ mod sim {
         let open = vec![false; map.level.doors.len()];
         let ctx = NavCtx { mesh: &map.scene.collision, graph: &map.nav, open: &open, solids: &solids };
         let (mut ok, mut total) = (0, 0);
-        for (sp, area) in &map.level.spawners {
+        let mut fields = Vec::new();
+        for wi in 0..map.level.windows.len() {
+            let o = outside_of(&map.level, wi);
+            let goal = Vec3::new(o.x, navgraph::ground(&map.scene.collision, o.x, o.z, o.y + 1.0, o.y - 4.0).unwrap_or(o.y - 0.6), o.z);
+            fields.push(player_field(&ctx, goal, &mut Vec::new()));
+        }
+        for (sp, _) in &map.level.spawners {
             let start = Vec3::new(sp.x, sp.y, sp.z);
-            let start = Vec3::new(start.x, map.scene.collision.ground(start.x, start.z, start.y + 1.0, start.y - 3.0, 0.6).unwrap_or(start.y), start.z);
-            // The window a zombie from here heads for (closest outside spot).
-            let Some(wi) = (0..map.level.windows.len())
-                .filter(|w| map.level.windows[*w].area == *area)
-                .min_by(|a, b| outside_of(&map.level, *a).distance(start).total_cmp(&outside_of(&map.level, *b).distance(start)))
-            else {
+            let start = Vec3::new(start.x, navgraph::ground(&map.scene.collision, start.x, start.z, start.y + 1.0, start.y - 3.0).unwrap_or(start.y), start.z);
+            // The window a zombie from here heads for.
+            let windows: Vec<usize> = (0..map.level.windows.len()).collect();
+            let Some(wi) = pick_window(&ctx, &fields, &windows, start) else {
+                println!("spawner {start:?}: no window with a route");
+                total += 1;
                 continue;
             };
             let o = outside_of(&map.level, wi);
-            let goal = Vec3::new(o.x, map.scene.collision.ground(o.x, o.z, o.y + 1.0, o.y - 4.0, 0.6).unwrap_or(o.y - 0.6), o.z);
-            let field = player_field(&ctx, goal, &mut Vec::new());
+            let goal = Vec3::new(o.x, navgraph::ground(&map.scene.collision, o.x, o.z, o.y + 1.0, o.y - 4.0).unwrap_or(o.y - 0.6), o.z);
+            let field = &fields[wi];
             let mut m = Mover::at(start);
             let mut pos = start;
             let mut t = 0.0;
             let dt = 1.0 / 60.0;
             while t < 60.0 && flat(goal - pos) >= 0.3 {
                 let feet = m.feet(pos);
-                let target = steer(&ctx, &mut m, feet, goal, &field, dt);
+                let target = steer(&ctx, &mut m, feet, goal, field, dt);
                 walk_to(&ctx, &mut m, &mut pos, target, 1.1, dt);
                 check_stuck(&ctx, &mut m, &mut pos, true, dt);
                 t += dt;
@@ -1396,6 +1425,12 @@ mod sim {
         let a = Vec3::new(v[0], v[1], v[2]);
         let b = ctx.node(v[3] as usize);
         println!("walk_ok {} walkable {} profile {:?}", ctx.walk_ok(a, b), navgraph::walkable(ctx.mesh, v3c(a), v3c(b)), navgraph::ground_profile(ctx.mesh, v3c(a), v3c(b)));
+        for k in 0..=20 {
+            let p = a.lerp(b, k as f32 / 20.0);
+            let all = map.scene.collision.ground_mask(p.x, p.z, p.y + 2.0, p.y - 3.0, 0.0, zm_core::trimesh::blocks::ALL);
+            let ai = navgraph::ground(&map.scene.collision, p.x, p.z, p.y + 2.0, p.y - 3.0);
+            println!("  ground at ({:.2} {:.2}): any {all:?} ai-walkable {ai:?}", p.x, p.z);
+        }
         let mut m = Mover::at(a);
         let mut pos = a;
         for i in 0..40 {
@@ -1408,7 +1443,7 @@ mod sim {
         for h in navgraph::BODY_HEIGHTS {
             let c = V3::new(pos.x, m.ground + h, pos.z);
             for (ti, t) in ctx.mesh.tris.iter().enumerate() {
-                if t.n.y.abs() < 0.7 && t.closest_point(c).sub(c).len() < navgraph::BODY + 0.01 {
+                if t.blocks & navgraph::AI_MASK != 0 && t.n.y.abs() < 0.7 && t.closest_point(c).sub(c).len() < navgraph::BODY + 0.01 {
                     println!("  touching tri {ti} at h {h:.2}: {:?} {:?} {:?} n {:?}", t.a, t.b, t.c, t.n);
                 }
             }
@@ -1458,7 +1493,7 @@ mod sim {
         let (mut total, mut ok, mut worst_dy, mut rescues) = (0, 0, 0.0f32, 0);
         for (k, &s) in spots.iter().enumerate() {
             let player = ctx.node(s) + Vec3::new(0.4, 0.0, 0.3);
-            let player = Vec3::new(player.x, map.scene.collision.ground(player.x, player.z, player.y + 0.5, player.y - 1.0, 0.6).unwrap_or(player.y), player.z);
+            let player = Vec3::new(player.x, navgraph::ground(&map.scene.collision, player.x, player.z, player.y + 0.5, player.y - 1.0).unwrap_or(player.y), player.z);
             let mut times = Vec::new();
             let only: Option<usize> = std::env::var("SIM_ONLY").ok().and_then(|v| v.parse().ok());
             for &n in nodes.iter().step_by(3).filter(|n| only.is_none_or(|o| o == **n)) {

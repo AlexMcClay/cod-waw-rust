@@ -15,7 +15,7 @@
 //! two floors unless a walkable slope (stairs, ramp) connects them.
 
 use crate::geom::V3;
-use crate::trimesh::TriMesh;
+use crate::trimesh::{blocks, TriMesh};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
@@ -59,6 +59,28 @@ impl PartialOrd for Item {
     }
 }
 
+/// What zombies collide with: the map's AI collision (monster clip and
+/// solid brushes, terrain, solid props), like the engine's AI, not the
+/// render geometry or player-only clip.
+pub const AI_MASK: u8 = blocks::AI;
+
+/// Height of the highest walkable surface for AI below `(x, top, z)`.
+pub fn ground(mesh: &TriMesh, x: f32, z: f32, top: f32, bottom: f32) -> Option<f32> {
+    mesh.ground_mask(x, z, top, bottom, 0.6, AI_MASK)
+}
+
+/// True if no AI collision blocks the segment `a`-`b`.
+pub fn clear(mesh: &TriMesh, a: V3, b: V3) -> bool {
+    let v = b.sub(a);
+    let len = v.len();
+    len < 1e-6 || mesh.raycast_mask(a, v.scale(1.0 / len), len, AI_MASK, |_| true).is_none()
+}
+
+/// Pushes a body sphere out of AI walls (surfaces steeper than walkable).
+pub fn push_body(mesh: &TriMesh, c: V3, r: f32, iterations: usize) -> (V3, bool) {
+    mesh.push_sphere_mask(c, r, iterations, AI_MASK, |t| t.n.y.abs() < 0.7)
+}
+
 /// Distance with vertical offsets weighted up, so a node on another floor
 /// right above or below counts as far away.
 pub fn floor_dist(a: V3, b: V3) -> f32 {
@@ -68,7 +90,7 @@ pub fn floor_dist(a: V3, b: V3) -> f32 {
 
 /// Ground height under `(p.x, p.z)` within a step of `p.y` (up) or `down`.
 pub fn ground_near(mesh: &TriMesh, p: V3, down: f32) -> Option<f32> {
-    mesh.ground(p.x, p.z, p.y + STEP + 0.1, p.y - down, 0.6)
+    ground(mesh, p.x, p.z, p.y + STEP + 0.1, p.y - down)
 }
 
 /// Ground heights sampled along a straight walk from `a` to `b` (both feet
@@ -85,7 +107,7 @@ pub fn ground_profile(mesh: &TriMesh, a: V3, b: V3) -> Option<Vec<f32>> {
     for i in 1..=n {
         let t = i as f32 / n as f32;
         let (x, z) = (a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t);
-        let g = mesh.ground(x, z, prev + climb_limit(prev, gb) + 0.02, prev - STEP - 0.02, 0.6)?;
+        let g = ground(mesh, x, z, prev + climb_limit(prev, gb) + 0.02, prev - STEP - 0.02)?;
         out.push(g);
         prev = g;
     }
@@ -127,7 +149,7 @@ pub fn walkable(mesh: &TriMesh, a: V3, b: V3) -> bool {
         let lift = (i..=j).map(|k| profile[k] - (p.y + (q.y - p.y) * (k - i) as f32 / (j - i) as f32)).fold(0.0f32, f32::max);
         let clear = [(KNEE, zero), (KNEE, side), (KNEE, side.scale(-1.0)), (CHEST, zero)].iter().all(|&(h, off)| {
             let up = V3::new(off.x, h + lift, off.z);
-            mesh.line_clear(p.add(up), q.add(up))
+            clear(mesh, p.add(up), q.add(up))
         });
         if !clear {
             return false;
@@ -146,7 +168,7 @@ pub fn walkable(mesh: &TriMesh, a: V3, b: V3) -> bool {
         let (i0, i1) = (fi.floor() as usize, (fi.ceil() as usize).min(n));
         let g = profile[i0] + (profile[i1] - profile[i0]) * (fi - i0 as f32);
         let (x, z) = (a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t);
-        BODY_HEIGHTS.iter().all(|h| !mesh.push_sphere(V3::new(x, g + h, z), r, 1, |tri| tri.n.y.abs() < 0.7).1)
+        BODY_HEIGHTS.iter().all(|h| !push_body(mesh, V3::new(x, g + h, z), r, 1).1)
     })
 }
 
