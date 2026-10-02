@@ -1,0 +1,2413 @@
+T4 (WaW PC) zone load-order spec. Mechanically rendered from t4_loaders_gen.py (itself translated from
+OpenAssetTools ZoneCodeGenerator output). Notation:
+  read STRUCT(N)            : read N bytes into the block on top of the block stack (struct header)
+  X.f = alloc(A)            : round current block offset up to A (NO file bytes skipped)
+  data(X.f, ESZ, COUNT)     : read ESZ*COUNT bytes (0 bytes from file if current block is RUNTIME)
+  xstring(X.f)              : if ptr==-1: alloc(1) + read NUL-terminated string; else back-ref
+  asset(TYPE, X.f)          : generic asset pointer load (push TEMP; -1/-2 => inline (+4-byte VIRTUAL slot for -2); else alias)
+  ptr_native / ptr_lookup   : back-reference to data / struct already loaded;  alias_lookup: ref to a pointer slot
+  array(T, ESZ, n)          : read n*ESZ bytes then run Load_T(False) for each element
+
+====================================================================================================
+ASSET clipMap_t
+  def LoadArray_cStaticModel_s:
+    load_array('cStaticModel_s', 80, a, count, Load_cStaticModel_s)
+  def LoadArray_cbrushside_t:
+    load_array('cbrushside_t', 12, a, count, Load_cbrushside_t)
+  def LoadArray_cNode_t:
+    load_array('cNode_t', 8, a, count, Load_cNode_t)
+  def LoadArray_cLeafBrushNode_s:
+    load_array('cLeafBrushNode_s', 20, a, count, Load_cLeafBrushNode_s)
+  def LoadArray_CollisionPartition:
+    load_array('CollisionPartition', 20, a, count, Load_CollisionPartition)
+  def LoadArray_cbrush_t:
+    load_array('cbrush_t', 80, a, count, Load_cbrush_t)
+  def LoadArray_DynEntityDef:
+    load_array('DynEntityDef', 84, a, count, Load_DynEntityDef)
+  def LoadArray_XModelPiece:
+    load_array('XModelPiece', 16, a, count, Load_XModelPiece)
+  def LoadArray_PhysConstraint:
+    load_array('PhysConstraint', 152, a, count, Load_PhysConstraint)
+  def Load_cStaticModel_s:
+    if a:
+        read STRUCT('cStaticModel_s', 80)
+    if G(cStaticModel_s.xmodel):
+        asset('XModel', cStaticModel_s.xmodel())
+  def Load_cbrushside_t:
+    if a:
+        read STRUCT('cbrushside_t', 12)
+    if G(cbrushside_t.plane):
+        zpt0 = ptype(G(cbrushside_t.plane))
+        if zpt0 == FOLLOWING:
+            cbrushside_t.plane = alloc(4)
+            data(cbrushside_t.plane(), 20, 1)
+        else:
+            cbrushside_t.plane().set(S.ptr_native(G(cbrushside_t.plane)))
+  def Load_cNode_t:
+    if a:
+        read STRUCT('cNode_t', 8)
+    if G(cNode_t.plane):
+        zpt1 = ptype(G(cNode_t.plane))
+        if zpt1 == FOLLOWING:
+            cNode_t.plane = alloc(4)
+            data(cNode_t.plane(), 20, 1)
+        else:
+            cNode_t.plane().set(S.ptr_native(G(cNode_t.plane)))
+  def Load_cLeafBrushNode_s:
+    if a:
+        read STRUCT('cLeafBrushNode_s', 20)
+    cLeafBrushNodeData_t = cLeafBrushNode_s.data
+    Load_cLeafBrushNodeData_t(False)
+  def Load_cLeafBrushNodeData_t:
+    if a:
+        read STRUCT('cLeafBrushNodeData_t', 12)
+    if G(cLeafBrushNode_s.leafBrushCount) > 0:
+        cLeafBrushNodeLeaf_t = cLeafBrushNodeData_t.leaf
+        Load_cLeafBrushNodeLeaf_t(False)
+  def Load_cLeafBrushNodeLeaf_t:
+    if a:
+        read STRUCT('cLeafBrushNodeLeaf_t', 4)
+    if G(cLeafBrushNodeLeaf_t.brushes):
+        zpt2 = ptype(G(cLeafBrushNodeLeaf_t.brushes))
+        if zpt2 == FOLLOWING:
+            cLeafBrushNodeLeaf_t.brushes = alloc(2)
+            data(cLeafBrushNodeLeaf_t.brushes(), 2, G(cLeafBrushNode_s.leafBrushCount))
+        else:
+            cLeafBrushNodeLeaf_t.brushes().set(S.ptr_native(G(cLeafBrushNodeLeaf_t.brushes)))
+  def Load_CollisionPartition:
+    if a:
+        read STRUCT('CollisionPartition', 20)
+    if G(CollisionPartition.borders):
+        zpt3 = ptype(G(CollisionPartition.borders))
+        if zpt3 == FOLLOWING:
+            CollisionPartition.borders = alloc(4)
+            data(CollisionPartition.borders(), 28, 1)
+        else:
+            CollisionPartition.borders().set(S.ptr_native(G(CollisionPartition.borders)))
+  def Load_cbrush_t:
+    if a:
+        read STRUCT('cbrush_t', 80)
+    if G(cbrush_t.sides):
+        zpt4 = ptype(G(cbrush_t.sides))
+        if zpt4 == FOLLOWING:
+            cbrush_t.sides = alloc(4)
+            cbrushside_t = cbrush_t.sides
+            Load_cbrushside_t(True)
+        else:
+            cbrush_t.sides().set(S.ptr_lookup(G(cbrush_t.sides)))
+    if G(cbrush_t.baseAdjacentSide):
+        zpt5 = ptype(G(cbrush_t.baseAdjacentSide))
+        if zpt5 == FOLLOWING:
+            cbrush_t.baseAdjacentSide = alloc(1)
+            data(cbrush_t.baseAdjacentSide(), 1, 1)
+        else:
+            cbrush_t.baseAdjacentSide().set(S.ptr_native(G(cbrush_t.baseAdjacentSide)))
+    if G(cbrush_t.verts):
+        zpt6 = ptype(G(cbrush_t.verts))
+        if zpt6 == FOLLOWING:
+            cbrush_t.verts = alloc(4)
+            data(cbrush_t.verts(), 12, 1)
+        else:
+            cbrush_t.verts().set(S.ptr_native(G(cbrush_t.verts)))
+  def Load_DynEntityDef:
+    if a:
+        read STRUCT('DynEntityDef', 84)
+    if G(DynEntityDef.xModel):
+        asset('XModel', DynEntityDef.xModel())
+    if G(DynEntityDef.destroyFx):
+        asset('FxEffectDef', DynEntityDef.destroyFx())
+    if G(DynEntityDef.destroyPieces):
+        zpt7 = ptype(G(DynEntityDef.destroyPieces))
+        if zpt7 == FOLLOWING:
+            DynEntityDef.destroyPieces = alloc(4)
+            XModelPieces = DynEntityDef.destroyPieces
+            Load_XModelPieces(True)
+        else:
+            DynEntityDef.destroyPieces().set(S.ptr_lookup(G(DynEntityDef.destroyPieces)))
+    if G(DynEntityDef.physPreset):
+        asset('PhysPreset', DynEntityDef.physPreset())
+  def Load_XModelPieces:
+    if a:
+        read STRUCT('XModelPieces', 12)
+    xstring XModelPieces.name()
+    if G(XModelPieces.pieces):
+        XModelPieces.pieces = alloc(4)
+        XModelPiece = XModelPieces.pieces
+        LoadArray_XModelPiece(True, G(XModelPieces.numpieces))
+  def Load_XModelPiece:
+    if a:
+        read STRUCT('XModelPiece', 16)
+    if G(XModelPiece.model):
+        asset('XModel', XModelPiece.model())
+  def Load_PhysConstraint:
+    if a:
+        read STRUCT('PhysConstraint', 152)
+    xstring PhysConstraint.target_bone1()
+    xstring PhysConstraint.target_bone2()
+    if G(PhysConstraint.material):
+        asset('Material', PhysConstraint.material())
+  def Load_clipMap_t:
+    if a:
+        read STRUCT('clipMap_t', 332)
+    push(VIRTUAL)
+    xstring clipMap_t.name()
+    if G(clipMap_t.planes):
+        zpt8 = ptype(G(clipMap_t.planes))
+        if zpt8 == FOLLOWING:
+            clipMap_t.planes = alloc(4)
+            data(clipMap_t.planes(), 20, G(clipMap_t.planeCount))
+        else:
+            clipMap_t.planes().set(S.ptr_native(G(clipMap_t.planes)))
+    if G(clipMap_t.staticModelList):
+        clipMap_t.staticModelList = alloc(4)
+        cStaticModel_s = clipMap_t.staticModelList
+        LoadArray_cStaticModel_s(True, G(clipMap_t.numStaticModels))
+    if G(clipMap_t.materials):
+        clipMap_t.materials = alloc(4)
+        data(clipMap_t.materials(), 72, G(clipMap_t.numMaterials))
+    if G(clipMap_t.brushsides):
+        clipMap_t.brushsides = alloc(4)
+        cbrushside_t = clipMap_t.brushsides
+        LoadArray_cbrushside_t(True, G(clipMap_t.numBrushSides))
+    if G(clipMap_t.brushEdges):
+        clipMap_t.brushEdges = alloc(1)
+        data(clipMap_t.brushEdges(), 1, G(clipMap_t.numBrushEdges))
+    if G(clipMap_t.nodes):
+        clipMap_t.nodes = alloc(4)
+        cNode_t = clipMap_t.nodes
+        LoadArray_cNode_t(True, G(clipMap_t.numNodes))
+    if G(clipMap_t.leafs):
+        clipMap_t.leafs = alloc(4)
+        data(clipMap_t.leafs(), 44, G(clipMap_t.numLeafs))
+    if G(clipMap_t.leafbrushes):
+        clipMap_t.leafbrushes = alloc(2)
+        data(clipMap_t.leafbrushes(), 2, G(clipMap_t.numLeafBrushes))
+    if G(clipMap_t.leafbrushNodes):
+        clipMap_t.leafbrushNodes = alloc(4)
+        cLeafBrushNode_s = clipMap_t.leafbrushNodes
+        LoadArray_cLeafBrushNode_s(True, G(clipMap_t.leafbrushNodesCount))
+    if G(clipMap_t.leafsurfaces):
+        clipMap_t.leafsurfaces = alloc(4)
+        data(clipMap_t.leafsurfaces(), 4, G(clipMap_t.numLeafSurfaces))
+    if G(clipMap_t.verts):
+        clipMap_t.verts = alloc(4)
+        data(clipMap_t.verts(), 12, G(clipMap_t.vertCount))
+    if G(clipMap_t.brushVerts):
+        clipMap_t.brushVerts = alloc(4)
+        data(clipMap_t.brushVerts(), 12, G(clipMap_t.numBrushVerts))
+    if G(clipMap_t.uinds):
+        clipMap_t.uinds = alloc(2)
+        data(clipMap_t.uinds(), 2, G(clipMap_t.nuinds))
+    if G(clipMap_t.triIndices):
+        clipMap_t.triIndices = alloc(2)
+        data(clipMap_t.triIndices(), 2, 3 * G(clipMap_t.triCount))
+    if G(clipMap_t.triEdgeIsWalkable):
+        clipMap_t.triEdgeIsWalkable = alloc(1)
+        data(clipMap_t.triEdgeIsWalkable(), 1, (3 * G(clipMap_t.triCount) + 31) // 32 * 4)
+    if G(clipMap_t.borders):
+        clipMap_t.borders = alloc(4)
+        data(clipMap_t.borders(), 28, G(clipMap_t.borderCount))
+    if G(clipMap_t.partitions):
+        clipMap_t.partitions = alloc(4)
+        CollisionPartition = clipMap_t.partitions
+        LoadArray_CollisionPartition(True, G(clipMap_t.partitionCount))
+    if G(clipMap_t.aabbTrees):
+        clipMap_t.aabbTrees = alloc(16)
+        data(clipMap_t.aabbTrees(), 32, G(clipMap_t.aabbTreeCount))
+    if G(clipMap_t.cmodels):
+        clipMap_t.cmodels = alloc(4)
+        data(clipMap_t.cmodels(), 72, G(clipMap_t.numSubModels))
+    if G(clipMap_t.brushes):
+        clipMap_t.brushes = alloc(16)
+        cbrush_t = clipMap_t.brushes
+        LoadArray_cbrush_t(True, G(clipMap_t.numBrushes))
+    if G(clipMap_t.visibility):
+        clipMap_t.visibility = alloc(1)
+        data(clipMap_t.visibility(), 1, G(clipMap_t.numClusters) * G(clipMap_t.clusterBytes))
+    if G(clipMap_t.mapEnts):
+        asset('MapEnts', clipMap_t.mapEnts())
+    if G(clipMap_t.box_brush):
+        zpt9 = ptype(G(clipMap_t.box_brush))
+        if zpt9 == FOLLOWING:
+            clipMap_t.box_brush = alloc(16)
+            cbrush_t = clipMap_t.box_brush
+            Load_cbrush_t(True)
+        else:
+            clipMap_t.box_brush().set(S.ptr_lookup(G(clipMap_t.box_brush)))
+    if G(clipMap_t.dynEntDefList, (0)):
+        clipMap_t.dynEntDefList((0)).set(S.alloc(4))
+        DynEntityDef = clipMap_t.dynEntDefList((0)).ref()
+        LoadArray_DynEntityDef(True, G(clipMap_t.dynEntCount, (0)))
+    if G(clipMap_t.dynEntDefList, (1)):
+        clipMap_t.dynEntDefList((1)).set(S.alloc(4))
+        DynEntityDef = clipMap_t.dynEntDefList((1)).ref()
+        LoadArray_DynEntityDef(True, G(clipMap_t.dynEntCount, (1)))
+    push(RUNTIME)
+    if G(clipMap_t.dynEntPoseList, (0)):
+        clipMap_t.dynEntPoseList((0)).set(S.alloc(4))
+        data(clipMap_t.dynEntPoseList((0)), 32, G(clipMap_t.dynEntCount, (0)))
+    pop()
+    push(RUNTIME)
+    if G(clipMap_t.dynEntPoseList, (1)):
+        clipMap_t.dynEntPoseList((1)).set(S.alloc(4))
+        data(clipMap_t.dynEntPoseList((1)), 32, G(clipMap_t.dynEntCount, (1)))
+    pop()
+    push(RUNTIME)
+    if G(clipMap_t.dynEntClientList, (0)):
+        clipMap_t.dynEntClientList((0)).set(S.alloc(4))
+        data(clipMap_t.dynEntClientList((0)), 16, G(clipMap_t.dynEntCount, (0)))
+    pop()
+    push(RUNTIME)
+    if G(clipMap_t.dynEntClientList, (1)):
+        clipMap_t.dynEntClientList((1)).set(S.alloc(4))
+        data(clipMap_t.dynEntClientList((1)), 16, G(clipMap_t.dynEntCount, (1)))
+    pop()
+    push(RUNTIME)
+    if G(clipMap_t.dynEntServerList, (0)):
+        clipMap_t.dynEntServerList((0)).set(S.alloc(4))
+        data(clipMap_t.dynEntServerList((0)), 8, G(clipMap_t.dynEntCount, (2)))
+    pop()
+    push(RUNTIME)
+    if G(clipMap_t.dynEntServerList, (1)):
+        clipMap_t.dynEntServerList((1)).set(S.alloc(4))
+        data(clipMap_t.dynEntServerList((1)), 8, G(clipMap_t.dynEntCount, (3)))
+    pop()
+    push(RUNTIME)
+    if G(clipMap_t.dynEntCollList, (0)):
+        clipMap_t.dynEntCollList((0)).set(S.alloc(4))
+        data(clipMap_t.dynEntCollList((0)), 32, G(clipMap_t.dynEntCount, (0)))
+    pop()
+    push(RUNTIME)
+    if G(clipMap_t.dynEntCollList, (1)):
+        clipMap_t.dynEntCollList((1)).set(S.alloc(4))
+        data(clipMap_t.dynEntCollList((1)), 32, G(clipMap_t.dynEntCount, (1)))
+    pop()
+    push(RUNTIME)
+    if G(clipMap_t.dynEntCollList, (2)):
+        clipMap_t.dynEntCollList((2)).set(S.alloc(4))
+        data(clipMap_t.dynEntCollList((2)), 32, G(clipMap_t.dynEntCount, (2)))
+    pop()
+    push(RUNTIME)
+    if G(clipMap_t.dynEntCollList, (3)):
+        clipMap_t.dynEntCollList((3)).set(S.alloc(4))
+        data(clipMap_t.dynEntCollList((3)), 32, G(clipMap_t.dynEntCount, (3)))
+    pop()
+    if G(clipMap_t.constraints):
+        clipMap_t.constraints = alloc(4)
+        PhysConstraint = clipMap_t.constraints
+        LoadArray_PhysConstraint(True, G(clipMap_t.num_constraints))
+    pop()
+
+====================================================================================================
+ASSET ComWorld
+  def LoadArray_ComPrimaryLight:
+    load_array('ComPrimaryLight', 72, a, count, Load_ComPrimaryLight)
+  def LoadArray_ComBurnableCell:
+    load_array('ComBurnableCell', 12, a, count, Load_ComBurnableCell)
+  def Load_ComPrimaryLight:
+    if a:
+        read STRUCT('ComPrimaryLight', 72)
+    xstring ComPrimaryLight.defName()
+  def Load_ComBurnableCell:
+    if a:
+        read STRUCT('ComBurnableCell', 12)
+    if G(ComBurnableCell.data):
+        ComBurnableCell.data = alloc(1)
+        data(ComBurnableCell.data(), 1, 32)
+  def Load_ComWorld:
+    if a:
+        read STRUCT('ComWorld', 64)
+    push(VIRTUAL)
+    xstring ComWorld.name()
+    if G(ComWorld.primaryLights):
+        ComWorld.primaryLights = alloc(4)
+        ComPrimaryLight = ComWorld.primaryLights
+        LoadArray_ComPrimaryLight(True, G(ComWorld.primaryLightCount))
+    if G(ComWorld.waterCells):
+        ComWorld.waterCells = alloc(4)
+        data(ComWorld.waterCells(), 8, G(ComWorld.numWaterCells))
+    if G(ComWorld.burnableCells):
+        ComWorld.burnableCells = alloc(4)
+        ComBurnableCell = ComWorld.burnableCells
+        LoadArray_ComBurnableCell(True, G(ComWorld.numBurnableCells))
+    pop()
+
+====================================================================================================
+ASSET DestructibleDef
+  def LoadPtrArray_XModel:
+    XModelPtr = ptr_array_begin('XModelPtr', a, count)
+    for _i in range(count):
+        ptr_array_select('XModel', _i)
+        if deref('XModel'):
+            asset('XModel', deref_lv('XModel'))
+  def LoadArray_DestructiblePiece:
+    load_array('DestructiblePiece', 248, a, count, Load_DestructiblePiece)
+  def LoadArray_DestructibleModel:
+    load_array('DestructibleModel', 40, a, count, Load_DestructibleModel)
+  def Load_DestructiblePiece:
+    if a:
+        read STRUCT('DestructiblePiece', 248)
+    DestructibleModel = DestructiblePiece.dmodels
+    LoadArray_DestructibleModel(False, 5)
+    xstring DestructiblePiece.attachBone()
+    if G(DestructiblePiece.physConstraints):
+        asset('PhysConstraints', DestructiblePiece.physConstraints())
+    SndAliasCustom = DestructiblePiece.damageSound
+    Load_SndAliasCustom(False)
+    if G(DestructiblePiece.burnEffect):
+        asset('FxEffectDef', DestructiblePiece.burnEffect())
+    SndAliasCustom = DestructiblePiece.burnSound
+    Load_SndAliasCustom(False)
+  def Load_DestructibleModel:
+    if a:
+        read STRUCT('DestructibleModel', 40)
+    if G(DestructibleModel.model):
+        asset('XModel', DestructibleModel.model())
+    if G(DestructibleModel.breakEffect):
+        asset('FxEffectDef', DestructibleModel.breakEffect())
+    SndAliasCustom = DestructibleModel.breakSound
+    Load_SndAliasCustom(False)
+    xstring DestructibleModel.breakNotify()
+    xstring DestructibleModel.loopSound()
+    XModelPtr = DestructibleModel.spawnModel
+    LoadPtrArray_XModel(False, 3)
+  def Load_SndAliasCustom:
+    if a:
+        read STRUCT('SndAliasCustom', 4)
+    if G(SndAliasCustom.name):
+        zpt10 = ptype(G(SndAliasCustom.name))
+        if zpt10 == FOLLOWING:
+            SndAliasCustom.name = alloc(4)
+            snd_alias_list_name = SndAliasCustom.name
+            Load_snd_alias_list_name(True)
+        else:
+            SndAliasCustom.name().set(S.ptr_lookup(G(SndAliasCustom.name)))
+  def Load_snd_alias_list_name:
+    if a:
+        read STRUCT('snd_alias_list_name', 4)
+    xstring snd_alias_list_name.soundName()
+  def Load_DestructibleDef:
+    if a:
+        read STRUCT('DestructibleDef', 20)
+    push(VIRTUAL)
+    xstring DestructibleDef.name()
+    if G(DestructibleDef.baseModel):
+        asset('XModel', DestructibleDef.baseModel())
+    if G(DestructibleDef.pieces):
+        DestructibleDef.pieces = alloc(4)
+        DestructiblePiece = DestructibleDef.pieces
+        LoadArray_DestructiblePiece(True, G(DestructibleDef.numPieces))
+    pop()
+
+====================================================================================================
+ASSET Font_s
+  def Load_Font_s:
+    if a:
+        read STRUCT('Font_s', 24)
+    push(VIRTUAL)
+    xstring Font_s.fontName()
+    if G(Font_s.material):
+        asset('Material', Font_s.material())
+    if G(Font_s.glowMaterial):
+        asset('Material', Font_s.glowMaterial())
+    if G(Font_s.glyphs):
+        zpt11 = ptype(G(Font_s.glyphs))
+        if zpt11 == FOLLOWING:
+            Font_s.glyphs = alloc(4)
+            data(Font_s.glyphs(), 24, G(Font_s.glyphCount))
+        else:
+            Font_s.glyphs().set(S.ptr_native(G(Font_s.glyphs)))
+    pop()
+
+====================================================================================================
+ASSET FxEffectDef
+  def LoadPtrArray_Material:
+    MaterialPtr = ptr_array_begin('MaterialPtr', a, count)
+    for _i in range(count):
+        ptr_array_select('Material', _i)
+        if deref('Material'):
+            asset('Material', deref_lv('Material'))
+  def LoadArray_FxElemDef:
+    load_array('FxElemDef', 256, a, count, Load_FxElemDef)
+  def LoadArray_FxElemMarkVisuals:
+    load_array('FxElemMarkVisuals', 8, a, count, Load_FxElemMarkVisuals)
+  def LoadArray_FxElemVisuals:
+    load_array('FxElemVisuals', 4, a, count, Load_FxElemVisuals)
+  def Load_FxElemDef:
+    if a:
+        read STRUCT('FxElemDef', 256)
+    if G(FxElemDef.velSamples):
+        FxElemDef.velSamples = alloc(4)
+        data(FxElemDef.velSamples(), 96, G(FxElemDef.velIntervalCount) + 1)
+    if G(FxElemDef.visSamples):
+        FxElemDef.visSamples = alloc(4)
+        data(FxElemDef.visSamples(), 48, G(FxElemDef.visStateIntervalCount) + 1)
+    FxElemDefVisuals = FxElemDef.visuals
+    Load_FxElemDefVisuals(False)
+    FxEffectDefRef = FxElemDef.effectOnImpact
+    Load_FxEffectDefRef(False)
+    FxEffectDefRef = FxElemDef.effectOnDeath
+    Load_FxEffectDefRef(False)
+    FxEffectDefRef = FxElemDef.effectEmitted
+    Load_FxEffectDefRef(False)
+    if G(FxElemDef.trailDef):
+        FxElemDef.trailDef = alloc(4)
+        FxTrailDef = FxElemDef.trailDef
+        Load_FxTrailDef(True)
+  def Load_FxElemDefVisuals:
+    if a:
+        read STRUCT('FxElemDefVisuals', 4)
+    if G(FxElemDef.elemType) == 10:
+        if G(FxElemDefVisuals.markArray):
+            FxElemDefVisuals.markArray = alloc(4)
+            FxElemMarkVisuals = FxElemDefVisuals.markArray
+            LoadArray_FxElemMarkVisuals(True, G(FxElemDef.visualCount))
+    elif G(FxElemDef.visualCount) > 1:
+        if G(FxElemDefVisuals.array):
+            FxElemDefVisuals.array = alloc(4)
+            FxElemVisuals = FxElemDefVisuals.array
+            LoadArray_FxElemVisuals(True, G(FxElemDef.visualCount))
+    else:
+        FxElemVisuals = FxElemDefVisuals.instance
+        Load_FxElemVisuals(False)
+  def Load_FxElemMarkVisuals:
+    if a:
+        read STRUCT('FxElemMarkVisuals', 8)
+    MaterialPtr = FxElemMarkVisuals.materials
+    LoadPtrArray_Material(False, 2)
+  def Load_FxElemVisuals:
+    if a:
+        read STRUCT('FxElemVisuals', 4)
+    if G(FxElemDef.elemType) == 0  or  G(FxElemDef.elemType) == 1  or  G(FxElemDef.elemType) == 2  or  G(FxElemDef.elemType) == 3  or  G(FxElemDef.elemType) == 4  or  G(FxElemDef.elemType) == 5:
+        if G(FxElemVisuals.material):
+            asset('Material', FxElemVisuals.material())
+    elif G(FxElemDef.elemType) == 6:
+        if G(FxElemVisuals.model):
+            asset('XModel', FxElemVisuals.model())
+    elif G(FxElemDef.elemType) == 11:
+        FxEffectDefRef = FxElemVisuals.effectDef
+        Load_FxEffectDefRef(False)
+    elif G(FxElemDef.elemType) == 9:
+        xstring FxElemVisuals.soundName()
+  def Load_FxEffectDefRef:
+    if a:
+        read STRUCT('FxEffectDefRef', 4)
+    xstring FxEffectDefRef.name()
+  def Load_FxTrailDef:
+    if a:
+        read STRUCT('FxTrailDef', 28)
+    if G(FxTrailDef.verts):
+        FxTrailDef.verts = alloc(4)
+        data(FxTrailDef.verts(), 20, G(FxTrailDef.vertCount))
+    if G(FxTrailDef.inds):
+        FxTrailDef.inds = alloc(2)
+        data(FxTrailDef.inds(), 2, G(FxTrailDef.indCount))
+  def Load_FxEffectDef:
+    if a:
+        read STRUCT('FxEffectDef', 36)
+    push(VIRTUAL)
+    xstring FxEffectDef.name()
+    if G(FxEffectDef.elemDefs):
+        FxEffectDef.elemDefs = alloc(4)
+        FxElemDef = FxEffectDef.elemDefs
+        LoadArray_FxElemDef(True, G(FxEffectDef.elemDefCountEmission) + G(FxEffectDef.elemDefCountLooping) + G(FxEffectDef.elemDefCountOneShot))
+    pop()
+
+====================================================================================================
+ASSET FxImpactTable
+  def LoadPtrArray_FxEffectDef:
+    FxEffectDefPtr = ptr_array_begin('FxEffectDefPtr', a, count)
+    for _i in range(count):
+        ptr_array_select('FxEffectDef', _i)
+        if deref('FxEffectDef'):
+            asset('FxEffectDef', deref_lv('FxEffectDef'))
+  def LoadArray_FxImpactEntry:
+    load_array('FxImpactEntry', 140, a, count, Load_FxImpactEntry)
+  def Load_FxImpactEntry:
+    if a:
+        read STRUCT('FxImpactEntry', 140)
+    FxEffectDefPtr = FxImpactEntry.nonflesh
+    LoadPtrArray_FxEffectDef(False, 31)
+    FxEffectDefPtr = FxImpactEntry.flesh
+    LoadPtrArray_FxEffectDef(False, 4)
+  def Load_FxImpactTable:
+    if a:
+        read STRUCT('FxImpactTable', 8)
+    push(VIRTUAL)
+    xstring FxImpactTable.name()
+    if G(FxImpactTable.table):
+        FxImpactTable.table = alloc(4)
+        FxImpactEntry = FxImpactTable.table
+        LoadArray_FxImpactEntry(True, 16)
+    pop()
+
+====================================================================================================
+ASSET GameWorldMp
+  def LoadPtrArray_pathnode_tree_t:
+    pathnode_tree_tPtr = ptr_array_begin('pathnode_tree_tPtr', a, count)
+    for _i in range(count):
+        ptr_array_select('pathnode_tree_t', _i)
+        if deref('pathnode_tree_t'):
+            zpt12 = ptype(deref('pathnode_tree_t'))
+            if zpt12 == FOLLOWING:
+                deref_lv('pathnode_tree_t').set(S.alloc(4))
+                pathnode_tree_t = deref('pathnode_tree_t')
+                Load_pathnode_tree_t(True)
+            else:
+                deref_lv('pathnode_tree_t').set(S.ptr_lookup(deref('pathnode_tree_t')))
+  def LoadArray_pathnode_t:
+    load_array('pathnode_t', 128, a, count, Load_pathnode_t)
+  def LoadArray_pathnode_tree_t:
+    load_array('pathnode_tree_t', 16, a, count, Load_pathnode_tree_t)
+  def Load_PathData:
+    if a:
+        read STRUCT('PathData', 40)
+    if G(PathData.nodes):
+        PathData.nodes = alloc(4)
+        pathnode_t = PathData.nodes
+        LoadArray_pathnode_t(True, G(PathData.nodeCount))
+    push(RUNTIME)
+    if G(PathData.basenodes):
+        PathData.basenodes = alloc(16)
+        data(PathData.basenodes(), 16, G(PathData.nodeCount))
+    pop()
+    if G(PathData.chainNodeForNode):
+        PathData.chainNodeForNode = alloc(2)
+        data(PathData.chainNodeForNode(), 2, G(PathData.nodeCount))
+    if G(PathData.nodeForChainNode):
+        PathData.nodeForChainNode = alloc(2)
+        data(PathData.nodeForChainNode(), 2, G(PathData.nodeCount))
+    if G(PathData.pathVis):
+        PathData.pathVis = alloc(1)
+        data(PathData.pathVis(), 1, G(PathData.visBytes))
+    if G(PathData.nodeTree):
+        PathData.nodeTree = alloc(4)
+        pathnode_tree_t = PathData.nodeTree
+        LoadArray_pathnode_tree_t(True, G(PathData.nodeTreeCount))
+  def Load_pathnode_t:
+    if a:
+        read STRUCT('pathnode_t', 128)
+    pathnode_constant_t = pathnode_t.constant
+    Load_pathnode_constant_t(False)
+  def Load_pathnode_constant_t:
+    if a:
+        read STRUCT('pathnode_constant_t', 68)
+    if G(pathnode_constant_t.Links):
+        pathnode_constant_t.Links = alloc(4)
+        data(pathnode_constant_t.Links(), 12, G(pathnode_constant_t.totalLinkCount))
+  def Load_pathnode_tree_t:
+    if a:
+        read STRUCT('pathnode_tree_t', 16)
+    pathnode_tree_info_t = pathnode_tree_t.u
+    Load_pathnode_tree_info_t(False)
+  def Load_pathnode_tree_info_t:
+    if a:
+        read STRUCT('pathnode_tree_info_t', 8)
+    if G(pathnode_tree_t.axis) >= 0:
+        pathnode_tree_tPtr = pathnode_tree_info_t.child
+        LoadPtrArray_pathnode_tree_t(False, 2)
+    else:
+        pathnode_tree_nodes_t = pathnode_tree_info_t.s
+        Load_pathnode_tree_nodes_t(False)
+  def Load_pathnode_tree_nodes_t:
+    if a:
+        read STRUCT('pathnode_tree_nodes_t', 8)
+    if G(pathnode_tree_nodes_t.nodes):
+        pathnode_tree_nodes_t.nodes = alloc(2)
+        data(pathnode_tree_nodes_t.nodes(), 2, G(pathnode_tree_nodes_t.nodeCount))
+  def Load_GameWorldMp:
+    if a:
+        read STRUCT('GameWorldMp', 44)
+    push(VIRTUAL)
+    xstring GameWorldMp.name()
+    PathData = GameWorldMp.path
+    Load_PathData(False)
+    pop()
+
+====================================================================================================
+ASSET GameWorldSp
+  def LoadPtrArray_pathnode_tree_t:
+    pathnode_tree_tPtr = ptr_array_begin('pathnode_tree_tPtr', a, count)
+    for _i in range(count):
+        ptr_array_select('pathnode_tree_t', _i)
+        if deref('pathnode_tree_t'):
+            zpt13 = ptype(deref('pathnode_tree_t'))
+            if zpt13 == FOLLOWING:
+                deref_lv('pathnode_tree_t').set(S.alloc(4))
+                pathnode_tree_t = deref('pathnode_tree_t')
+                Load_pathnode_tree_t(True)
+            else:
+                deref_lv('pathnode_tree_t').set(S.ptr_lookup(deref('pathnode_tree_t')))
+  def LoadArray_pathnode_t:
+    load_array('pathnode_t', 128, a, count, Load_pathnode_t)
+  def LoadArray_pathnode_tree_t:
+    load_array('pathnode_tree_t', 16, a, count, Load_pathnode_tree_t)
+  def Load_PathData:
+    if a:
+        read STRUCT('PathData', 40)
+    if G(PathData.nodes):
+        PathData.nodes = alloc(4)
+        pathnode_t = PathData.nodes
+        LoadArray_pathnode_t(True, G(PathData.nodeCount))
+    push(RUNTIME)
+    if G(PathData.basenodes):
+        PathData.basenodes = alloc(16)
+        data(PathData.basenodes(), 16, G(PathData.nodeCount))
+    pop()
+    if G(PathData.chainNodeForNode):
+        PathData.chainNodeForNode = alloc(2)
+        data(PathData.chainNodeForNode(), 2, G(PathData.nodeCount))
+    if G(PathData.nodeForChainNode):
+        PathData.nodeForChainNode = alloc(2)
+        data(PathData.nodeForChainNode(), 2, G(PathData.nodeCount))
+    if G(PathData.pathVis):
+        PathData.pathVis = alloc(1)
+        data(PathData.pathVis(), 1, G(PathData.visBytes))
+    if G(PathData.nodeTree):
+        PathData.nodeTree = alloc(4)
+        pathnode_tree_t = PathData.nodeTree
+        LoadArray_pathnode_tree_t(True, G(PathData.nodeTreeCount))
+  def Load_pathnode_t:
+    if a:
+        read STRUCT('pathnode_t', 128)
+    pathnode_constant_t = pathnode_t.constant
+    Load_pathnode_constant_t(False)
+  def Load_pathnode_constant_t:
+    if a:
+        read STRUCT('pathnode_constant_t', 68)
+    if G(pathnode_constant_t.Links):
+        pathnode_constant_t.Links = alloc(4)
+        data(pathnode_constant_t.Links(), 12, G(pathnode_constant_t.totalLinkCount))
+  def Load_pathnode_tree_t:
+    if a:
+        read STRUCT('pathnode_tree_t', 16)
+    pathnode_tree_info_t = pathnode_tree_t.u
+    Load_pathnode_tree_info_t(False)
+  def Load_pathnode_tree_info_t:
+    if a:
+        read STRUCT('pathnode_tree_info_t', 8)
+    if G(pathnode_tree_t.axis) >= 0:
+        pathnode_tree_tPtr = pathnode_tree_info_t.child
+        LoadPtrArray_pathnode_tree_t(False, 2)
+    else:
+        pathnode_tree_nodes_t = pathnode_tree_info_t.s
+        Load_pathnode_tree_nodes_t(False)
+  def Load_pathnode_tree_nodes_t:
+    if a:
+        read STRUCT('pathnode_tree_nodes_t', 8)
+    if G(pathnode_tree_nodes_t.nodes):
+        pathnode_tree_nodes_t.nodes = alloc(2)
+        data(pathnode_tree_nodes_t.nodes(), 2, G(pathnode_tree_nodes_t.nodeCount))
+  def Load_GameWorldSp:
+    if a:
+        read STRUCT('GameWorldSp', 44)
+    push(VIRTUAL)
+    xstring GameWorldSp.name()
+    PathData = GameWorldSp.path
+    Load_PathData(False)
+    pop()
+
+====================================================================================================
+ASSET GfxImage
+  def Load_GfxTexture:
+    if a:
+        read STRUCT('GfxTexture', 4)
+    push(TEMP)
+    if G(GfxTexture.loadDef):
+        zpt14 = ptype(G(GfxTexture.loadDef))
+        if zpt14 == FOLLOWING or zpt14 == INSERT:
+            GfxTexture.loadDef = alloc(4)
+            tie15 = None
+            if zpt14 == INSERT:
+                tie15 = S.insert_ptr()
+            GfxImageLoadDef = GfxTexture.loadDef
+            Load_GfxImageLoadDef(True)
+            pass  # m_actions.LoadImageData(varGfxImageLoadDef, varGfxImage);
+            if zpt14 == INSERT:
+                S.set_alias(tie15, G(GfxTexture.loadDef))
+        else:
+            GfxTexture.loadDef().set(S.alias_lookup(G(GfxTexture.loadDef)))
+    pop()
+  def Load_GfxImageLoadDef:
+    if a:
+        read STRUCT('GfxImageLoadDef', 16)
+    if a:
+        data(GfxImageLoadDef.data(), 1, G(GfxImageLoadDef.resourceSize))
+  def Load_GfxImage:
+    if a:
+        read STRUCT('GfxImage', 36)
+    push(VIRTUAL)
+    xstring GfxImage.name()
+    GfxTexture = GfxImage.texture
+    Load_GfxTexture(False)
+    pop()
+
+====================================================================================================
+ASSET GfxLightDef
+  def Load_GfxLightImage:
+    if a:
+        read STRUCT('GfxLightImage', 8)
+    if G(GfxLightImage.image):
+        asset('GfxImage', GfxLightImage.image())
+  def Load_GfxLightDef:
+    if a:
+        read STRUCT('GfxLightDef', 16)
+    push(VIRTUAL)
+    xstring GfxLightDef.name()
+    GfxLightImage = GfxLightDef.attenuation
+    Load_GfxLightImage(False)
+    pop()
+
+====================================================================================================
+ASSET GfxWorld
+  def LoadArray_GfxReflectionProbe:
+    load_array('GfxReflectionProbe', 16, a, count, Load_GfxReflectionProbe)
+  def LoadArray_GfxCell:
+    load_array('GfxCell', 56, a, count, Load_GfxCell)
+  def LoadArray_GfxAabbTree:
+    load_array('GfxAabbTree', 40, a, count, Load_GfxAabbTree)
+  def LoadArray_GfxPortal:
+    load_array('GfxPortal', 68, a, count, Load_GfxPortal)
+  def LoadArray_GfxLightmapArray:
+    load_array('GfxLightmapArray', 8, a, count, Load_GfxLightmapArray)
+  def LoadArray_MaterialMemory:
+    load_array('MaterialMemory', 8, a, count, Load_MaterialMemory)
+  def LoadArray_GfxShadowGeometry:
+    load_array('GfxShadowGeometry', 12, a, count, Load_GfxShadowGeometry)
+  def LoadArray_GfxLightRegion:
+    load_array('GfxLightRegion', 8, a, count, Load_GfxLightRegion)
+  def LoadArray_GfxLightRegionHull:
+    load_array('GfxLightRegionHull', 80, a, count, Load_GfxLightRegionHull)
+  def LoadArray_GfxSurface:
+    load_array('GfxSurface', 52, a, count, Load_GfxSurface)
+  def LoadArray_GfxStaticModelDrawInst:
+    load_array('GfxStaticModelDrawInst', 92, a, count, Load_GfxStaticModelDrawInst)
+  def LoadArray_GfxWaterBuffer:
+    load_array('GfxWaterBuffer', 8, a, count, Load_GfxWaterBuffer)
+  def Load_GfxLight:
+    if a:
+        read STRUCT('GfxLight', 64)
+    if G(GfxLight.def):
+        asset('GfxLightDef', GfxLight.def())
+  def Load_GfxReflectionProbe:
+    if a:
+        read STRUCT('GfxReflectionProbe', 16)
+    if G(GfxReflectionProbe.reflectionImage):
+        asset('GfxImage', GfxReflectionProbe.reflectionImage())
+  def Load_GfxWorldDpvsPlanes:
+    if a:
+        read STRUCT('GfxWorldDpvsPlanes', 16)
+    if G(GfxWorldDpvsPlanes.planes):
+        zpt16 = ptype(G(GfxWorldDpvsPlanes.planes))
+        if zpt16 == FOLLOWING:
+            GfxWorldDpvsPlanes.planes = alloc(4)
+            data(GfxWorldDpvsPlanes.planes(), 20, G(GfxWorld.planeCount))
+        else:
+            GfxWorldDpvsPlanes.planes().set(S.ptr_native(G(GfxWorldDpvsPlanes.planes)))
+    if G(GfxWorldDpvsPlanes.nodes):
+        GfxWorldDpvsPlanes.nodes = alloc(2)
+        data(GfxWorldDpvsPlanes.nodes(), 2, G(GfxWorld.nodeCount))
+    push(RUNTIME)
+    if G(GfxWorldDpvsPlanes.sceneEntCellBits):
+        GfxWorldDpvsPlanes.sceneEntCellBits = alloc(4)
+        data(GfxWorldDpvsPlanes.sceneEntCellBits(), 4, G(GfxWorldDpvsPlanes.cellCount) * 256)
+    pop()
+  def Load_GfxCell:
+    if a:
+        read STRUCT('GfxCell', 56)
+    if G(GfxCell.aabbTree):
+        GfxCell.aabbTree = alloc(4)
+        GfxAabbTree = GfxCell.aabbTree
+        LoadArray_GfxAabbTree(True, G(GfxCell.aabbTreeCount))
+    if G(GfxCell.portals):
+        GfxCell.portals = alloc(4)
+        GfxPortal = GfxCell.portals
+        LoadArray_GfxPortal(True, G(GfxCell.portalCount))
+    if G(GfxCell.cullGroups):
+        GfxCell.cullGroups = alloc(4)
+        data(GfxCell.cullGroups(), 4, G(GfxCell.cullGroupCount))
+    if G(GfxCell.reflectionProbes):
+        GfxCell.reflectionProbes = alloc(1)
+        data(GfxCell.reflectionProbes(), 1, G(GfxCell.reflectionProbeCount))
+  def Load_GfxAabbTree:
+    if a:
+        read STRUCT('GfxAabbTree', 40)
+    if G(GfxAabbTree.smodelIndexes):
+        zpt17 = ptype(G(GfxAabbTree.smodelIndexes))
+        if zpt17 == FOLLOWING:
+            GfxAabbTree.smodelIndexes = alloc(2)
+            data(GfxAabbTree.smodelIndexes(), 2, G(GfxAabbTree.smodelIndexCount))
+        else:
+            GfxAabbTree.smodelIndexes().set(S.ptr_native(G(GfxAabbTree.smodelIndexes)))
+  def Load_GfxPortal:
+    if a:
+        read STRUCT('GfxPortal', 68)
+    if G(GfxPortal.cell):
+        zpt18 = ptype(G(GfxPortal.cell))
+        if zpt18 == FOLLOWING:
+            GfxPortal.cell = alloc(4)
+            GfxCell = GfxPortal.cell
+            Load_GfxCell(True)
+        else:
+            GfxPortal.cell().set(S.ptr_lookup(G(GfxPortal.cell)))
+    if G(GfxPortal.vertices):
+        GfxPortal.vertices = alloc(4)
+        data(GfxPortal.vertices(), 12, G(GfxPortal.vertexCount))
+  def Load_GfxLightmapArray:
+    if a:
+        read STRUCT('GfxLightmapArray', 8)
+    if G(GfxLightmapArray.primary):
+        asset('GfxImage', GfxLightmapArray.primary())
+    if G(GfxLightmapArray.secondary):
+        asset('GfxImage', GfxLightmapArray.secondary())
+  def Load_GfxLightGrid:
+    if a:
+        read STRUCT('GfxLightGrid', 56)
+    if G(GfxLightGrid.rowDataStart):
+        GfxLightGrid.rowDataStart = alloc(2)
+        data(GfxLightGrid.rowDataStart(), 2, G(GfxLightGrid.maxs, (G(GfxLightGrid.rowAxis))) - G(GfxLightGrid.mins, (G(GfxLightGrid.rowAxis))) + 1)
+    if G(GfxLightGrid.rawRowData):
+        GfxLightGrid.rawRowData = alloc(1)
+        data(GfxLightGrid.rawRowData(), 1, G(GfxLightGrid.rawRowDataSize))
+    if G(GfxLightGrid.entries):
+        GfxLightGrid.entries = alloc(4)
+        data(GfxLightGrid.entries(), 4, G(GfxLightGrid.entryCount))
+    if G(GfxLightGrid.colors):
+        GfxLightGrid.colors = alloc(4)
+        data(GfxLightGrid.colors(), 168, G(GfxLightGrid.colorCount))
+  def Load_MaterialMemory:
+    if a:
+        read STRUCT('MaterialMemory', 8)
+    if G(MaterialMemory.material):
+        asset('Material', MaterialMemory.material())
+  def Load_GfxWorldVertexData:
+    if a:
+        read STRUCT('GfxWorldVertexData', 8)
+    if G(GfxWorldVertexData.vertices):
+        GfxWorldVertexData.vertices = alloc(4)
+        data(GfxWorldVertexData.vertices(), 44, G(GfxWorld.vertexCount))
+  def Load_GfxWorldVertexLayerData:
+    if a:
+        read STRUCT('GfxWorldVertexLayerData', 8)
+    if G(GfxWorldVertexLayerData.data):
+        GfxWorldVertexLayerData.data = alloc(1)
+        data(GfxWorldVertexLayerData.data(), 1, G(GfxWorld.vertexLayerDataSize))
+  def Load_sunflare_t:
+    if a:
+        read STRUCT('sunflare_t', 96)
+    if G(sunflare_t.spriteMaterial):
+        asset('Material', sunflare_t.spriteMaterial())
+    if G(sunflare_t.flareMaterial):
+        asset('Material', sunflare_t.flareMaterial())
+  def Load_GfxShadowGeometry:
+    if a:
+        read STRUCT('GfxShadowGeometry', 12)
+    if G(GfxShadowGeometry.sortedSurfIndex):
+        GfxShadowGeometry.sortedSurfIndex = alloc(2)
+        data(GfxShadowGeometry.sortedSurfIndex(), 2, G(GfxShadowGeometry.surfaceCount))
+    if G(GfxShadowGeometry.smodelIndex):
+        GfxShadowGeometry.smodelIndex = alloc(2)
+        data(GfxShadowGeometry.smodelIndex(), 2, G(GfxShadowGeometry.smodelCount))
+  def Load_GfxLightRegion:
+    if a:
+        read STRUCT('GfxLightRegion', 8)
+    if G(GfxLightRegion.hulls):
+        GfxLightRegion.hulls = alloc(4)
+        GfxLightRegionHull = GfxLightRegion.hulls
+        LoadArray_GfxLightRegionHull(True, G(GfxLightRegion.hullCount))
+  def Load_GfxLightRegionHull:
+    if a:
+        read STRUCT('GfxLightRegionHull', 80)
+    if G(GfxLightRegionHull.axis):
+        GfxLightRegionHull.axis = alloc(4)
+        data(GfxLightRegionHull.axis(), 20, G(GfxLightRegionHull.axisCount))
+  def Load_GfxWorldDpvsStatic:
+    if a:
+        read STRUCT('GfxWorldDpvsStatic', 100)
+    push(RUNTIME)
+    if G(GfxWorldDpvsStatic.smodelVisData, (0)):
+        GfxWorldDpvsStatic.smodelVisData((0)).set(S.alloc(1))
+        data(GfxWorldDpvsStatic.smodelVisData((0)), 1, G(GfxWorldDpvsStatic.smodelCount))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsStatic.smodelVisData, (1)):
+        GfxWorldDpvsStatic.smodelVisData((1)).set(S.alloc(1))
+        data(GfxWorldDpvsStatic.smodelVisData((1)), 1, G(GfxWorldDpvsStatic.smodelCount))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsStatic.smodelVisData, (2)):
+        GfxWorldDpvsStatic.smodelVisData((2)).set(S.alloc(1))
+        data(GfxWorldDpvsStatic.smodelVisData((2)), 1, G(GfxWorldDpvsStatic.smodelCount))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsStatic.surfaceVisData, (0)):
+        GfxWorldDpvsStatic.surfaceVisData((0)).set(S.alloc(1))
+        data(GfxWorldDpvsStatic.surfaceVisData((0)), 1, G(GfxWorldDpvsStatic.staticSurfaceCount))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsStatic.surfaceVisData, (1)):
+        GfxWorldDpvsStatic.surfaceVisData((1)).set(S.alloc(1))
+        data(GfxWorldDpvsStatic.surfaceVisData((1)), 1, G(GfxWorldDpvsStatic.staticSurfaceCount))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsStatic.surfaceVisData, (2)):
+        GfxWorldDpvsStatic.surfaceVisData((2)).set(S.alloc(1))
+        data(GfxWorldDpvsStatic.surfaceVisData((2)), 1, G(GfxWorldDpvsStatic.staticSurfaceCount))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsStatic.lodData):
+        GfxWorldDpvsStatic.lodData = alloc(128)
+        data(GfxWorldDpvsStatic.lodData(), 128, 2 * G(GfxWorldDpvsStatic.smodelVisDataCount))
+    pop()
+    if G(GfxWorldDpvsStatic.sortedSurfIndex):
+        GfxWorldDpvsStatic.sortedSurfIndex = alloc(2)
+        data(GfxWorldDpvsStatic.sortedSurfIndex(), 2, G(GfxWorldDpvsStatic.staticSurfaceCount))
+    if G(GfxWorldDpvsStatic.smodelInsts):
+        GfxWorldDpvsStatic.smodelInsts = alloc(4)
+        data(GfxWorldDpvsStatic.smodelInsts(), 28, G(GfxWorldDpvsStatic.smodelCount))
+    if G(GfxWorldDpvsStatic.surfaces):
+        GfxWorldDpvsStatic.surfaces = alloc(4)
+        GfxSurface = GfxWorldDpvsStatic.surfaces
+        LoadArray_GfxSurface(True, G(GfxWorld.surfaceCount))
+    if G(GfxWorldDpvsStatic.cullGroups):
+        GfxWorldDpvsStatic.cullGroups = alloc(4)
+        data(GfxWorldDpvsStatic.cullGroups(), 32, G(GfxWorld.cullGroupCount))
+    if G(GfxWorldDpvsStatic.smodelDrawInsts):
+        GfxWorldDpvsStatic.smodelDrawInsts = alloc(4)
+        GfxStaticModelDrawInst = GfxWorldDpvsStatic.smodelDrawInsts
+        LoadArray_GfxStaticModelDrawInst(True, G(GfxWorldDpvsStatic.smodelCount))
+    push(RUNTIME)
+    if G(GfxWorldDpvsStatic.surfaceMaterials):
+        GfxWorldDpvsStatic.surfaceMaterials = alloc(4)
+        data(GfxWorldDpvsStatic.surfaceMaterials(), 8, G(GfxWorldDpvsStatic.staticSurfaceCount))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsStatic.surfaceCastsSunShadow):
+        GfxWorldDpvsStatic.surfaceCastsSunShadow = alloc(128)
+        data(GfxWorldDpvsStatic.surfaceCastsSunShadow(), 128, G(GfxWorldDpvsStatic.surfaceVisDataCount))
+    pop()
+  def Load_GfxSurface:
+    if a:
+        read STRUCT('GfxSurface', 52)
+    if G(GfxSurface.material):
+        asset('Material', GfxSurface.material())
+  def Load_GfxStaticModelDrawInst:
+    if a:
+        read STRUCT('GfxStaticModelDrawInst', 92)
+    if G(GfxStaticModelDrawInst.model):
+        asset('XModel', GfxStaticModelDrawInst.model())
+  def Load_GfxWorldDpvsDynamic:
+    if a:
+        read STRUCT('GfxWorldDpvsDynamic', 48)
+    push(RUNTIME)
+    if G(GfxWorldDpvsDynamic.dynEntCellBits, (0)):
+        GfxWorldDpvsDynamic.dynEntCellBits((0)).set(S.alloc(4))
+        data(GfxWorldDpvsDynamic.dynEntCellBits((0)), 4, G(GfxWorldDpvsDynamic.dynEntClientWordCount, (0)) * G(GfxWorld.dpvsPlanes, 'cellCount'))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsDynamic.dynEntCellBits, (1)):
+        GfxWorldDpvsDynamic.dynEntCellBits((1)).set(S.alloc(4))
+        data(GfxWorldDpvsDynamic.dynEntCellBits((1)), 4, G(GfxWorldDpvsDynamic.dynEntClientWordCount, (1)) * G(GfxWorld.dpvsPlanes, 'cellCount'))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsDynamic.dynEntVisData, (0), (0)):
+        GfxWorldDpvsDynamic.dynEntVisData((0), (0)).set(S.alloc(16))
+        data(GfxWorldDpvsDynamic.dynEntVisData((0), (0)), 16, 32 * G(GfxWorldDpvsDynamic.dynEntClientWordCount, (0)))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsDynamic.dynEntVisData, (0), (1)):
+        GfxWorldDpvsDynamic.dynEntVisData((0), (1)).set(S.alloc(16))
+        data(GfxWorldDpvsDynamic.dynEntVisData((0), (1)), 16, 32 * G(GfxWorldDpvsDynamic.dynEntClientWordCount, (0)))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsDynamic.dynEntVisData, (0), (2)):
+        GfxWorldDpvsDynamic.dynEntVisData((0), (2)).set(S.alloc(16))
+        data(GfxWorldDpvsDynamic.dynEntVisData((0), (2)), 16, 32 * G(GfxWorldDpvsDynamic.dynEntClientWordCount, (0)))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsDynamic.dynEntVisData, (1), (0)):
+        GfxWorldDpvsDynamic.dynEntVisData((1), (0)).set(S.alloc(16))
+        data(GfxWorldDpvsDynamic.dynEntVisData((1), (0)), 16, 32 * G(GfxWorldDpvsDynamic.dynEntClientWordCount, (1)))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsDynamic.dynEntVisData, (1), (1)):
+        GfxWorldDpvsDynamic.dynEntVisData((1), (1)).set(S.alloc(16))
+        data(GfxWorldDpvsDynamic.dynEntVisData((1), (1)), 16, 32 * G(GfxWorldDpvsDynamic.dynEntClientWordCount, (1)))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorldDpvsDynamic.dynEntVisData, (1), (2)):
+        GfxWorldDpvsDynamic.dynEntVisData((1), (2)).set(S.alloc(16))
+        data(GfxWorldDpvsDynamic.dynEntVisData((1), (2)), 16, 32 * G(GfxWorldDpvsDynamic.dynEntClientWordCount, (1)))
+    pop()
+  def Load_GfxWaterBuffer:
+    if a:
+        read STRUCT('GfxWaterBuffer', 8)
+    if G(GfxWaterBuffer.buffer):
+        GfxWaterBuffer.buffer = alloc(4)
+        data(GfxWaterBuffer.buffer(), 16, G(GfxWaterBuffer.bufferSize) // 16)
+  def Load_GfxWorld:
+    if a:
+        read STRUCT('GfxWorld', 800)
+    push(VIRTUAL)
+    xstring GfxWorld.name()
+    xstring GfxWorld.baseName()
+    if G(GfxWorld.indices):
+        GfxWorld.indices = alloc(2)
+        data(GfxWorld.indices(), 2, G(GfxWorld.indexCount))
+    if G(GfxWorld.skyStartSurfs):
+        GfxWorld.skyStartSurfs = alloc(4)
+        data(GfxWorld.skyStartSurfs(), 4, G(GfxWorld.skySurfCount))
+    if G(GfxWorld.skyImage):
+        asset('GfxImage', GfxWorld.skyImage())
+    xstring GfxWorld.skyBoxModel()
+    if G(GfxWorld.sunLight):
+        zpt19 = ptype(G(GfxWorld.sunLight))
+        if zpt19 == FOLLOWING:
+            GfxWorld.sunLight = alloc(4)
+            GfxLight = GfxWorld.sunLight
+            Load_GfxLight(True)
+        else:
+            GfxWorld.sunLight().set(S.ptr_lookup(G(GfxWorld.sunLight)))
+    if G(GfxWorld.reflectionProbes):
+        GfxWorld.reflectionProbes = alloc(4)
+        GfxReflectionProbe = GfxWorld.reflectionProbes
+        LoadArray_GfxReflectionProbe(True, G(GfxWorld.reflectionProbeCount))
+    push(RUNTIME)
+    if G(GfxWorld.reflectionProbeTextures):
+        GfxWorld.reflectionProbeTextures = alloc(4)
+        data(GfxWorld.reflectionProbeTextures(), 4, G(GfxWorld.reflectionProbeCount))
+    pop()
+    if G(GfxWorld.coronas):
+        GfxWorld.coronas = alloc(4)
+        data(GfxWorld.coronas(), 32, G(GfxWorld.coronaCount))
+    GfxWorldDpvsPlanes = GfxWorld.dpvsPlanes
+    Load_GfxWorldDpvsPlanes(False)
+    if G(GfxWorld.cells):
+        GfxWorld.cells = alloc(4)
+        GfxCell = GfxWorld.cells
+        LoadArray_GfxCell(True, G(GfxWorld.dpvsPlanes, 'cellCount'))
+    if G(GfxWorld.lightmaps):
+        GfxWorld.lightmaps = alloc(4)
+        GfxLightmapArray = GfxWorld.lightmaps
+        LoadArray_GfxLightmapArray(True, G(GfxWorld.lightmapCount))
+    GfxLightGrid = GfxWorld.lightGrid
+    Load_GfxLightGrid(False)
+    push(RUNTIME)
+    if G(GfxWorld.lightmapPrimaryTextures):
+        GfxWorld.lightmapPrimaryTextures = alloc(4)
+        data(GfxWorld.lightmapPrimaryTextures(), 4, G(GfxWorld.lightmapCount))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorld.lightmapSecondaryTextures):
+        GfxWorld.lightmapSecondaryTextures = alloc(4)
+        data(GfxWorld.lightmapSecondaryTextures(), 4, G(GfxWorld.lightmapCount))
+    pop()
+    if G(GfxWorld.models):
+        GfxWorld.models = alloc(4)
+        data(GfxWorld.models(), 56, G(GfxWorld.modelCount))
+    if G(GfxWorld.materialMemory):
+        GfxWorld.materialMemory = alloc(4)
+        MaterialMemory = GfxWorld.materialMemory
+        LoadArray_MaterialMemory(True, G(GfxWorld.materialMemoryCount))
+    GfxWorldVertexData = GfxWorld.vd
+    Load_GfxWorldVertexData(False)
+    GfxWorldVertexLayerData = GfxWorld.vld
+    Load_GfxWorldVertexLayerData(False)
+    sunflare_t = GfxWorld.sun
+    Load_sunflare_t(False)
+    if G(GfxWorld.outdoorImage):
+        asset('GfxImage', GfxWorld.outdoorImage())
+    push(RUNTIME)
+    if G(GfxWorld.cellCasterBits):
+        GfxWorld.cellCasterBits = alloc(4)
+        data(GfxWorld.cellCasterBits(), 4, G(GfxWorld.dpvsPlanes, 'cellCount') * ((G(GfxWorld.dpvsPlanes, 'cellCount') + 31) // 32))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorld.sceneDynModel):
+        GfxWorld.sceneDynModel = alloc(4)
+        data(GfxWorld.sceneDynModel(), 6, G(GfxWorld.dpvsDyn, 'dynEntClientCount', (0)))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorld.sceneDynBrush):
+        GfxWorld.sceneDynBrush = alloc(4)
+        data(GfxWorld.sceneDynBrush(), 4, G(GfxWorld.dpvsDyn, 'dynEntClientCount', (1)))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorld.primaryLightEntityShadowVis):
+        GfxWorld.primaryLightEntityShadowVis = alloc(4)
+        data(GfxWorld.primaryLightEntityShadowVis(), 4, (G(GfxWorld.primaryLightCount) - G(GfxWorld.sunPrimaryLightIndex) - 1) * 8192)
+    pop()
+    push(RUNTIME)
+    if G(GfxWorld.primaryLightDynEntShadowVis, (0)):
+        GfxWorld.primaryLightDynEntShadowVis((0)).set(S.alloc(4))
+        data(GfxWorld.primaryLightDynEntShadowVis((0)), 4, G(GfxWorld.dpvsDyn, 'dynEntClientCount', (0)) * (G(GfxWorld.primaryLightCount) - G(GfxWorld.sunPrimaryLightIndex) - 1))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorld.primaryLightDynEntShadowVis, (1)):
+        GfxWorld.primaryLightDynEntShadowVis((1)).set(S.alloc(4))
+        data(GfxWorld.primaryLightDynEntShadowVis((1)), 4, G(GfxWorld.dpvsDyn, 'dynEntClientCount', (1)) * (G(GfxWorld.primaryLightCount) - G(GfxWorld.sunPrimaryLightIndex) - 1))
+    pop()
+    push(RUNTIME)
+    if G(GfxWorld.nonSunPrimaryLightForModelDynEnt):
+        GfxWorld.nonSunPrimaryLightForModelDynEnt = alloc(1)
+        data(GfxWorld.nonSunPrimaryLightForModelDynEnt(), 1, G(GfxWorld.dpvsDyn, 'dynEntClientCount', (0)))
+    pop()
+    if G(GfxWorld.shadowGeom):
+        GfxWorld.shadowGeom = alloc(4)
+        GfxShadowGeometry = GfxWorld.shadowGeom
+        LoadArray_GfxShadowGeometry(True, G(GfxWorld.primaryLightCount))
+    if G(GfxWorld.lightRegion):
+        GfxWorld.lightRegion = alloc(4)
+        GfxLightRegion = GfxWorld.lightRegion
+        LoadArray_GfxLightRegion(True, G(GfxWorld.primaryLightCount))
+    GfxWorldDpvsStatic = GfxWorld.dpvs
+    Load_GfxWorldDpvsStatic(False)
+    GfxWorldDpvsDynamic = GfxWorld.dpvsDyn
+    Load_GfxWorldDpvsDynamic(False)
+    if G(GfxWorld.worldLodChains):
+        GfxWorld.worldLodChains = alloc(4)
+        data(GfxWorld.worldLodChains(), 24, G(GfxWorld.worldLodChainCount))
+    if G(GfxWorld.worldLodInfos):
+        GfxWorld.worldLodInfos = alloc(4)
+        data(GfxWorld.worldLodInfos(), 12, G(GfxWorld.worldLodInfoCount))
+    if G(GfxWorld.worldLodSurfaces):
+        GfxWorld.worldLodSurfaces = alloc(4)
+        data(GfxWorld.worldLodSurfaces(), 4, G(GfxWorld.worldLodSurfaceCount))
+    GfxWaterBuffer = GfxWorld.waterBuffers
+    LoadArray_GfxWaterBuffer(False, 2)
+    if G(GfxWorld.waterMaterial):
+        asset('Material', GfxWorld.waterMaterial())
+    pop()
+
+====================================================================================================
+ASSET LoadedSound
+  def Load_snd_asset:
+    if a:
+        read STRUCT('snd_asset', 8)
+    if G(snd_asset.data):
+        snd_asset.data = alloc(1)
+        data(snd_asset.data(), 1, G(snd_asset.data_size))
+  def Load_LoadedSound:
+    if a:
+        read STRUCT('LoadedSound', 12)
+    push(VIRTUAL)
+    xstring LoadedSound.name()
+    snd_asset = LoadedSound.sound
+    Load_snd_asset(False)
+    pop()
+
+====================================================================================================
+ASSET LocalizeEntry
+  def Load_LocalizeEntry:
+    if a:
+        read STRUCT('LocalizeEntry', 8)
+    push(VIRTUAL)
+    xstring LocalizeEntry.value()
+    xstring LocalizeEntry.name()
+    pop()
+
+====================================================================================================
+ASSET MapEnts
+  def Load_MapEnts:
+    if a:
+        read STRUCT('MapEnts', 12)
+    push(VIRTUAL)
+    xstring MapEnts.name()
+    if G(MapEnts.entityString):
+        MapEnts.entityString = alloc(1)
+        data(MapEnts.entityString(), 1, G(MapEnts.numEntityChars))
+    pop()
+
+====================================================================================================
+ASSET Material
+  def LoadArray_MaterialTextureDef:
+    load_array('MaterialTextureDef', 16, a, count, Load_MaterialTextureDef)
+  def Load_MaterialInfo:
+    if a:
+        read STRUCT('MaterialInfo', 32)
+    xstring MaterialInfo.name()
+  def Load_MaterialTextureDef:
+    if a:
+        read STRUCT('MaterialTextureDef', 16)
+    MaterialTextureDefInfo = MaterialTextureDef.u
+    Load_MaterialTextureDefInfo(False)
+  def Load_MaterialTextureDefInfo:
+    if a:
+        read STRUCT('MaterialTextureDefInfo', 4)
+    if G(MaterialTextureDef.semantic) == 11:
+        if G(MaterialTextureDefInfo.water):
+            zpt20 = ptype(G(MaterialTextureDefInfo.water))
+            if zpt20 == FOLLOWING:
+                MaterialTextureDefInfo.water = alloc(4)
+                water_t = MaterialTextureDefInfo.water
+                Load_water_t(True)
+            else:
+                MaterialTextureDefInfo.water().set(S.ptr_lookup(G(MaterialTextureDefInfo.water)))
+    else:
+        if G(MaterialTextureDefInfo.image):
+            asset('GfxImage', MaterialTextureDefInfo.image())
+  def Load_water_t:
+    if a:
+        read STRUCT('water_t', 68)
+    if G(water_t.H0):
+        water_t.H0 = alloc(4)
+        data(water_t.H0(), 8, G(water_t.N) * G(water_t.M))
+    if G(water_t.wTerm):
+        water_t.wTerm = alloc(4)
+        data(water_t.wTerm(), 4, G(water_t.N) * G(water_t.M))
+    if G(water_t.image):
+        asset('GfxImage', water_t.image())
+  def Load_Material:
+    if a:
+        read STRUCT('Material', 112)
+    push(VIRTUAL)
+    MaterialInfo = Material.info
+    Load_MaterialInfo(False)
+    if G(Material.techniqueSet):
+        asset('MaterialTechniqueSet', Material.techniqueSet())
+    if G(Material.textureTable):
+        zpt21 = ptype(G(Material.textureTable))
+        if zpt21 == FOLLOWING:
+            Material.textureTable = alloc(4)
+            MaterialTextureDef = Material.textureTable
+            LoadArray_MaterialTextureDef(True, G(Material.textureCount))
+        else:
+            Material.textureTable().set(S.ptr_lookup(G(Material.textureTable)))
+    if G(Material.constantTable):
+        zpt22 = ptype(G(Material.constantTable))
+        if zpt22 == FOLLOWING:
+            Material.constantTable = alloc(16)
+            data(Material.constantTable(), 32, G(Material.constantCount))
+        else:
+            Material.constantTable().set(S.ptr_native(G(Material.constantTable)))
+    if G(Material.stateBitsTable):
+        zpt23 = ptype(G(Material.stateBitsTable))
+        if zpt23 == FOLLOWING:
+            Material.stateBitsTable = alloc(4)
+            data(Material.stateBitsTable(), 8, G(Material.stateBitsCount))
+        else:
+            Material.stateBitsTable().set(S.ptr_native(G(Material.stateBitsTable)))
+    pop()
+
+====================================================================================================
+ASSET MaterialTechniqueSet
+  def LoadPtrArray_MaterialTechnique:
+    MaterialTechniquePtr = ptr_array_begin('MaterialTechniquePtr', a, count)
+    for _i in range(count):
+        ptr_array_select('MaterialTechnique', _i)
+        if deref('MaterialTechnique'):
+            zpt24 = ptype(deref('MaterialTechnique'))
+            if zpt24 == FOLLOWING:
+                S.alloc(4)
+                dyn = dynread STRUCT('MaterialTechnique')
+                deref_lv('MaterialTechnique').set(S.alloc(0, dyn=dyn))
+                MaterialTechnique = deref('MaterialTechnique')
+                Load_MaterialTechnique(True)
+            else:
+                deref_lv('MaterialTechnique').set(S.ptr_lookup(deref('MaterialTechnique')))
+  def LoadArray_MaterialPass:
+    load_array('MaterialPass', 20, a, count, Load_MaterialPass)
+  def LoadArray_MaterialShaderArgument:
+    load_array('MaterialShaderArgument', 8, a, count, Load_MaterialShaderArgument)
+  def Load_MaterialTechnique:
+    if a:
+        fill_last('MaterialTechnique')
+    MaterialPass = MaterialTechnique.passArray
+    LoadArray_MaterialPass(False, G(MaterialTechnique.passCount))
+    xstring MaterialTechnique.name()
+  def Load_MaterialPass:
+    if a:
+        read STRUCT('MaterialPass', 20)
+    if G(MaterialPass.vertexDecl):
+        zpt25 = ptype(G(MaterialPass.vertexDecl))
+        if zpt25 == FOLLOWING:
+            MaterialPass.vertexDecl = alloc(4)
+            MaterialVertexDeclaration = MaterialPass.vertexDecl
+            read STRUCT('MaterialVertexDeclaration', 104)
+        else:
+            MaterialPass.vertexDecl().set(S.ptr_lookup(G(MaterialPass.vertexDecl)))
+    if G(MaterialPass.vertexShader):
+        zpt26 = ptype(G(MaterialPass.vertexShader))
+        if zpt26 == FOLLOWING:
+            MaterialPass.vertexShader = alloc(4)
+            MaterialVertexShader = MaterialPass.vertexShader
+            Load_MaterialVertexShader(True)
+        else:
+            MaterialPass.vertexShader().set(S.ptr_lookup(G(MaterialPass.vertexShader)))
+    if G(MaterialPass.pixelShader):
+        zpt27 = ptype(G(MaterialPass.pixelShader))
+        if zpt27 == FOLLOWING:
+            MaterialPass.pixelShader = alloc(4)
+            MaterialPixelShader = MaterialPass.pixelShader
+            Load_MaterialPixelShader(True)
+        else:
+            MaterialPass.pixelShader().set(S.ptr_lookup(G(MaterialPass.pixelShader)))
+    if G(MaterialPass.args):
+        MaterialPass.args = alloc(4)
+        MaterialShaderArgument = MaterialPass.args
+        LoadArray_MaterialShaderArgument(True, G(MaterialPass.perPrimArgCount) + G(MaterialPass.perObjArgCount) + G(MaterialPass.stableArgCount))
+  def Load_MaterialVertexShader:
+    if a:
+        read STRUCT('MaterialVertexShader', 16)
+    xstring MaterialVertexShader.name()
+    MaterialVertexShaderProgram = MaterialVertexShader.prog
+    Load_MaterialVertexShaderProgram(False)
+  def Load_MaterialVertexShaderProgram:
+    if a:
+        read STRUCT('MaterialVertexShaderProgram', 12)
+    GfxVertexShaderLoadDef = MaterialVertexShaderProgram.loadDef
+    Load_GfxVertexShaderLoadDef(False)
+  def Load_GfxVertexShaderLoadDef:
+    if a:
+        read STRUCT('GfxVertexShaderLoadDef', 8)
+    if G(GfxVertexShaderLoadDef.program):
+        GfxVertexShaderLoadDef.program = alloc(4)
+        data(GfxVertexShaderLoadDef.program(), 4, G(GfxVertexShaderLoadDef.programSize))
+  def Load_MaterialPixelShader:
+    if a:
+        read STRUCT('MaterialPixelShader', 16)
+    xstring MaterialPixelShader.name()
+    MaterialPixelShaderProgram = MaterialPixelShader.prog
+    Load_MaterialPixelShaderProgram(False)
+  def Load_MaterialPixelShaderProgram:
+    if a:
+        read STRUCT('MaterialPixelShaderProgram', 12)
+    GfxPixelShaderLoadDef = MaterialPixelShaderProgram.loadDef
+    Load_GfxPixelShaderLoadDef(False)
+  def Load_GfxPixelShaderLoadDef:
+    if a:
+        read STRUCT('GfxPixelShaderLoadDef', 8)
+    if G(GfxPixelShaderLoadDef.program):
+        GfxPixelShaderLoadDef.program = alloc(4)
+        data(GfxPixelShaderLoadDef.program(), 4, G(GfxPixelShaderLoadDef.programSize))
+  def Load_MaterialShaderArgument:
+    if a:
+        read STRUCT('MaterialShaderArgument', 8)
+    MaterialArgumentDef = MaterialShaderArgument.u
+    Load_MaterialArgumentDef(False)
+  def Load_MaterialArgumentDef:
+    if a:
+        read STRUCT('MaterialArgumentDef', 4)
+    if G(MaterialShaderArgument.type) == 1  or  G(MaterialShaderArgument.type) == 7:
+        if G(MaterialArgumentDef.literalConst):
+            zpt28 = ptype(G(MaterialArgumentDef.literalConst))
+            if zpt28 == FOLLOWING:
+                MaterialArgumentDef.literalConst = alloc(4)
+                data(MaterialArgumentDef.literalConst(), 16, 1)
+            else:
+                MaterialArgumentDef.literalConst().set(S.ptr_native(G(MaterialArgumentDef.literalConst)))
+  def Load_MaterialTechniqueSet:
+    if a:
+        read STRUCT('MaterialTechniqueSet', 248)
+    push(VIRTUAL)
+    xstring MaterialTechniqueSet.name()
+    MaterialTechniquePtr = MaterialTechniqueSet.techniques
+    LoadPtrArray_MaterialTechnique(False, 59)
+    pop()
+
+====================================================================================================
+ASSET menuDef_t
+  def LoadPtrArray_expressionEntry:
+    expressionEntryPtr = ptr_array_begin('expressionEntryPtr', a, count)
+    for _i in range(count):
+        ptr_array_select('expressionEntry', _i)
+        if deref('expressionEntry'):
+            deref_lv('expressionEntry').set(S.alloc(4))
+            expressionEntry = deref('expressionEntry')
+            Load_expressionEntry(True)
+  def LoadPtrArray_itemDef_s:
+    itemDef_sPtr = ptr_array_begin('itemDef_sPtr', a, count)
+    for _i in range(count):
+        ptr_array_select('itemDef_s', _i)
+        if deref('itemDef_s'):
+            deref_lv('itemDef_s').set(S.alloc(4))
+            itemDef_s = deref('itemDef_s')
+            Load_itemDef_s(True)
+  def Load_windowDef_t:
+    if a:
+        read STRUCT('windowDef_t', 156)
+    xstring windowDef_t.name()
+    xstring windowDef_t.group()
+    if G(windowDef_t.background):
+        asset('Material', windowDef_t.background())
+  def Load_ItemKeyHandler:
+    if a:
+        read STRUCT('ItemKeyHandler', 12)
+    xstring ItemKeyHandler.action()
+    if G(ItemKeyHandler.next):
+        ItemKeyHandler.next = alloc(4)
+        ItemKeyHandler = ItemKeyHandler.next
+        Load_ItemKeyHandler(True)
+  def Load_statement_s:
+    if a:
+        read STRUCT('statement_s', 8)
+    if G(statement_s.entries):
+        statement_s.entries = alloc(4)
+        expressionEntryPtr = statement_s.entries
+        LoadPtrArray_expressionEntry(True, G(statement_s.numEntries))
+  def Load_expressionEntry:
+    if a:
+        read STRUCT('expressionEntry', 12)
+    entryInternalData = expressionEntry.data
+    Load_entryInternalData(False)
+  def Load_entryInternalData:
+    if a:
+        read STRUCT('entryInternalData', 8)
+    if G(expressionEntry.type) == 1:
+        Operand = entryInternalData.operand
+        Load_Operand(False)
+  def Load_Operand:
+    if a:
+        read STRUCT('Operand', 8)
+    operandInternalDataUnion = Operand.internals
+    Load_operandInternalDataUnion(False)
+  def Load_operandInternalDataUnion:
+    if a:
+        read STRUCT('operandInternalDataUnion', 4)
+    if G(Operand.dataType) == 2:
+        xstring operandInternalDataUnion.stringVal()
+  def Load_itemDef_s:
+    if a:
+        read STRUCT('itemDef_s', 376)
+    windowDef_t = itemDef_s.window
+    Load_windowDef_t(False)
+    xstring itemDef_s.text()
+    xstring itemDef_s.mouseEnterText()
+    xstring itemDef_s.mouseExitText()
+    xstring itemDef_s.mouseEnter()
+    xstring itemDef_s.mouseExit()
+    xstring itemDef_s.action()
+    xstring itemDef_s.onAccept()
+    xstring itemDef_s.onFocus()
+    xstring itemDef_s.leaveFocus()
+    xstring itemDef_s.dvar()
+    xstring itemDef_s.dvarTest()
+    xstring itemDef_s.onListboxSelectionChange()
+    if G(itemDef_s.onKey):
+        itemDef_s.onKey = alloc(4)
+        ItemKeyHandler = itemDef_s.onKey
+        Load_ItemKeyHandler(True)
+    xstring itemDef_s.enableDvar()
+    if G(itemDef_s.focusSound):
+        asset('snd_alias_list_t', itemDef_s.focusSound())
+    itemDefData_t = itemDef_s.typeData
+    Load_itemDefData_t(False)
+    statement_s = itemDef_s.visibleExp
+    Load_statement_s(False)
+    statement_s = itemDef_s.textExp
+    Load_statement_s(False)
+    statement_s = itemDef_s.materialExp
+    Load_statement_s(False)
+    statement_s = itemDef_s.rectXExp
+    Load_statement_s(False)
+    statement_s = itemDef_s.rectYExp
+    Load_statement_s(False)
+    statement_s = itemDef_s.rectWExp
+    Load_statement_s(False)
+    statement_s = itemDef_s.rectHExp
+    Load_statement_s(False)
+    statement_s = itemDef_s.forecolorAExp
+    Load_statement_s(False)
+  def Load_itemDefData_t:
+    if a:
+        read STRUCT('itemDefData_t', 4)
+    if G(itemDef_s.type) == 6:
+        if G(itemDefData_t.listBox):
+            itemDefData_t.listBox = alloc(4)
+            listBoxDef_s = itemDefData_t.listBox
+            Load_listBoxDef_s(True)
+    elif G(itemDef_s.type) == 0  or  G(itemDef_s.type) == 4  or  G(itemDef_s.type) == 9  or  G(itemDef_s.type) == 10  or  G(itemDef_s.type) == 11  or  G(itemDef_s.type) == 14  or  G(itemDef_s.type) == 16  or  G(itemDef_s.type) == 17  or  G(itemDef_s.type) == 18:
+        if G(itemDefData_t.editField):
+            itemDefData_t.editField = alloc(4)
+            data(itemDefData_t.editField(), 32, 1)
+    elif G(itemDef_s.type) == 12:
+        if G(itemDefData_t.multi):
+            itemDefData_t.multi = alloc(4)
+            multiDef_s = itemDefData_t.multi
+            Load_multiDef_s(True)
+    elif G(itemDef_s.type) == 13:
+        xstring itemDefData_t.enumDvarName()
+  def Load_listBoxDef_s:
+    if a:
+        read STRUCT('listBoxDef_s', 364)
+    xstring listBoxDef_s.onDoubleClick()
+    if G(listBoxDef_s.selectIcon):
+        asset('Material', listBoxDef_s.selectIcon())
+    if G(listBoxDef_s.backgroundItemListbox):
+        asset('Material', listBoxDef_s.backgroundItemListbox())
+    if G(listBoxDef_s.highlightTexture):
+        asset('Material', listBoxDef_s.highlightTexture())
+  def Load_multiDef_s:
+    if a:
+        read STRUCT('multiDef_s', 392)
+    xstring multiDef_s.dvarList
+    load_xstring_array(False, 32)
+    xstring multiDef_s.dvarStr
+    load_xstring_array(False, 32)
+  def Load_menuDef_t:
+    if a:
+        read STRUCT('menuDef_t', 288)
+    push(VIRTUAL)
+    windowDef_t = menuDef_t.window
+    Load_windowDef_t(False)
+    xstring menuDef_t.font()
+    xstring menuDef_t.onOpen()
+    xstring menuDef_t.onFocus()
+    xstring menuDef_t.onClose()
+    xstring menuDef_t.onESC()
+    if G(menuDef_t.onKey):
+        menuDef_t.onKey = alloc(4)
+        ItemKeyHandler = menuDef_t.onKey
+        Load_ItemKeyHandler(True)
+    statement_s = menuDef_t.visibleExp
+    Load_statement_s(False)
+    xstring menuDef_t.allowedBinding()
+    xstring menuDef_t.soundName()
+    statement_s = menuDef_t.rectXExp
+    Load_statement_s(False)
+    statement_s = menuDef_t.rectYExp
+    Load_statement_s(False)
+    if G(menuDef_t.items):
+        menuDef_t.items = alloc(4)
+        itemDef_sPtr = menuDef_t.items
+        LoadPtrArray_itemDef_s(True, G(menuDef_t.itemCount))
+    pop()
+
+====================================================================================================
+ASSET MenuList
+  def LoadPtrArray_menuDef_t:
+    menuDef_tPtr = ptr_array_begin('menuDef_tPtr', a, count)
+    for _i in range(count):
+        ptr_array_select('menuDef_t', _i)
+        if deref('menuDef_t'):
+            asset('menuDef_t', deref_lv('menuDef_t'))
+  def Load_MenuList:
+    if a:
+        read STRUCT('MenuList', 12)
+    push(VIRTUAL)
+    xstring MenuList.name()
+    if G(MenuList.menus):
+        MenuList.menus = alloc(4)
+        menuDef_tPtr = MenuList.menus
+        LoadPtrArray_menuDef_t(True, G(MenuList.menuCount))
+    pop()
+
+====================================================================================================
+ASSET PackIndex
+  def Load_PackIndex:
+    if a:
+        read STRUCT('PackIndex', 28)
+    push(VIRTUAL)
+    xstring PackIndex.name()
+    if G(PackIndex.entries):
+        PackIndex.entries = alloc(4)
+        data(PackIndex.entries(), 12, G(PackIndex.header, 'count'))
+    pop()
+
+====================================================================================================
+ASSET PhysConstraints
+  def LoadArray_PhysConstraint:
+    load_array('PhysConstraint', 152, a, count, Load_PhysConstraint)
+  def Load_PhysConstraint:
+    if a:
+        read STRUCT('PhysConstraint', 152)
+    xstring PhysConstraint.target_bone1()
+    xstring PhysConstraint.target_bone2()
+    if G(PhysConstraint.material):
+        asset('Material', PhysConstraint.material())
+  def Load_PhysConstraints:
+    if a:
+        read STRUCT('PhysConstraints', 2440)
+    push(VIRTUAL)
+    xstring PhysConstraints.name()
+    PhysConstraint = PhysConstraints.data
+    LoadArray_PhysConstraint(False, 16)
+    pop()
+
+====================================================================================================
+ASSET PhysPreset
+  def Load_PhysPreset:
+    if a:
+        read STRUCT('PhysPreset', 48)
+    push(VIRTUAL)
+    xstring PhysPreset.name()
+    xstring PhysPreset.sndAliasPrefix()
+    pop()
+
+====================================================================================================
+ASSET RawFile
+  def Load_RawFile:
+    if a:
+        read STRUCT('RawFile', 12)
+    push(VIRTUAL)
+    xstring RawFile.name()
+    if G(RawFile.buffer):
+        RawFile.buffer = alloc(1)
+        data(RawFile.buffer(), 1, G(RawFile.len) + 1)
+    pop()
+
+====================================================================================================
+ASSET snd_alias_list_t
+  def LoadArray_snd_alias_t:
+    load_array('snd_alias_t', 184, a, count, Load_snd_alias_t)
+  def Load_snd_alias_t:
+    if a:
+        read STRUCT('snd_alias_t', 184)
+    xstring snd_alias_t.aliasName()
+    xstring snd_alias_t.subtitle()
+    xstring snd_alias_t.secondaryAliasName()
+    xstring snd_alias_t.chainAliasName()
+    if G(snd_alias_t.soundFile):
+        zpt29 = ptype(G(snd_alias_t.soundFile))
+        if zpt29 == FOLLOWING:
+            snd_alias_t.soundFile = alloc(4)
+            SoundFile = snd_alias_t.soundFile
+            Load_SoundFile(True)
+        else:
+            snd_alias_t.soundFile().set(S.ptr_lookup(G(snd_alias_t.soundFile)))
+  def Load_SoundFile:
+    if a:
+        read STRUCT('SoundFile', 20)
+    SoundFileRef = SoundFile.u
+    Load_SoundFileRef(False)
+  def Load_SoundFileRef:
+    if a:
+        read STRUCT('SoundFileRef', 16)
+    if G(SoundFile.type) == 1:
+        if G(SoundFileRef.loadSnd):
+            asset('LoadedSound', SoundFileRef.loadSnd())
+    else:
+        StreamedSound = SoundFileRef.streamSnd
+        Load_StreamedSound(False)
+  def Load_StreamedSound:
+    if a:
+        read STRUCT('StreamedSound', 16)
+    StreamFileName = StreamedSound.filename
+    Load_StreamFileName(False)
+    if G(StreamedSound.primeSnd):
+        zpt30 = ptype(G(StreamedSound.primeSnd))
+        if zpt30 == FOLLOWING:
+            StreamedSound.primeSnd = alloc(4)
+            PrimedSound = StreamedSound.primeSnd
+            Load_PrimedSound(True)
+        else:
+            StreamedSound.primeSnd().set(S.ptr_lookup(G(StreamedSound.primeSnd)))
+  def Load_StreamFileName:
+    if a:
+        read STRUCT('StreamFileName', 12)
+    xstring StreamFileName.dir()
+    xstring StreamFileName.name()
+  def Load_PrimedSound:
+    if a:
+        read STRUCT('PrimedSound', 12)
+    xstring PrimedSound.name()
+    push(LARGE)
+    if G(PrimedSound.buffer):
+        PrimedSound.buffer = alloc(2048)
+        data(PrimedSound.buffer(), 1, G(PrimedSound.size))
+    pop()
+  def Load_snd_alias_list_t:
+    if a:
+        read STRUCT('snd_alias_list_t', 12)
+    push(VIRTUAL)
+    xstring snd_alias_list_t.aliasName()
+    if G(snd_alias_list_t.head):
+        zpt31 = ptype(G(snd_alias_list_t.head))
+        if zpt31 == FOLLOWING:
+            snd_alias_list_t.head = alloc(4)
+            snd_alias_t = snd_alias_list_t.head
+            LoadArray_snd_alias_t(True, G(snd_alias_list_t.count))
+        else:
+            snd_alias_list_t.head().set(S.ptr_lookup(G(snd_alias_list_t.head)))
+    pop()
+
+====================================================================================================
+ASSET SndDriverGlobals
+  def Load_SndDriverGlobals:
+    if a:
+        read STRUCT('SndDriverGlobals', 23556)
+    push(VIRTUAL)
+    xstring SndDriverGlobals.name()
+    pop()
+
+====================================================================================================
+ASSET StringTable
+  def Load_StringTable:
+    if a:
+        read STRUCT('StringTable', 16)
+    push(VIRTUAL)
+    xstring StringTable.name()
+    if G(StringTable.values):
+        StringTable.values = alloc(4)
+        xstring StringTable.values
+        load_xstring_array(True, G(StringTable.columnCount) * G(StringTable.rowCount))
+    pop()
+
+====================================================================================================
+ASSET WeaponDef
+  def LoadPtrArray_XModel:
+    XModelPtr = ptr_array_begin('XModelPtr', a, count)
+    for _i in range(count):
+        ptr_array_select('XModel', _i)
+        if deref('XModel'):
+            asset('XModel', deref_lv('XModel'))
+  def LoadArray_SndAliasCustom:
+    load_array('SndAliasCustom', 4, a, count, Load_SndAliasCustom)
+  def Load_SndAliasCustom:
+    if a:
+        read STRUCT('SndAliasCustom', 4)
+    if G(SndAliasCustom.name):
+        zpt32 = ptype(G(SndAliasCustom.name))
+        if zpt32 == FOLLOWING:
+            SndAliasCustom.name = alloc(4)
+            snd_alias_list_name = SndAliasCustom.name
+            Load_snd_alias_list_name(True)
+        else:
+            SndAliasCustom.name().set(S.ptr_lookup(G(SndAliasCustom.name)))
+  def Load_snd_alias_list_name:
+    if a:
+        read STRUCT('snd_alias_list_name', 4)
+    xstring snd_alias_list_name.soundName()
+  def Load_FlameTable:
+    if a:
+        read STRUCT('FlameTable', 476)
+    xstring FlameTable.name()
+    if G(FlameTable.fire):
+        asset('Material', FlameTable.fire())
+    if G(FlameTable.smoke):
+        asset('Material', FlameTable.smoke())
+    if G(FlameTable.heat):
+        asset('Material', FlameTable.heat())
+    if G(FlameTable.drips):
+        asset('Material', FlameTable.drips())
+    if G(FlameTable.streamFuel):
+        asset('Material', FlameTable.streamFuel())
+    if G(FlameTable.streamFuel2):
+        asset('Material', FlameTable.streamFuel2())
+    if G(FlameTable.streamFlame):
+        asset('Material', FlameTable.streamFlame())
+    if G(FlameTable.streamFlame2):
+        asset('Material', FlameTable.streamFlame2())
+    SndAliasCustom = FlameTable.flameOffLoopSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = FlameTable.flameIgniteSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = FlameTable.flameOnLoopSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = FlameTable.flameCooldownSound
+    Load_SndAliasCustom(False)
+  def Load_WeaponDef:
+    if a:
+        read STRUCT('WeaponDef', 2476)
+    push(VIRTUAL)
+    xstring WeaponDef.szInternalName()
+    xstring WeaponDef.szDisplayName()
+    xstring WeaponDef.szOverlayName()
+    XModelPtr = WeaponDef.gunXModel
+    LoadPtrArray_XModel(False, 16)
+    if G(WeaponDef.handXModel):
+        asset('XModel', WeaponDef.handXModel())
+    xstring WeaponDef.szXAnims
+    load_xstring_array(False, 35)
+    xstring WeaponDef.szModeName()
+    if G(WeaponDef.viewFlashEffect):
+        asset('FxEffectDef', WeaponDef.viewFlashEffect())
+    if G(WeaponDef.worldFlashEffect):
+        asset('FxEffectDef', WeaponDef.worldFlashEffect())
+    SndAliasCustom = WeaponDef.pickupSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.pickupSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.ammoPickupSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.ammoPickupSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.projectileSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.pullbackSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.pullbackSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.fireSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.fireSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.fireLoopSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.fireLoopSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.fireStopSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.fireStopSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.fireLastSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.fireLastSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.emptyFireSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.emptyFireSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.crackSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.whizbySound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.meleeSwipeSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.meleeSwipeSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.meleeHitSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.meleeMissSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.rechamberSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.rechamberSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.reloadSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.reloadSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.reloadEmptySound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.reloadEmptySoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.reloadStartSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.reloadStartSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.reloadEndSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.reloadEndSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.rotateLoopSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.rotateLoopSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.deploySound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.deploySoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.finishDeploySound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.finishDeploySoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.breakdownSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.breakdownSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.finishBreakdownSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.finishBreakdownSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.detonateSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.detonateSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.nightVisionWearSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.nightVisionWearSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.nightVisionRemoveSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.nightVisionRemoveSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.altSwitchSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.altSwitchSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.raiseSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.raiseSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.firstRaiseSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.firstRaiseSoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.putawaySound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.putawaySoundPlayer
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.overheatSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.overheatSoundPlayer
+    Load_SndAliasCustom(False)
+    if G(WeaponDef.bounceSound):
+        zpt33 = ptype(G(WeaponDef.bounceSound))
+        if zpt33 == FOLLOWING:
+            WeaponDef.bounceSound = alloc(4)
+            SndAliasCustom = WeaponDef.bounceSound
+            LoadArray_SndAliasCustom(True, 31)
+        else:
+            WeaponDef.bounceSound().set(S.ptr_lookup(G(WeaponDef.bounceSound)))
+    xstring WeaponDef.standMountedWeapdef()
+    xstring WeaponDef.crouchMountedWeapdef()
+    xstring WeaponDef.proneMountedWeapdef()
+    if G(WeaponDef.viewShellEjectEffect):
+        asset('FxEffectDef', WeaponDef.viewShellEjectEffect())
+    if G(WeaponDef.worldShellEjectEffect):
+        asset('FxEffectDef', WeaponDef.worldShellEjectEffect())
+    if G(WeaponDef.viewLastShotEjectEffect):
+        asset('FxEffectDef', WeaponDef.viewLastShotEjectEffect())
+    if G(WeaponDef.worldLastShotEjectEffect):
+        asset('FxEffectDef', WeaponDef.worldLastShotEjectEffect())
+    if G(WeaponDef.reticleCenter):
+        asset('Material', WeaponDef.reticleCenter())
+    if G(WeaponDef.reticleSide):
+        asset('Material', WeaponDef.reticleSide())
+    XModelPtr = WeaponDef.worldModel
+    LoadPtrArray_XModel(False, 16)
+    if G(WeaponDef.worldClipModel):
+        asset('XModel', WeaponDef.worldClipModel())
+    if G(WeaponDef.rocketModel):
+        asset('XModel', WeaponDef.rocketModel())
+    if G(WeaponDef.knifeModel):
+        asset('XModel', WeaponDef.knifeModel())
+    if G(WeaponDef.worldKnifeModel):
+        asset('XModel', WeaponDef.worldKnifeModel())
+    if G(WeaponDef.mountedModel):
+        asset('XModel', WeaponDef.mountedModel())
+    if G(WeaponDef.hudIcon):
+        asset('Material', WeaponDef.hudIcon())
+    if G(WeaponDef.ammoCounterIcon):
+        asset('Material', WeaponDef.ammoCounterIcon())
+    xstring WeaponDef.szAmmoName()
+    xstring WeaponDef.szClipName()
+    xstring WeaponDef.szSharedAmmoCapName()
+    if G(WeaponDef.overlayMaterial):
+        asset('Material', WeaponDef.overlayMaterial())
+    if G(WeaponDef.overlayMaterialLowRes):
+        asset('Material', WeaponDef.overlayMaterialLowRes())
+    if G(WeaponDef.killIcon):
+        asset('Material', WeaponDef.killIcon())
+    if G(WeaponDef.dpadIcon):
+        asset('Material', WeaponDef.dpadIcon())
+    xstring WeaponDef.szAltWeaponName()
+    if G(WeaponDef.projectileModel):
+        asset('XModel', WeaponDef.projectileModel())
+    if G(WeaponDef.projExplosionEffect):
+        asset('FxEffectDef', WeaponDef.projExplosionEffect())
+    if G(WeaponDef.projDudEffect):
+        asset('FxEffectDef', WeaponDef.projDudEffect())
+    SndAliasCustom = WeaponDef.projExplosionSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.projDudSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.mortarShellSound
+    Load_SndAliasCustom(False)
+    SndAliasCustom = WeaponDef.tankShellSound
+    Load_SndAliasCustom(False)
+    if G(WeaponDef.projTrailEffect):
+        asset('FxEffectDef', WeaponDef.projTrailEffect())
+    if G(WeaponDef.projIgnitionEffect):
+        asset('FxEffectDef', WeaponDef.projIgnitionEffect())
+    SndAliasCustom = WeaponDef.projIgnitionSound
+    Load_SndAliasCustom(False)
+    xstring WeaponDef.aiVsAiAccuracyGraphName()
+    if G(WeaponDef.aiVsAiAccuracyGraphKnots):
+        zpt34 = ptype(G(WeaponDef.aiVsAiAccuracyGraphKnots))
+        if zpt34 == FOLLOWING:
+            WeaponDef.aiVsAiAccuracyGraphKnots = alloc(4)
+            data(WeaponDef.aiVsAiAccuracyGraphKnots(), 8, G(WeaponDef.aiVsAiAccuracyGraphKnotCount))
+        else:
+            WeaponDef.aiVsAiAccuracyGraphKnots().set(S.ptr_native(G(WeaponDef.aiVsAiAccuracyGraphKnots)))
+    if G(WeaponDef.originalAiVsAiAccuracyGraphKnots):
+        zpt35 = ptype(G(WeaponDef.originalAiVsAiAccuracyGraphKnots))
+        if zpt35 == FOLLOWING:
+            WeaponDef.originalAiVsAiAccuracyGraphKnots = alloc(4)
+            data(WeaponDef.originalAiVsAiAccuracyGraphKnots(), 8, G(WeaponDef.aiVsAiAccuracyGraphKnotCount))
+        else:
+            WeaponDef.originalAiVsAiAccuracyGraphKnots().set(S.ptr_native(G(WeaponDef.originalAiVsAiAccuracyGraphKnots)))
+    xstring WeaponDef.aiVsPlayerAccuracyGraphName()
+    if G(WeaponDef.aiVsPlayerAccuracyGraphKnots):
+        zpt36 = ptype(G(WeaponDef.aiVsPlayerAccuracyGraphKnots))
+        if zpt36 == FOLLOWING:
+            WeaponDef.aiVsPlayerAccuracyGraphKnots = alloc(4)
+            data(WeaponDef.aiVsPlayerAccuracyGraphKnots(), 8, G(WeaponDef.aiVsPlayerAccuracyGraphKnotCount))
+        else:
+            WeaponDef.aiVsPlayerAccuracyGraphKnots().set(S.ptr_native(G(WeaponDef.aiVsPlayerAccuracyGraphKnots)))
+    if G(WeaponDef.originalAiVsPlayerAccuracyGraphKnots):
+        zpt37 = ptype(G(WeaponDef.originalAiVsPlayerAccuracyGraphKnots))
+        if zpt37 == FOLLOWING:
+            WeaponDef.originalAiVsPlayerAccuracyGraphKnots = alloc(4)
+            data(WeaponDef.originalAiVsPlayerAccuracyGraphKnots(), 8, G(WeaponDef.aiVsPlayerAccuracyGraphKnotCount))
+        else:
+            WeaponDef.originalAiVsPlayerAccuracyGraphKnots().set(S.ptr_native(G(WeaponDef.originalAiVsPlayerAccuracyGraphKnots)))
+    xstring WeaponDef.szUseHintString()
+    xstring WeaponDef.dropHintString()
+    xstring WeaponDef.szScript()
+    xstring WeaponDef.fireRumble()
+    xstring WeaponDef.meleeImpactRumble()
+    xstring WeaponDef.flameTableFirstPerson()
+    xstring WeaponDef.flameTableThirdPerson()
+    if G(WeaponDef.flameTableFirstPersonPtr):
+        zpt38 = ptype(G(WeaponDef.flameTableFirstPersonPtr))
+        if zpt38 == FOLLOWING:
+            WeaponDef.flameTableFirstPersonPtr = alloc(4)
+            FlameTable = WeaponDef.flameTableFirstPersonPtr
+            Load_FlameTable(True)
+        else:
+            WeaponDef.flameTableFirstPersonPtr().set(S.ptr_lookup(G(WeaponDef.flameTableFirstPersonPtr)))
+    if G(WeaponDef.flameTableThirdPersonPtr):
+        zpt39 = ptype(G(WeaponDef.flameTableThirdPersonPtr))
+        if zpt39 == FOLLOWING:
+            WeaponDef.flameTableThirdPersonPtr = alloc(4)
+            FlameTable = WeaponDef.flameTableThirdPersonPtr
+            Load_FlameTable(True)
+        else:
+            WeaponDef.flameTableThirdPersonPtr().set(S.ptr_lookup(G(WeaponDef.flameTableThirdPersonPtr)))
+    if G(WeaponDef.tagFx_preparationEffect):
+        asset('FxEffectDef', WeaponDef.tagFx_preparationEffect())
+    if G(WeaponDef.tagFlash_preparationEffect):
+        asset('FxEffectDef', WeaponDef.tagFlash_preparationEffect())
+    pop()
+
+====================================================================================================
+ASSET XAnimParts
+  def LoadArray_XAnimNotifyInfo:
+    load_array('XAnimNotifyInfo', 8, a, count, Load_XAnimNotifyInfo)
+  def Load_XAnimNotifyInfo:
+    if a:
+        read STRUCT('XAnimNotifyInfo', 8)
+  def Load_XAnimDeltaPart:
+    if a:
+        read STRUCT('XAnimDeltaPart', 8)
+    if G(XAnimDeltaPart.trans):
+        S.alloc(4)
+        dyn = dynread STRUCT('XAnimPartTrans')
+        XAnimDeltaPart.trans().set(S.alloc(0, dyn=dyn))
+        XAnimPartTrans = XAnimDeltaPart.trans
+        Load_XAnimPartTrans(True)
+    if G(XAnimDeltaPart.quat):
+        S.alloc(4)
+        dyn = dynread STRUCT('XAnimDeltaPartQuat')
+        XAnimDeltaPart.quat().set(S.alloc(0, dyn=dyn))
+        XAnimDeltaPartQuat = XAnimDeltaPart.quat
+        Load_XAnimDeltaPartQuat(True)
+  def Load_XAnimPartTrans:
+    if a:
+        fill_last('XAnimPartTrans')
+    XAnimPartTransData = XAnimPartTrans.u
+    Load_XAnimPartTransData(False)
+  def Load_XAnimPartTransData:
+    if G(XAnimPartTrans.size) > 0:
+        XAnimPartTransFrames = XAnimPartTransData.frames
+        Load_XAnimPartTransFrames(False)
+    else:
+        pass
+  def Load_XAnimPartTransFrames:
+    XAnimDynamicIndicesTrans = XAnimPartTransFrames.indices
+    Load_XAnimDynamicIndicesTrans(False)
+    XAnimDynamicFrames = XAnimPartTransFrames.frames
+    Load_XAnimDynamicFrames(False)
+  def Load_XAnimDynamicIndicesTrans:
+    if G(XAnimParts.numframes) < 256:
+        if a:
+            data(XAnimDynamicIndicesTrans._1(), 1, G(XAnimPartTrans.size) + 1)
+    else:
+        if a:
+            data(XAnimDynamicIndicesTrans._2(), 2, G(XAnimPartTrans.size) + 1)
+  def Load_XAnimDynamicFrames:
+    if a:
+        read STRUCT('XAnimDynamicFrames', 4)
+    if G(XAnimPartTrans.smallTrans):
+        if G(XAnimDynamicFrames._1):
+            XAnimDynamicFrames._1 = alloc(1)
+            data(XAnimDynamicFrames._1(), 3, G(XAnimPartTrans.size) + 1)
+    else:
+        if G(XAnimDynamicFrames._2):
+            XAnimDynamicFrames._2 = alloc(4)
+            data(XAnimDynamicFrames._2(), 6, G(XAnimPartTrans.size) + 1)
+  def Load_XAnimDeltaPartQuat:
+    if a:
+        fill_last('XAnimDeltaPartQuat')
+    XAnimDeltaPartQuatData = XAnimDeltaPartQuat.u
+    Load_XAnimDeltaPartQuatData(False)
+  def Load_XAnimDeltaPartQuatData:
+    if G(XAnimDeltaPartQuat.size) > 0:
+        XAnimDeltaPartQuatDataFrames = XAnimDeltaPartQuatData.frames
+        Load_XAnimDeltaPartQuatDataFrames(False)
+    else:
+        pass
+  def Load_XAnimDeltaPartQuatDataFrames:
+    XAnimDynamicIndicesQuat = XAnimDeltaPartQuatDataFrames.indices
+    Load_XAnimDynamicIndicesQuat(False)
+    if G(XAnimDeltaPartQuatDataFrames.frames):
+        XAnimDeltaPartQuatDataFrames.frames = alloc(4)
+        data(XAnimDeltaPartQuatDataFrames.frames(), 4, G(XAnimDeltaPartQuat.size) + 1)
+  def Load_XAnimDynamicIndicesQuat:
+    if G(XAnimParts.numframes) < 256:
+        if a:
+            data(XAnimDynamicIndicesQuat._1(), 1, G(XAnimDeltaPartQuat.size) + 1)
+    else:
+        if a:
+            data(XAnimDynamicIndicesQuat._2(), 2, G(XAnimDeltaPartQuat.size) + 1)
+  def Load_XAnimIndices:
+    if a:
+        read STRUCT('XAnimIndices', 4)
+    if G(XAnimParts.numframes) < 256:
+        if G(XAnimIndices._1):
+            XAnimIndices._1 = alloc(1)
+            data(XAnimIndices._1(), 1, G(XAnimParts.indexCount))
+    else:
+        if G(XAnimIndices._2):
+            XAnimIndices._2 = alloc(2)
+            data(XAnimIndices._2(), 2, G(XAnimParts.indexCount))
+  def Load_XAnimParts:
+    if a:
+        read STRUCT('XAnimParts', 88)
+    push(VIRTUAL)
+    xstring XAnimParts.name()
+    if G(XAnimParts.names):
+        XAnimParts.names = alloc(2)
+        data(XAnimParts.names(), 2, G(XAnimParts.boneCount, (9)))
+    if G(XAnimParts.notify):
+        XAnimParts.notify = alloc(4)
+        XAnimNotifyInfo = XAnimParts.notify
+        LoadArray_XAnimNotifyInfo(True, G(XAnimParts.notifyCount))
+    if G(XAnimParts.deltaPart):
+        XAnimParts.deltaPart = alloc(4)
+        XAnimDeltaPart = XAnimParts.deltaPart
+        Load_XAnimDeltaPart(True)
+    if G(XAnimParts.dataByte):
+        XAnimParts.dataByte = alloc(1)
+        data(XAnimParts.dataByte(), 1, G(XAnimParts.dataByteCount))
+    if G(XAnimParts.dataShort):
+        XAnimParts.dataShort = alloc(2)
+        data(XAnimParts.dataShort(), 2, G(XAnimParts.dataShortCount))
+    if G(XAnimParts.dataInt):
+        XAnimParts.dataInt = alloc(4)
+        data(XAnimParts.dataInt(), 4, G(XAnimParts.dataIntCount))
+    if G(XAnimParts.randomDataShort):
+        XAnimParts.randomDataShort = alloc(2)
+        data(XAnimParts.randomDataShort(), 2, G(XAnimParts.randomDataShortCount))
+    if G(XAnimParts.randomDataByte):
+        XAnimParts.randomDataByte = alloc(1)
+        data(XAnimParts.randomDataByte(), 1, G(XAnimParts.randomDataByteCount))
+    if G(XAnimParts.randomDataInt):
+        XAnimParts.randomDataInt = alloc(4)
+        data(XAnimParts.randomDataInt(), 4, G(XAnimParts.randomDataIntCount))
+    XAnimIndices = XAnimParts.indices
+    Load_XAnimIndices(False)
+    pop()
+
+====================================================================================================
+ASSET XModel
+  def LoadPtrArray_Material:
+    MaterialPtr = ptr_array_begin('MaterialPtr', a, count)
+    for _i in range(count):
+        ptr_array_select('Material', _i)
+        if deref('Material'):
+            asset('Material', deref_lv('Material'))
+  def LoadArray_XSurface:
+    load_array('XSurface', 64, a, count, Load_XSurface)
+  def LoadArray_XRigidVertList:
+    load_array('XRigidVertList', 12, a, count, Load_XRigidVertList)
+  def LoadArray_XModelCollSurf_s:
+    load_array('XModelCollSurf_s', 44, a, count, Load_XModelCollSurf_s)
+  def LoadArray_PhysGeomInfo:
+    load_array('PhysGeomInfo', 68, a, count, Load_PhysGeomInfo)
+  def LoadArray_cbrushside_t:
+    load_array('cbrushside_t', 12, a, count, Load_cbrushside_t)
+  def Load_XSurface:
+    if a:
+        read STRUCT('XSurface', 64)
+    XSurfaceVertexInfo = XSurface.vertInfo
+    Load_XSurfaceVertexInfo(False)
+    if G(XSurface.verts0):
+        zpt40 = ptype(G(XSurface.verts0))
+        if zpt40 == FOLLOWING:
+            XSurface.verts0 = alloc(16)
+            data(XSurface.verts0(), 32, G(XSurface.vertCount))
+        else:
+            XSurface.verts0().set(S.ptr_native(G(XSurface.verts0)))
+    if G(XSurface.vertList):
+        zpt41 = ptype(G(XSurface.vertList))
+        if zpt41 == FOLLOWING:
+            XSurface.vertList = alloc(4)
+            XRigidVertList = XSurface.vertList
+            LoadArray_XRigidVertList(True, G(XSurface.vertListCount))
+        else:
+            XSurface.vertList().set(S.ptr_lookup(G(XSurface.vertList)))
+    if G(XSurface.triIndices):
+        zpt42 = ptype(G(XSurface.triIndices))
+        if zpt42 == FOLLOWING:
+            XSurface.triIndices = alloc(16)
+            data(XSurface.triIndices(), 6, G(XSurface.triCount))
+        else:
+            XSurface.triIndices().set(S.ptr_native(G(XSurface.triIndices)))
+  def Load_XSurfaceVertexInfo:
+    if a:
+        read STRUCT('XSurfaceVertexInfo', 12)
+    if G(XSurfaceVertexInfo.vertsBlend):
+        zpt43 = ptype(G(XSurfaceVertexInfo.vertsBlend))
+        if zpt43 == FOLLOWING:
+            XSurfaceVertexInfo.vertsBlend = alloc(2)
+            data(XSurfaceVertexInfo.vertsBlend(), 2, G(XSurfaceVertexInfo.vertCount, (0)) + 3 * G(XSurfaceVertexInfo.vertCount, (1)) + 5 * G(XSurfaceVertexInfo.vertCount, (2)) + 7 * G(XSurfaceVertexInfo.vertCount, (3)))
+        else:
+            XSurfaceVertexInfo.vertsBlend().set(S.ptr_native(G(XSurfaceVertexInfo.vertsBlend)))
+  def Load_XRigidVertList:
+    if a:
+        read STRUCT('XRigidVertList', 12)
+    if G(XRigidVertList.collisionTree):
+        zpt44 = ptype(G(XRigidVertList.collisionTree))
+        if zpt44 == FOLLOWING:
+            XRigidVertList.collisionTree = alloc(4)
+            XSurfaceCollisionTree = XRigidVertList.collisionTree
+            Load_XSurfaceCollisionTree(True)
+        else:
+            XRigidVertList.collisionTree().set(S.ptr_lookup(G(XRigidVertList.collisionTree)))
+  def Load_XSurfaceCollisionTree:
+    if a:
+        read STRUCT('XSurfaceCollisionTree', 40)
+    if G(XSurfaceCollisionTree.nodes):
+        XSurfaceCollisionTree.nodes = alloc(16)
+        data(XSurfaceCollisionTree.nodes(), 16, G(XSurfaceCollisionTree.nodeCount))
+    if G(XSurfaceCollisionTree.leafs):
+        XSurfaceCollisionTree.leafs = alloc(2)
+        data(XSurfaceCollisionTree.leafs(), 2, G(XSurfaceCollisionTree.leafCount))
+  def Load_XModelCollSurf_s:
+    if a:
+        read STRUCT('XModelCollSurf_s', 44)
+    if G(XModelCollSurf_s.collTris):
+        XModelCollSurf_s.collTris = alloc(4)
+        data(XModelCollSurf_s.collTris(), 48, G(XModelCollSurf_s.numCollTris))
+  def Load_PhysGeomList:
+    if a:
+        read STRUCT('PhysGeomList', 20)
+    if G(PhysGeomList.geoms):
+        zpt45 = ptype(G(PhysGeomList.geoms))
+        if zpt45 == FOLLOWING:
+            PhysGeomList.geoms = alloc(4)
+            PhysGeomInfo = PhysGeomList.geoms
+            LoadArray_PhysGeomInfo(True, G(PhysGeomList.count))
+        else:
+            PhysGeomList.geoms().set(S.ptr_lookup(G(PhysGeomList.geoms)))
+  def Load_PhysGeomInfo:
+    if a:
+        read STRUCT('PhysGeomInfo', 68)
+    if G(PhysGeomInfo.brush):
+        zpt46 = ptype(G(PhysGeomInfo.brush))
+        if zpt46 == FOLLOWING:
+            PhysGeomInfo.brush = alloc(4)
+            BrushWrapper = PhysGeomInfo.brush
+            Load_BrushWrapper(True)
+        else:
+            PhysGeomInfo.brush().set(S.ptr_lookup(G(PhysGeomInfo.brush)))
+  def Load_BrushWrapper:
+    if a:
+        read STRUCT('BrushWrapper', 96)
+    if G(BrushWrapper.sides):
+        BrushWrapper.sides = alloc(4)
+        cbrushside_t = BrushWrapper.sides
+        LoadArray_cbrushside_t(True, G(BrushWrapper.numsides))
+    if G(BrushWrapper.baseAdjacentSide):
+        BrushWrapper.baseAdjacentSide = alloc(1)
+        data(BrushWrapper.baseAdjacentSide(), 1, G(BrushWrapper.totalEdgeCount))
+    if G(BrushWrapper.verts):
+        zpt47 = ptype(G(BrushWrapper.verts))
+        if zpt47 == FOLLOWING:
+            BrushWrapper.verts = alloc(4)
+            data(BrushWrapper.verts(), 12, G(BrushWrapper.numverts))
+        else:
+            BrushWrapper.verts().set(S.ptr_native(G(BrushWrapper.verts)))
+    if G(BrushWrapper.planes):
+        zpt48 = ptype(G(BrushWrapper.planes))
+        if zpt48 == FOLLOWING:
+            BrushWrapper.planes = alloc(4)
+            data(BrushWrapper.planes(), 20, G(BrushWrapper.numsides))
+        else:
+            BrushWrapper.planes().set(S.ptr_native(G(BrushWrapper.planes)))
+  def Load_cbrushside_t:
+    if a:
+        read STRUCT('cbrushside_t', 12)
+    if G(cbrushside_t.plane):
+        zpt49 = ptype(G(cbrushside_t.plane))
+        if zpt49 == FOLLOWING:
+            cbrushside_t.plane = alloc(4)
+            data(cbrushside_t.plane(), 20, 1)
+        else:
+            cbrushside_t.plane().set(S.ptr_native(G(cbrushside_t.plane)))
+  def Load_XModel:
+    if a:
+        read STRUCT('XModel', 228)
+    push(VIRTUAL)
+    xstring XModel.name()
+    if G(XModel.boneNames):
+        zpt50 = ptype(G(XModel.boneNames))
+        if zpt50 == FOLLOWING:
+            XModel.boneNames = alloc(2)
+            data(XModel.boneNames(), 2, G(XModel.numBones))
+        else:
+            XModel.boneNames().set(S.ptr_native(G(XModel.boneNames)))
+    if G(XModel.parentList):
+        zpt51 = ptype(G(XModel.parentList))
+        if zpt51 == FOLLOWING:
+            XModel.parentList = alloc(1)
+            data(XModel.parentList(), 1, G(XModel.numBones) - G(XModel.numRootBones))
+        else:
+            XModel.parentList().set(S.ptr_native(G(XModel.parentList)))
+    if G(XModel.quats):
+        zpt52 = ptype(G(XModel.quats))
+        if zpt52 == FOLLOWING:
+            XModel.quats = alloc(2)
+            data(XModel.quats(), 8, G(XModel.numBones) - G(XModel.numRootBones))
+        else:
+            XModel.quats().set(S.ptr_native(G(XModel.quats)))
+    if G(XModel.trans):
+        zpt53 = ptype(G(XModel.trans))
+        if zpt53 == FOLLOWING:
+            XModel.trans = alloc(4)
+            data(XModel.trans(), 4, (G(XModel.numBones) - G(XModel.numRootBones)) * 4)
+        else:
+            XModel.trans().set(S.ptr_native(G(XModel.trans)))
+    if G(XModel.partClassification):
+        zpt54 = ptype(G(XModel.partClassification))
+        if zpt54 == FOLLOWING:
+            XModel.partClassification = alloc(1)
+            data(XModel.partClassification(), 1, G(XModel.numBones))
+        else:
+            XModel.partClassification().set(S.ptr_native(G(XModel.partClassification)))
+    if G(XModel.baseMat):
+        zpt55 = ptype(G(XModel.baseMat))
+        if zpt55 == FOLLOWING:
+            XModel.baseMat = alloc(4)
+            data(XModel.baseMat(), 32, G(XModel.numBones))
+        else:
+            XModel.baseMat().set(S.ptr_native(G(XModel.baseMat)))
+    if G(XModel.surfs):
+        XModel.surfs = alloc(4)
+        XSurface = XModel.surfs
+        LoadArray_XSurface(True, G(XModel.numsurfs))
+    if G(XModel.materialHandles):
+        XModel.materialHandles = alloc(4)
+        MaterialPtr = XModel.materialHandles
+        LoadPtrArray_Material(True, G(XModel.numsurfs))
+    if G(XModel.collSurfs):
+        XModel.collSurfs = alloc(4)
+        XModelCollSurf_s = XModel.collSurfs
+        LoadArray_XModelCollSurf_s(True, G(XModel.numCollSurfs))
+    if G(XModel.boneInfo):
+        XModel.boneInfo = alloc(4)
+        data(XModel.boneInfo(), 40, G(XModel.numBones))
+    if G(XModel.physPreset):
+        asset('PhysPreset', XModel.physPreset())
+    if G(XModel.physGeoms):
+        zpt56 = ptype(G(XModel.physGeoms))
+        if zpt56 == FOLLOWING:
+            XModel.physGeoms = alloc(4)
+            PhysGeomList = XModel.physGeoms
+            Load_PhysGeomList(True)
+        else:
+            XModel.physGeoms().set(S.ptr_lookup(G(XModel.physGeoms)))
+    if G(XModel.collmap):
+        zpt57 = ptype(G(XModel.collmap))
+        if zpt57 == FOLLOWING:
+            XModel.collmap = alloc(4)
+            PhysGeomList = XModel.collmap
+            Load_PhysGeomList(True)
+        else:
+            XModel.collmap().set(S.ptr_lookup(G(XModel.collmap)))
+    if G(XModel.physConstraints):
+        asset('PhysConstraints', XModel.physConstraints())
+    pop()

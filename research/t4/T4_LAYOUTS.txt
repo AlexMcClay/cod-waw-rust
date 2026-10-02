@@ -1,0 +1,2375 @@
+32-bit struct layouts (T4/WaW PC) used by the zone loaders. size/offsets from OAT ZoneCodeGenerator (struct tests + 32-bit FillStruct offsets),
+member C types from OAT T4_Assets.h. "-" offset = member not present in the 32-bit stream layout as filled by the loader (e.g. runtime-only D3D handles).
+
+struct BrushWrapper  size=96
+     0x0  mins                               float[3]
+     0xc  contents                           int
+    0x10  maxs                               float[3]
+    0x1c  numsides                           unsigned int
+    0x20  sides                              cbrushside_t*
+    0x24  axialMaterialNum                   int16_t[2][3]
+    0x30  baseAdjacentSide                   cbrushedge_t*
+    0x34  firstAdjacentSideOffsets           int16_t[2][3]
+    0x40  edgeCount                          char[2][3]
+    0x48  numverts                           unsigned int
+    0x4c  verts                              vec3_t*
+    0x50  totalEdgeCount                     int
+    0x54  planes                             cplane_s*
+
+struct CardMemory  size=8  align=4
+     0x0  platform                           int[2]
+
+struct cbrush_t  size=80
+     0x0  mins                               float[3]
+     0xc  contents                           int
+    0x10  maxs                               float[3]
+    0x1c  numsides                           unsigned int
+    0x20  sides                              cbrushside_t*
+    0x24  axialMaterialNum                   int16_t[2][3]
+    0x30  baseAdjacentSide                   cbrushedge_t*
+    0x34  firstAdjacentSideOffsets           int16_t[2][3]
+    0x40  edgeCount                          char[2][3]
+    0x48  numverts                           unsigned int
+    0x4c  verts                              vec3_t*
+
+struct cbrushside_t  size=12
+     0x0  plane                              cplane_s*
+     0x4  materialNum                        unsigned int
+     0x8  firstAdjacentSideOffset            int16_t
+     0xa  edgeCount                          char
+
+struct cLeaf_t  size=44  align=4
+     0x0  firstCollAabbIndex                 uint16_t
+     0x2  collAabbCount                      uint16_t
+     0x4  brushContents                      int
+     0x8  terrainContents                    int
+     0xc  mins                               float[3]
+    0x18  maxs                               float[3]
+    0x24  leafBrushNode                      int
+    0x28  cluster                            int16_t
+
+struct cLeafBrushNode_s  size=20
+     0x0  axis                               char
+     0x2  leafBrushCount                     int16_t
+     0x4  contents                           int
+     0x8  data                               cLeafBrushNodeData_t
+
+struct cLeafBrushNodeChildren_t  size=12  align=4
+     0x0  dist                               float
+     0x4  range                              float
+     0x8  childOffset                        uint16_t[2]
+
+struct cLeafBrushNodeData_t  size=12
+     0x0  leaf                               cLeafBrushNodeLeaf_t
+     0x0  children                           cLeafBrushNodeChildren_t
+
+struct cLeafBrushNodeLeaf_t  size=4
+     0x0  brushes                            uint16_t*
+
+struct clipMap_t  size=332
+     0x0  name                               char*
+     0x4  isInUse                            int
+     0x8  planeCount                         int
+     0xc  planes                             cplane_s*
+    0x10  numStaticModels                    unsigned int
+    0x14  staticModelList                    cStaticModel_s*
+    0x18  numMaterials                       unsigned int
+    0x1c  materials                          dmaterial_t*
+    0x20  numBrushSides                      unsigned int
+    0x24  brushsides                         cbrushside_t*
+    0x28  numBrushEdges                      unsigned int
+    0x2c  brushEdges                         cbrushedge_t*
+    0x30  numNodes                           unsigned int
+    0x34  nodes                              cNode_t*
+    0x38  numLeafs                           unsigned int
+    0x3c  leafs                              cLeaf_t*
+    0x40  leafbrushNodesCount                unsigned int
+    0x44  leafbrushNodes                     cLeafBrushNode_s*
+    0x48  numLeafBrushes                     unsigned int
+    0x4c  leafbrushes                        LeafBrush*
+    0x50  numLeafSurfaces                    unsigned int
+    0x54  leafsurfaces                       unsigned int*
+    0x58  vertCount                          unsigned int
+    0x5c  verts                              vec3_t*
+    0x60  numBrushVerts                      unsigned int
+    0x64  brushVerts                         vec3_t*
+    0x68  nuinds                             unsigned int
+    0x6c  uinds                              uint16_t*
+    0x70  triCount                           int
+    0x74  triIndices                         uint16_t*
+    0x78  triEdgeIsWalkable                  char*
+    0x7c  borderCount                        int
+    0x80  borders                            CollisionBorder*
+    0x84  partitionCount                     int
+    0x88  partitions                         CollisionPartition*
+    0x8c  aabbTreeCount                      int
+    0x90  aabbTrees                          CollisionAabbTree*
+    0x94  numSubModels                       unsigned int
+    0x98  cmodels                            cmodel_t*
+    0x9c  numBrushes                         uint16_t
+    0xa0  brushes                            cbrush_t*
+    0xa4  numClusters                        int
+    0xa8  clusterBytes                       int
+    0xac  visibility                         char*
+    0xb0  vised                              int
+    0xb4  mapEnts                            MapEnts*
+    0xb8  box_brush                          cbrush_t*
+    0xbc  box_model                          cmodel_t
+   0x104  originalDynEntCount                uint16_t
+   0x106  dynEntCount                        uint16_t[4]
+   0x110  dynEntDefList                      DynEntityDef*[2]
+   0x118  dynEntPoseList                     DynEntityPose*[2]
+   0x120  dynEntClientList                   DynEntityClient*[2]
+   0x128  dynEntServerList                   DynEntityServer*[2]
+   0x130  dynEntCollList                     DynEntityColl*[4]
+   0x140  num_constraints                    int
+   0x144  constraints                        PhysConstraint*
+   0x148  checksum                           unsigned int
+
+struct cmodel_t  size=72  align=4
+     0x0  mins                               float[3]
+     0xc  maxs                               float[3]
+    0x18  radius                             float
+    0x1c  leaf                               cLeaf_t
+
+struct cNode_t  size=8
+     0x0  plane                              cplane_s*
+     0x4  children                           int16_t[2]
+
+struct CollisionAabbTree  size=32  align=4
+     0x0  origin                             float[3]
+     0xc  materialIndex                      uint16_t
+     0xe  childCount                         uint16_t
+    0x10  halfSize                           float[3]
+    0x1c  u                                  CollisionAabbTreeIndex
+
+struct CollisionAabbTreeIndex  size=4  align=4
+     0x0  firstChildIndex                    int
+     0x0  partitionIndex                     int
+
+struct CollisionBorder  size=28  align=4
+     0x0  distEq                             float[3]
+     0xc  zBase                              float
+    0x10  zSlope                             float
+    0x14  start                              float
+    0x18  length                             float
+
+struct CollisionPartition  size=20
+     0x0  triCount                           unsigned char
+     0x1  borderCount                        unsigned char
+     0x4  firstTri                           int
+     0x8  nuinds                             int
+     0xc  fuind                              int
+    0x10  borders                            CollisionBorder*
+
+struct columnInfo_s  size=16  align=4
+     0x0  pos                                int
+     0x4  width                              int
+     0x8  maxChars                           int
+     0xc  alignment                          int
+
+struct ComBurnableCell  size=12
+     0x0  x                                  int
+     0x4  y                                  int
+     0x8  data                               ComBurnableSample*
+
+struct ComBurnableHeader  size=16  align=4
+     0x0  minx                               int
+     0x4  miny                               int
+     0x8  maxx                               int
+     0xc  maxy                               int
+
+struct ComBurnableSample  size=1  align=1
+     0x0  state                              unsigned char
+
+struct complex_s  size=8  align=4
+     0x0  real                               float
+     0x4  imag                               float
+
+struct ComPrimaryLight  size=72
+     0x0  type                               unsigned char
+     0x1  canUseShadowMap                    unsigned char
+     0x2  exponent                           unsigned char
+     0x3  priority                           char
+     0x4  cullDist                           int16_t
+     0x8  color                              float[3]
+    0x14  dir                                float[3]
+    0x20  origin                             float[3]
+    0x2c  radius                             float
+    0x30  cosHalfFovOuter                    float
+    0x34  cosHalfFovInner                    float
+    0x38  cosHalfFovExpanded                 float
+    0x3c  rotationLimit                      float
+    0x40  translationLimit                   float
+    0x44  defName                            char*
+
+struct ComWaterCell  size=8  align=2
+     0x0  waterheight                        int16_t
+     0x2  flooroffset                        char
+     0x3  shoredist                          unsigned char
+     0x4  color                              unsigned char[4]
+
+struct ComWaterHeader  size=16  align=4
+     0x0  minx                               int
+     0x4  miny                               int
+     0x8  maxx                               int
+     0xc  maxy                               int
+
+struct ComWorld  size=64
+     0x0  name                               char*
+     0x4  isInUse                            int
+     0x8  primaryLightCount                  unsigned int
+     0xc  primaryLights                      ComPrimaryLight*
+    0x10  waterHeader                        ComWaterHeader
+    0x20  numWaterCells                      unsigned int
+    0x24  waterCells                         ComWaterCell*
+    0x28  burnableHeader                     ComBurnableHeader
+    0x38  numBurnableCells                   unsigned int
+    0x3c  burnableCells                      ComBurnableCell*
+
+struct cplane_s  size=20  align=4
+     0x0  normal                             float[3]
+     0xc  dist                               float
+    0x10  type                               char
+    0x11  signbits                           char
+    0x12  pad                                char[2]
+
+struct cStaticModel_s  size=80
+     0x0  writable                           cStaticModelWritable
+     0x4  xmodel                             XModel*
+     0x8  origin                             float[3]
+    0x14  invScaledAxis                      float[3][3]
+    0x38  absmin                             float[3]
+    0x44  absmax                             float[3]
+
+struct cStaticModelWritable  size=2  align=2
+     0x0  nextModelInWorldSector             uint16_t
+
+struct DestructibleDef  size=20
+     0x0  name                               char*
+     0x4  baseModel                          XModel*
+     0x8  numPieces                          int
+     0xc  pieces                             DestructiblePiece*
+    0x10  clientOnly                         int
+
+struct DestructibleModel  size=40
+     0x0  model                              XModel*
+     0x4  breakHealth                        float
+     0x8  flags                              unsigned int
+     0xc  breakEffect                        FxEffectDef*
+    0x10  breakSound                         SndAliasCustom
+    0x14  breakNotify                        char*
+    0x18  loopSound                          char*
+    0x1c  spawnModel                         XModel*[3]
+
+struct DestructiblePiece  size=248
+     0x0  dmodels                            DestructibleModel[5]
+    0xc8  attachBone                         char*
+    0xcc  attachBoneHash                     ScriptString
+    0xce  parentPiece                        unsigned char
+    0xd0  parentDamagePercent                float
+    0xd4  bulletDamageScale                  float
+    0xd8  explosiveDamageScale               float
+    0xdc  entityDamageTransfer               float
+    0xe0  physConstraints                    PhysConstraints*
+    0xe4  health                             int
+    0xe8  damageSound                        SndAliasCustom
+    0xec  burnEffect                         FxEffectDef*
+    0xf0  burnSound                          SndAliasCustom
+    0xf4  enableLabel                        ScriptString
+
+struct dmaterial_t  size=72  align=4
+     0x0  material                           char[64]
+    0x40  surfaceFlags                       int
+    0x44  contentFlags                       int
+
+struct DObjAnimMat  size=32  align=4
+     0x0  quat                               vec4_t
+    0x10  trans                              vec3_t
+    0x1c  transWeight                        float
+
+struct DpvsPlane  size=20  align=4
+     0x0  coeffs                             float[4]
+    0x10  side                               char[3]
+    0x13  pad                                char
+
+struct DynEntityClient  size=16  align=4
+     0x0  physObjId                          int
+     0x4  flags                              uint16_t
+     0x6  lightingHandle                     uint16_t
+     0x8  health                             int
+     0xc  burnTime                           uint16_t
+     0xe  fadeTime                           uint16_t
+
+struct DynEntityColl  size=32  align=4
+     0x0  sector                             uint16_t
+     0x2  nextEntInSector                    uint16_t
+     0x4  linkMins                           float[3]
+    0x10  linkMaxs                           float[3]
+    0x1c  contents                           int
+
+struct DynEntityDef  size=84
+     0x0  type                               DynEntityType
+     0x4  pose                               GfxPlacement
+    0x20  xModel                             XModel*
+    0x24  brushModel                         uint16_t
+    0x26  physicsBrushModel                  uint16_t
+    0x28  destroyFx                          FxEffectDef*
+    0x2c  destroyPieces                      XModelPieces*
+    0x30  physPreset                         PhysPreset*
+    0x34  physConstraints                    unsigned char[4]
+    0x38  health                             int
+    0x3c  mass                               PhysMass
+    0x48  flags                              int
+    0x4c  contents                           int
+    0x50  targetname                         ScriptString
+
+struct DynEntityPose  size=32  align=4
+     0x0  pose                               GfxPlacement
+    0x1c  radius                             float
+
+struct DynEntityServer  size=8  align=4
+     0x0  flags                              uint16_t
+     0x4  health                             int
+
+struct editFieldDef_s  size=32  align=4
+     0x0  minVal                             float
+     0x4  maxVal                             float
+     0x8  defVal                             float
+     0xc  range                              float
+    0x10  maxChars                           int
+    0x14  maxCharsGotoNext                   int
+    0x18  maxPaintChars                      int
+    0x1c  paintOffset                        int
+
+struct entryInternalData  size=8
+     0x0  operand                            Operand
+     0x0  op                                 operationEnum
+
+struct expressionEntry  size=12
+     0x0  type                               int
+     0x4  data                               entryInternalData
+
+struct FlameTable  size=476
+     0x0  flameVar_streamChunkGravityStart   float
+     0x4  flameVar_streamChunkGravityEnd     float
+     0x8  flameVar_streamChunkMaxSize        float
+     0xc  flameVar_streamChunkStartSize      float
+    0x10  flameVar_streamChunkEndSize        float
+    0x14  flameVar_streamChunkStartSizeRand  float
+    0x18  flameVar_streamChunkEndSizeRand    float
+    0x1c  flameVar_streamChunkDistScalar     float
+    0x20  flameVar_streamChunkDistSwayScale  float
+    0x24  flameVar_streamChunkDistSwayVelMax float
+    0x28  flameVar_streamChunkSpeed          float
+    0x2c  flameVar_streamChunkDecel          float
+    0x30  flameVar_streamChunkVelocityAddScale float
+    0x34  flameVar_streamChunkDuration       float
+    0x38  flameVar_streamChunkDurationScaleMaxVel float
+    0x3c  flameVar_streamChunkDurationVelScalar float
+    0x40  flameVar_streamChunkSizeSpeedScale float
+    0x44  flameVar_streamChunkSizeAgeScale   float
+    0x48  flameVar_streamChunkSpawnFireIntervalStart float
+    0x4c  flameVar_streamChunkSpawnFireIntervalEnd float
+    0x50  flameVar_streamChunkSpawnFireMinLifeFrac float
+    0x54  flameVar_streamChunkSpawnFireMaxLifeFrac float
+    0x58  flameVar_streamChunkFireMinLifeFrac float
+    0x5c  flameVar_streamChunkFireMinLifeFracStart float
+    0x60  flameVar_streamChunkFireMinLifeFracEnd float
+    0x64  flameVar_streamChunkDripsMinLifeFrac float
+    0x68  flameVar_streamChunkDripsMinLifeFracStart float
+    0x6c  flameVar_streamChunkDripsMinLifeFracEnd float
+    0x70  flameVar_streamChunkRotationRange  float
+    0x74  flameVar_streamSizeRandSinWave     float
+    0x78  flameVar_streamSizeRandCosWave     float
+    0x7c  flameVar_streamDripsChunkInterval  float
+    0x80  flameVar_streamDripsChunkMinFrac   float
+    0x84  flameVar_streamDripsChunkRandFrac  float
+    0x88  flameVar_streamSmokeChunkInterval  float
+    0x8c  flameVar_streamSmokeChunkMinFrac   float
+    0x90  flameVar_streamSmokeChunkRandFrac  float
+    0x94  flameVar_streamChunkCullDistSizeFrac float
+    0x98  flameVar_streamChunkCullMinLife    float
+    0x9c  flameVar_streamChunkCullMaxLife    float
+    0xa0  flameVar_streamFuelSizeStart       float
+    0xa4  flameVar_streamFuelSizeEnd         float
+    0xa8  flameVar_streamFuelLength          float
+    0xac  flameVar_streamFuelNumSegments     float
+    0xb0  flameVar_streamFuelAnimLoopTime    float
+    0xb4  flameVar_streamFlameSizeStart      float
+    0xb8  flameVar_streamFlameSizeEnd        float
+    0xbc  flameVar_streamFlameLength         float
+    0xc0  flameVar_streamFlameNumSegments    float
+    0xc4  flameVar_streamFlameAnimLoopTime   float
+    0xc8  flameVar_streamPrimaryLightRadius  float
+    0xcc  flameVar_streamPrimaryLightRadiusFlutter float
+    0xd0  flameVar_streamPrimaryLightR       float
+    0xd4  flameVar_streamPrimaryLightG       float
+    0xd8  flameVar_streamPrimaryLightB       float
+    0xdc  flameVar_streamPrimaryLightFlutterR float
+    0xe0  flameVar_streamPrimaryLightFlutterG float
+    0xe4  flameVar_streamPrimaryLightFlutterB float
+    0xe8  flameVar_fireLife                  float
+    0xec  flameVar_fireLifeRand              float
+    0xf0  flameVar_fireSpeedScale            float
+    0xf4  flameVar_fireSpeedScaleRand        float
+    0xf8  flameVar_fireVelocityAddZ          float
+    0xfc  flameVar_fireVelocityAddZRand      float
+   0x100  flameVar_fireVelocityAddSideways   float
+   0x104  flameVar_fireGravity               float
+   0x108  flameVar_fireGravityEnd            float
+   0x10c  flameVar_fireMaxRotVel             float
+   0x110  flameVar_fireFriction              float
+   0x114  flameVar_fireEndSizeAdd            float
+   0x118  flameVar_fireStartSizeScale        float
+   0x11c  flameVar_fireEndSizeScale          float
+   0x120  flameVar_dripsLife                 float
+   0x124  flameVar_dripsLifeRand             float
+   0x128  flameVar_dripsSpeedScale           float
+   0x12c  flameVar_dripsSpeedScaleRand       float
+   0x130  flameVar_dripsVelocityAddZ         float
+   0x134  flameVar_dripsVelocityAddZRand     float
+   0x138  flameVar_dripsVelocityAddSideways  float
+   0x13c  flameVar_dripsGravity              float
+   0x140  flameVar_dripsGravityEnd           float
+   0x144  flameVar_dripsMaxRotVel            float
+   0x148  flameVar_dripsFriction             float
+   0x14c  flameVar_dripsEndSizeAdd           float
+   0x150  flameVar_dripsStartSizeScale       float
+   0x154  flameVar_dripsEndSizeScale         float
+   0x158  flameVar_smokeLife                 float
+   0x15c  flameVar_smokeLifeRand             float
+   0x160  flameVar_smokeSpeedScale           float
+   0x164  flameVar_smokeVelocityAddZ         float
+   0x168  flameVar_smokeGravity              float
+   0x16c  flameVar_smokeGravityEnd           float
+   0x170  flameVar_smokeMaxRotation          float
+   0x174  flameVar_smokeMaxRotVel            float
+   0x178  flameVar_smokeFriction             float
+   0x17c  flameVar_smokeEndSizeAdd           float
+   0x180  flameVar_smokeStartSizeAdd         float
+   0x184  flameVar_smokeOriginSizeOfsZScale  float
+   0x188  flameVar_smokeOriginOfsZ           float
+   0x18c  flameVar_smokeFadein               float
+   0x190  flameVar_smokeFadeout              float
+   0x194  flameVar_smokeMaxAlpha             float
+   0x198  flameVar_smokeBrightness           float
+   0x19c  flameVar_smokeOriginOffset         float
+   0x1a0  flameVar_collisionSpeedScale       float
+   0x1a4  flameVar_collisionVolumeScale      float
+   0x1a8  name                               char*
+   0x1ac  fire                               Material*
+   0x1b0  smoke                              Material*
+   0x1b4  heat                               Material*
+   0x1b8  drips                              Material*
+   0x1bc  streamFuel                         Material*
+   0x1c0  streamFuel2                        Material*
+   0x1c4  streamFlame                        Material*
+   0x1c8  streamFlame2                       Material*
+   0x1cc  flameOffLoopSound                  SndAliasCustom
+   0x1d0  flameIgniteSound                   SndAliasCustom
+   0x1d4  flameOnLoopSound                   SndAliasCustom
+   0x1d8  flameCooldownSound                 SndAliasCustom
+
+struct Font_s  size=24
+     0x0  fontName                           char*
+     0x4  pixelHeight                        int
+     0x8  glyphCount                         int
+     0xc  material                           Material*
+    0x10  glowMaterial                       Material*
+    0x14  glyphs                             Glyph*
+
+struct FxEffectDef  size=36
+     0x0  name                               char*
+     0x4  flags                              int
+     0x8  totalSize                          int
+     0xc  msecLoopingLife                    int
+    0x10  elemDefCountLooping                int
+    0x14  elemDefCountOneShot                int
+    0x18  elemDefCountEmission               int
+    0x1c  efPriority                         char
+    0x20  elemDefs                           FxElemDef*
+
+struct FxEffectDefRef  size=4
+     0x0  name                               char*
+       -  handle                             FxEffectDef*
+
+struct FxElemAtlas  size=8  align=2
+     0x0  behavior                           char
+     0x1  index                              char
+     0x2  fps                                char
+     0x3  loopCount                          char
+     0x4  colIndexBits                       char
+     0x5  rowIndexBits                       char
+     0x6  entryCount                         int16_t
+
+struct FxElemDef  size=256
+     0x0  flags                              int
+     0x4  spawn                              FxSpawnDef
+     0xc  spawnRange                         FxFloatRange
+    0x14  fadeInRange                        FxFloatRange
+    0x1c  fadeOutRange                       FxFloatRange
+    0x24  spawnFrustumCullRadius             float
+    0x28  spawnDelayMsec                     FxIntRange
+    0x30  lifeSpanMsec                       FxIntRange
+    0x38  spawnOrigin                        FxFloatRange[3]
+    0x50  spawnOffsetRadius                  FxFloatRange
+    0x58  spawnOffsetHeight                  FxFloatRange
+    0x60  spawnAngles                        FxFloatRange[3]
+    0x78  angularVelocity                    FxFloatRange[3]
+    0x90  initialRotation                    FxFloatRange
+    0x98  gravity                            FxFloatRange
+    0xa0  reflectionFactor                   FxFloatRange
+    0xa8  atlas                              FxElemAtlas
+    0xb0  windInfluence                      float
+    0xb4  elemType                           char
+    0xb5  visualCount                        char
+    0xb6  velIntervalCount                   char
+    0xb7  visStateIntervalCount              char
+    0xb8  velSamples                         FxElemVelStateSample*
+    0xbc  visSamples                         FxElemVisStateSample*
+    0xc0  visuals                            FxElemDefVisuals
+    0xc4  collMins                           float[3]
+    0xd0  collMaxs                           float[3]
+    0xdc  effectOnImpact                     FxEffectDefRef
+    0xe0  effectOnDeath                      FxEffectDefRef
+    0xe4  effectEmitted                      FxEffectDefRef
+    0xe8  emitDist                           FxFloatRange
+    0xf0  emitDistVariance                   FxFloatRange
+    0xf8  trailDef                           FxTrailDef*
+    0xfc  sortOrder                          char
+    0xfd  lightingFrac                       char
+    0xfe  useItemClip                        char
+    0xff  unused                             char[1]
+
+struct FxElemDefVisuals  size=4
+     0x0  markArray                          FxElemMarkVisuals*
+     0x0  array                              FxElemVisuals*
+     0x0  instance                           FxElemVisuals
+
+struct FxElemMarkVisuals  size=8
+     0x0  materials                          Material*[2]
+
+struct FxElemVec3Range  size=24  align=4
+     0x0  base                               float[3]
+     0xc  amplitude                          float[3]
+
+struct FxElemVelStateInFrame  size=48  align=4
+     0x0  velocity                           FxElemVec3Range
+    0x18  totalDelta                         FxElemVec3Range
+
+struct FxElemVelStateSample  size=96  align=4
+     0x0  local                              FxElemVelStateInFrame
+    0x30  world                              FxElemVelStateInFrame
+
+struct FxElemVisStateSample  size=48  align=4
+     0x0  base                               FxElemVisualState
+    0x18  amplitude                          FxElemVisualState
+
+struct FxElemVisuals  size=4
+     0x0  material                           Material*
+     0x0  model                              XModel*
+     0x0  effectDef                          FxEffectDefRef
+     0x0  soundName                          char*
+       -  anonymous                          void*
+
+struct FxElemVisualState  size=24  align=4
+     0x0  color                              char[4]
+     0x4  rotationDelta                      float
+     0x8  rotationTotal                      float
+     0xc  size                               float[2]
+    0x14  scale                              float
+
+struct FxFloatRange  size=8  align=4
+     0x0  base                               float
+     0x4  amplitude                          float
+
+struct FxImpactEntry  size=140
+     0x0  nonflesh                           FxEffectDef*[31]
+    0x7c  flesh                              FxEffectDef*[4]
+
+struct FxImpactTable  size=8
+     0x0  name                               char*
+     0x4  table                              FxImpactEntry*
+
+struct FxIntRange  size=8  align=4
+     0x0  base                               int
+     0x4  amplitude                          int
+
+struct FxSpawnDef  size=8  align=4
+     0x0  looping                            FxSpawnDefLooping
+     0x0  oneShot                            FxSpawnDefOneShot
+
+struct FxSpawnDefLooping  size=8  align=4
+     0x0  intervalMsec                       int
+     0x4  count                              int
+
+struct FxSpawnDefOneShot  size=8  align=4
+     0x0  count                              FxIntRange
+
+struct FxTrailDef  size=28
+     0x0  scrollTimeMsec                     int
+     0x4  repeatDist                         int
+     0x8  splitDist                          int
+     0xc  vertCount                          int
+    0x10  verts                              FxTrailVertex*
+    0x14  indCount                           int
+    0x18  inds                               uint16_t*
+
+struct FxTrailVertex  size=20  align=4
+     0x0  pos                                float[2]
+     0x8  normal                             float[2]
+    0x10  texCoord                           float
+
+struct GameWorldMp  size=44
+     0x0  name                               char*
+     0x4  path                               PathData
+
+struct GameWorldSp  size=44
+     0x0  name                               char*
+     0x4  path                               PathData
+
+struct GfxAabbTree  size=40
+     0x0  mins                               float[3]
+     0xc  maxs                               float[3]
+    0x18  childCount                         uint16_t
+    0x1a  surfaceCount                       uint16_t
+    0x1c  startSurfIndex                     uint16_t
+    0x1e  smodelIndexCount                   uint16_t
+    0x20  smodelIndexes                      uint16_t*
+    0x24  childrenOffset                     int
+
+struct GfxBrushModel  size=56  align=4
+     0x0  writable                           GfxBrushModelWritable
+    0x18  bounds                             float[2][3]
+    0x30  surfaceCount                       unsigned int
+    0x34  startSurfIndex                     unsigned int
+
+struct GfxBrushModelWritable  size=24  align=4
+     0x0  mins                               float[3]
+     0xc  maxs                               float[3]
+
+struct GfxCell  size=56
+     0x0  mins                               float[3]
+     0xc  maxs                               float[3]
+    0x18  aabbTreeCount                      int
+    0x1c  aabbTree                           GfxAabbTree*
+    0x20  portalCount                        int
+    0x24  portals                            GfxPortal*
+    0x28  cullGroupCount                     int
+    0x2c  cullGroups                         int*
+    0x30  reflectionProbeCount               char
+    0x34  reflectionProbes                   char*
+
+struct GfxColor  size=4  align=4
+     0x0  packed                             unsigned int
+     0x0  array                              unsigned char[4]
+
+struct GfxCullGroup  size=32  align=4
+     0x0  mins                               float[3]
+     0xc  maxs                               float[3]
+    0x18  surfaceCount                       int
+    0x1c  startSurfIndex                     int
+
+struct GfxDrawSurf  size=8  align=8
+     0x0  fields                             GfxDrawSurfFields
+     0x0  packed                             uint64_t
+
+struct GfxDrawSurfFields  size=8  align=8
+       -  objectId                           uint64_t
+       -  reflectionProbeIndex               uint64_t
+       -  customIndex                        uint64_t
+       -  materialSortedIndex                uint64_t
+       -  prepass                            uint64_t
+       -  primaryLightIndex                  uint64_t
+       -  surfType                           uint64_t
+       -  primarySortKey                     uint64_t
+       -  unused                             uint64_t
+
+struct GfxImage  size=36
+     0x0  mapType                            MapType
+     0x4  texture                            GfxTexture
+     0x8  picmip                             Picmip
+     0xa  noPicmip                           bool
+     0xb  semantic                           char
+     0xc  track                              char
+    0x10  cardMemory                         CardMemory
+    0x18  width                              uint16_t
+    0x1a  height                             uint16_t
+    0x1c  depth                              uint16_t
+    0x1e  category                           char
+    0x1f  delayLoadPixels                    bool
+    0x20  name                               char*
+
+struct GfxImageLoadDef  size=20  align=4
+     0x0  levelCount                         char
+     0x1  flags                              char
+     0x2  dimensions                         uint16_t[3]
+     0x8  format                             int
+     0xc  resourceSize                       unsigned int
+    0x10  data                               char[1]
+
+struct GfxLight  size=64
+     0x0  type                               unsigned char
+     0x1  canUseShadowMap                    unsigned char
+     0x2  cullDist                           int16_t
+     0x4  color                              float[3]
+    0x10  dir                                float[3]
+    0x1c  origin                             float[3]
+    0x28  radius                             float
+    0x2c  cosHalfFovOuter                    float
+    0x30  cosHalfFovInner                    float
+    0x34  exponent                           int
+    0x38  spotShadowIndex                    unsigned int
+    0x3c  def                                GfxLightDef*
+
+struct GfxLightCorona  size=32  align=4
+     0x0  origin                             float[3]
+     0xc  radius                             float
+    0x10  color                              float[3]
+    0x1c  intensity                          float
+
+struct GfxLightDef  size=16
+     0x0  name                               char*
+     0x4  attenuation                        GfxLightImage
+     0xc  lmapLookupStart                    int
+
+struct GfxLightGrid  size=56
+     0x0  hasLightRegions                    bool
+     0x4  sunPrimaryLightIndex               unsigned int
+     0x8  mins                               uint16_t[3]
+     0xe  maxs                               uint16_t[3]
+    0x14  rowAxis                            unsigned int
+    0x18  colAxis                            unsigned int
+    0x1c  rowDataStart                       uint16_t*
+    0x20  rawRowDataSize                     unsigned int
+    0x24  rawRowData                         char*
+    0x28  entryCount                         unsigned int
+    0x2c  entries                            GfxLightGridEntry*
+    0x30  colorCount                         unsigned int
+    0x34  colors                             GfxLightGridColors*
+
+struct GfxLightGridColors  size=168  align=4
+     0x0  rgb                                char[56][3]
+
+struct GfxLightGridEntry  size=4  align=4
+     0x0  colorsIndex                        uint16_t
+     0x2  primaryLightIndex                  char
+     0x3  needsTrace                         char
+
+struct GfxLightImage  size=8
+     0x0  image                              GfxImage*
+     0x4  samplerState                       char
+
+struct GfxLightmapArray  size=8
+     0x0  primary                            GfxImage*
+     0x4  secondary                          GfxImage*
+
+struct GfxLightRegion  size=8
+     0x0  hullCount                          unsigned int
+     0x4  hulls                              GfxLightRegionHull*
+
+struct GfxLightRegionAxis  size=20  align=4
+     0x0  dir                                float[3]
+     0xc  midPoint                           float
+    0x10  halfSize                           float
+
+struct GfxLightRegionHull  size=80
+     0x0  kdopMidPoint                       float[9]
+    0x24  kdopHalfSize                       float[9]
+    0x48  axisCount                          unsigned int
+    0x4c  axis                               GfxLightRegionAxis*
+
+struct GfxPackedPlacement  size=52  align=4
+     0x0  origin                             float[3]
+     0xc  axis                               float[3][3]
+    0x30  scale                              float
+
+struct GfxPackedVertex  size=32  align=16
+     0x0  xyz                                vec3_t
+     0xc  binormalSign                       float
+    0x10  color                              GfxColor
+    0x14  texCoord                           PackedTexCoords
+    0x18  normal                             PackedUnitVec
+    0x1c  tangent                            PackedUnitVec
+
+struct GfxPixelShaderLoadDef  size=8
+     0x0  program                            unsigned int*
+     0x4  programSize                        uint16_t
+     0x6  loadForRenderer                    uint16_t
+
+struct GfxPlacement  size=28  align=4
+     0x0  quat                               float[4]
+    0x10  origin                             float[3]
+
+struct GfxPortal  size=68
+     0xc  plane                              DpvsPlane
+    0x20  cell                               GfxCell*
+    0x24  vertices                           vec3_t*
+    0x28  vertexCount                        char
+    0x2c  hullAxis                           float[2][3]
+       -  writable                           GfxPortalWritable
+
+struct GfxReflectionProbe  size=16
+     0x0  origin                             float[3]
+     0xc  reflectionImage                    GfxImage*
+
+struct GfxSceneDynBrush  size=4  align=4
+     0x0  info                               BModelDrawInfo
+     0x2  dynEntId                           uint16_t
+
+struct GfxSceneDynModel  size=6  align=2
+     0x0  info                               XModelDrawInfo
+     0x4  dynEntId                           uint16_t
+
+struct GfxShadowGeometry  size=12
+     0x0  surfaceCount                       uint16_t
+     0x2  smodelCount                        uint16_t
+     0x4  sortedSurfIndex                    uint16_t*
+     0x8  smodelIndex                        uint16_t*
+
+struct GfxStateBits  size=8  align=4
+     0x0  loadBits                           GfxStateBitsLoadBits
+
+struct GfxStateBitsLoadBits  size=8  align=4
+     0x0  raw                                unsigned int[2]
+     0x0  structured                         GfxStateBitsLoadBitsStructured
+
+struct GfxStateBitsLoadBitsStructured  size=8  align=4
+       -  srcBlendRgb                        unsigned int
+       -  dstBlendRgb                        unsigned int
+       -  blendOpRgb                         unsigned int
+       -  alphaTestDisabled                  unsigned int
+       -  alphaTest                          unsigned int
+       -  cullFace                           unsigned int
+       -  srcBlendAlpha                      unsigned int
+       -  dstBlendAlpha                      unsigned int
+       -  blendOpAlpha                       unsigned int
+       -  colorWriteRgb                      unsigned int
+       -  colorWriteAlpha                    unsigned int
+       -  unused1                            unsigned int
+       -  polymodeLine                       unsigned int
+       -  depthWrite                         unsigned int
+       -  depthTestDisabled                  unsigned int
+       -  depthTest                          unsigned int
+       -  polygonOffset                      unsigned int
+       -  stencilFrontEnabled                unsigned int
+       -  stencilBackEnabled                 unsigned int
+       -  stencilFrontPass                   unsigned int
+       -  stencilFrontFail                   unsigned int
+       -  stencilFrontZFail                  unsigned int
+       -  stencilFrontFunc                   unsigned int
+       -  stencilBackPass                    unsigned int
+       -  stencilBackFail                    unsigned int
+       -  stencilBackZFail                   unsigned int
+       -  stencilBackFunc                    unsigned int
+
+struct GfxStaticModelDrawInst  size=92
+     0x0  cullDist                           float
+     0x4  placement                          GfxPackedPlacement
+    0x38  model                              XModel*
+    0x3c  lodFade                            ModelLodFade
+    0x40  cachedLightSettingIndex            int
+    0x44  field_44                           char
+    0x45  field_45                           char
+    0x46  reflectionProbeIndex               unsigned char
+    0x47  primaryLightIndex                  unsigned char
+    0x48  flags                              int
+    0x4c  smodelCacheIndex                   unsigned int[4]
+
+struct GfxStaticModelInst  size=28  align=4
+     0x0  mins                               float[3]
+     0xc  maxs                               float[3]
+    0x18  groundLighting                     GfxColor
+
+struct GfxSurface  size=52
+     0x0  tris                               srfTriangles_t
+    0x10  pad                                int
+    0x14  material                           Material*
+    0x18  lightmapIndex                      char
+    0x19  reflectionProbeIndex               char
+    0x1a  primaryLightIndex                  char
+    0x1b  flags                              char
+    0x1c  bounds                             float[2][3]
+
+struct GfxTexture  size=4
+     0x0  loadDef                            GfxImageLoadDef*
+
+struct GfxVertexShaderLoadDef  size=8
+     0x0  program                            unsigned int*
+     0x4  programSize                        uint16_t
+     0x6  loadForRenderer                    uint16_t
+
+struct GfxWaterBuffer  size=8
+     0x0  bufferSize                         unsigned int
+     0x4  buffer                             vec4_t*
+
+struct GfxWorld  size=800
+     0x0  name                               char*
+     0x4  baseName                           char*
+     0x8  planeCount                         int
+     0xc  nodeCount                          int
+    0x10  indexCount                         int
+    0x14  indices                            uint16_t*
+    0x18  surfaceCount                       int
+    0x1c  streamInfo                         int
+    0x20  skySurfCount                       int
+    0x24  skyStartSurfs                      int*
+    0x28  skyImage                           GfxImage*
+    0x2c  skySamplerState                    char
+    0x30  skyBoxModel                        char*
+    0x34  vertexCount                        unsigned int
+    0x38  vd                                 GfxWorldVertexData
+    0x40  vertexLayerDataSize                unsigned int
+    0x44  vld                                GfxWorldVertexLayerData
+    0x4c  vertexStream2DataSize              unsigned int
+    0x50  sunParse                           SunLightParseParams
+    0xd8  sunLight                           GfxLight*
+    0xdc  sunColorFromBsp                    float[3]
+    0xe8  sunPrimaryLightIndex               unsigned int
+    0xec  primaryLightCount                  unsigned int
+    0xf0  cullGroupCount                     int
+    0xf4  reflectionProbeCount               unsigned int
+    0xf8  reflectionProbes                   GfxReflectionProbe*
+    0xfc  reflectionProbeTextures            GfxTexture*
+   0x100  coronaCount                        unsigned int
+   0x104  coronas                            GfxLightCorona*
+   0x108  dpvsPlanes                         GfxWorldDpvsPlanes
+   0x118  cellBitsCount                      int
+   0x11c  cells                              GfxCell*
+   0x120  lightmapCount                      int
+   0x124  lightmaps                          GfxLightmapArray*
+   0x128  lightGrid                          GfxLightGrid
+   0x160  lightmapPrimaryTextures            GfxTexture*
+   0x164  lightmapSecondaryTextures          GfxTexture*
+   0x168  modelCount                         int
+   0x16c  models                             GfxBrushModel*
+   0x170  mins                               float[3]
+   0x17c  maxs                               float[3]
+   0x188  checksum                           unsigned int
+   0x18c  materialMemoryCount                int
+   0x190  materialMemory                     MaterialMemory*
+   0x194  sun                                sunflare_t
+   0x1f4  outdoorLookupMatrix                float[4][4]
+   0x234  outdoorImage                       GfxImage*
+   0x238  cellCasterBits                     unsigned int*
+   0x23c  sceneDynModel                      GfxSceneDynModel4*
+   0x240  sceneDynBrush                      GfxSceneDynBrush*
+   0x244  primaryLightEntityShadowVis        unsigned int*
+   0x248  primaryLightDynEntShadowVis        unsigned int*[2]
+   0x250  nonSunPrimaryLightForModelDynEnt   char*
+   0x254  shadowGeom                         GfxShadowGeometry*
+   0x258  lightRegion                        GfxLightRegion*
+   0x25c  dpvs                               GfxWorldDpvsStatic
+   0x2c0  dpvsDyn                            GfxWorldDpvsDynamic
+   0x2f0  worldLodChainCount                 unsigned int
+   0x2f4  worldLodChains                     GfxWorldLodChain*
+   0x2f8  worldLodInfoCount                  unsigned int
+   0x2fc  worldLodInfos                      GfxWorldLodInfo*
+   0x300  worldLodSurfaceCount               unsigned int
+   0x304  worldLodSurfaces                   unsigned int*
+   0x308  waterDirection                     float
+   0x30c  waterBuffers                       GfxWaterBuffer[2]
+   0x31c  waterMaterial                      Material*
+
+struct GfxWorldDpvsDynamic  size=48
+     0x0  dynEntClientWordCount              unsigned int[2]
+     0x8  dynEntClientCount                  unsigned int[2]
+    0x10  dynEntCellBits                     unsigned int*[2]
+    0x18  dynEntVisData                      raw_byte16*[2][3]
+
+struct GfxWorldDpvsPlanes  size=16
+     0x0  cellCount                          int
+     0x4  planes                             cplane_s*
+     0x8  nodes                              uint16_t*
+     0xc  sceneEntCellBits                   unsigned int*
+
+struct GfxWorldDpvsStatic  size=100
+     0x0  smodelCount                        unsigned int
+     0x4  staticSurfaceCount                 unsigned int
+     0x8  litSurfsBegin                      unsigned int
+     0xc  litSurfsEnd                        unsigned int
+    0x10  decalSurfsBegin                    unsigned int
+    0x14  decalSurfsEnd                      unsigned int
+    0x18  emissiveSurfsBegin                 unsigned int
+    0x1c  emissiveSurfsEnd                   unsigned int
+    0x20  smodelVisDataCount                 unsigned int
+    0x24  surfaceVisDataCount                unsigned int
+    0x28  smodelVisData                      char*[3]
+    0x34  surfaceVisData                     char*[3]
+    0x40  lodData                            raw_uint128*
+    0x44  sortedSurfIndex                    uint16_t*
+    0x48  smodelInsts                        GfxStaticModelInst*
+    0x4c  surfaces                           GfxSurface*
+    0x50  cullGroups                         GfxCullGroup*
+    0x54  smodelDrawInsts                    GfxStaticModelDrawInst*
+    0x58  surfaceMaterials                   GfxDrawSurf*
+    0x5c  surfaceCastsSunShadow              raw_uint128*
+    0x60  usageCount                         volatile int
+
+struct GfxWorldLodChain  size=24  align=4
+     0x0  origin                             float[3]
+     0xc  lastDist                           float
+    0x10  firstLodInfo                       unsigned int
+    0x14  lodInfoCount                       uint16_t
+
+struct GfxWorldLodInfo  size=12  align=4
+     0x0  dist                               float
+     0x4  firstSurf                          unsigned int
+     0x8  surfCount                          uint16_t
+
+struct GfxWorldVertex  size=44  align=4
+     0x0  xyz                                float[3]
+     0xc  binormalSign                       float
+    0x10  color                              GfxColor
+    0x14  texCoord                           float[2]
+    0x1c  lmapCoord                          float[2]
+    0x24  normal                             PackedUnitVec
+    0x28  tangent                            PackedUnitVec
+
+struct GfxWorldVertexData  size=8
+     0x0  vertices                           GfxWorldVertex*
+       -  worldVb                            void*
+
+struct GfxWorldVertexLayerData  size=8
+     0x0  data                               char*
+       -  layerVb                            void*
+
+struct Glyph  size=24  align=4
+     0x0  letter                             uint16_t
+     0x2  x0                                 char
+     0x3  y0                                 char
+     0x4  dx                                 unsigned char
+     0x5  pixelWidth                         unsigned char
+     0x6  pixelHeight                        unsigned char
+     0x8  s0                                 float
+     0xc  t0                                 float
+    0x10  s1                                 float
+    0x14  t1                                 float
+
+struct itemDef_s  size=376
+     0x0  window                             windowDef_t
+    0x9c  textRect                           rectDef_s[1]
+    0xb4  type                               int
+    0xb8  dataType                           int
+    0xbc  alignment                          int
+    0xc0  fontEnum                           int
+    0xc4  textAlignMode                      int
+    0xc8  textalignx                         float
+    0xcc  textaligny                         float
+    0xd0  textscale                          float
+    0xd4  textStyle                          int
+    0xd8  gameMsgWindowIndex                 int
+    0xdc  gameMsgWindowMode                  int
+    0xe0  text                               char*
+    0xe4  itemFlags                          unsigned int
+    0xec  mouseEnterText                     char*
+    0xf0  mouseExitText                      char*
+    0xf4  mouseEnter                         char*
+    0xf8  mouseExit                          char*
+    0xfc  action                             char*
+   0x100  onAccept                           char*
+   0x104  onFocus                            char*
+   0x108  leaveFocus                         char*
+   0x10c  dvar                               char*
+   0x110  dvarTest                           char*
+   0x114  onListboxSelectionChange           char*
+   0x118  onKey                              ItemKeyHandler*
+   0x11c  enableDvar                         char*
+   0x120  dvarFlags                          int
+   0x124  focusSound                         snd_alias_list_t*
+   0x128  special                            float
+   0x12c  cursorPos                          int[1]
+   0x130  typeData                           itemDefData_t
+   0x134  imageTrack                         int
+   0x138  visibleExp                         statement_s
+   0x140  textExp                            statement_s
+   0x148  materialExp                        statement_s
+   0x150  rectXExp                           statement_s
+   0x158  rectYExp                           statement_s
+   0x160  rectWExp                           statement_s
+   0x168  rectHExp                           statement_s
+   0x170  forecolorAExp                      statement_s
+       -  parent                             menuDef_t*
+
+struct itemDefData_t  size=4
+     0x0  listBox                            listBoxDef_s*
+     0x0  editField                          editFieldDef_s*
+     0x0  multi                              multiDef_s*
+     0x0  enumDvarName                       char*
+       -  data                               void*
+
+struct ItemKeyHandler  size=12
+     0x0  key                                int
+     0x4  action                             char*
+     0x8  next                               ItemKeyHandler*
+
+struct listBoxDef_s  size=364
+     0x0  mousePos                           int
+     0x4  startPos                           int[1]
+     0x8  endPos                             int[1]
+     0xc  drawPadding                        int
+    0x10  elementWidth                       float
+    0x14  elementHeight                      float
+    0x18  elementStyle                       int
+    0x1c  numColumns                         int
+    0x20  columnInfo                         columnInfo_s[16]
+   0x120  onDoubleClick                      char*
+   0x124  notselectable                      int
+   0x128  noScrollBars                       int
+   0x12c  usePaging                          int
+   0x130  selectBorder                       float[4]
+   0x140  disableColor                       float[4]
+   0x150  focusColor                         float[4]
+   0x160  selectIcon                         Material*
+   0x164  backgroundItemListbox              Material*
+   0x168  highlightTexture                   Material*
+
+struct LoadedSound  size=12
+     0x0  name                               char*
+     0x4  sound                              snd_asset
+
+struct LocalizeEntry  size=8
+     0x0  value                              char*
+     0x4  name                               char*
+
+struct MapEnts  size=12
+     0x0  name                               char*
+     0x4  entityString                       char*
+     0x8  numEntityChars                     int
+
+struct Material  size=112
+     0x0  info                               MaterialInfo
+    0x20  stateBitsEntry                     char[59]
+    0x5b  textureCount                       unsigned char
+    0x5c  constantCount                      unsigned char
+    0x5d  stateBitsCount                     unsigned char
+    0x5e  stateFlags                         unsigned char
+    0x5f  cameraRegion                       unsigned char
+    0x60  techniqueSet                       MaterialTechniqueSet*
+    0x64  textureTable                       MaterialTextureDef*
+    0x68  constantTable                      MaterialConstantDef*
+    0x6c  stateBitsTable                     GfxStateBits*
+
+struct MaterialArgumentCodeConst  size=4  align=2
+     0x0  index                              uint16_t
+     0x2  firstRow                           unsigned char
+     0x3  rowCount                           unsigned char
+
+struct MaterialArgumentDef  size=4
+     0x0  literalConst                       float*
+     0x0  codeConst                          MaterialArgumentCodeConst
+     0x0  codeSampler                        unsigned int
+     0x0  nameHash                           unsigned int
+
+struct MaterialConstantDef  size=32  align=16
+     0x0  nameHash                           unsigned int
+     0x4  name                               char[12]
+    0x10  literal                            vec4_t
+
+struct MaterialInfo  size=32
+     0x0  name                               char*
+     0x4  gameFlags                          unsigned char
+     0x5  sortKey                            unsigned char
+     0x6  textureAtlasRowCount               unsigned char
+     0x7  textureAtlasColumnCount            unsigned char
+     0x8  drawSurf                           GfxDrawSurf
+    0x10  surfaceTypeBits                    unsigned int
+    0x14  layeredSurfaceTypes                unsigned int
+    0x18  hashIndex                          uint16_t
+
+struct MaterialMemory  size=8
+     0x0  material                           Material*
+     0x4  memory                             int
+
+struct MaterialPass  size=20
+     0x0  vertexDecl                         MaterialVertexDeclaration*
+     0x4  vertexShader                       MaterialVertexShader*
+     0x8  pixelShader                        MaterialPixelShader*
+     0xc  perPrimArgCount                    unsigned char
+     0xd  perObjArgCount                     unsigned char
+     0xe  stableArgCount                     unsigned char
+     0xf  customSamplerFlags                 unsigned char
+    0x10  args                               MaterialShaderArgument*
+
+struct MaterialPixelShader  size=16
+     0x0  name                               char*
+     0x4  prog                               MaterialPixelShaderProgram
+
+struct MaterialPixelShaderProgram  size=12
+     0x4  loadDef                            GfxPixelShaderLoadDef
+       -  ps                                 void*
+
+struct MaterialShaderArgument  size=8
+     0x0  type                               uint16_t
+     0x2  dest                               uint16_t
+     0x4  u                                  MaterialArgumentDef
+
+struct MaterialStreamRouting  size=2  align=1
+     0x0  source                             unsigned char
+     0x1  dest                               unsigned char
+
+struct MaterialTechnique  size=None
+     0x0  name                               char*
+     0x4  flags                              uint16_t
+     0x6  passCount                          uint16_t
+     0x8  passArray                          MaterialPass[1]
+
+struct MaterialTechniqueSet  size=248
+     0x0  name                               char*
+     0x4  worldVertFormat                    MaterialWorldVertexFormat
+     0x5  hasBeenUploaded                    bool
+     0x6  unused                             char[1]
+     0xc  techniques                         MaterialTechnique*[59]
+       -  remappedTechniqueSet               MaterialTechniqueSet*
+
+struct MaterialTextureDef  size=16
+     0x0  nameHash                           unsigned int
+     0x4  nameStart                          char
+     0x5  nameEnd                            char
+     0x6  samplerState                       MaterialTextureDefSamplerState
+     0x7  semantic                           unsigned char
+     0x8  isMatureContent                    char
+     0xc  u                                  MaterialTextureDefInfo
+
+struct MaterialTextureDefInfo  size=4
+     0x0  image                              GfxImage*
+     0x0  water                              water_t*
+
+struct MaterialTextureDefSamplerState  size=1  align=1
+       -  filter                             unsigned char
+       -  mipMap                             unsigned char
+       -  clampU                             unsigned char
+       -  clampV                             unsigned char
+       -  clampW                             unsigned char
+
+struct MaterialVertexDeclaration  size=104
+     0x0  streamCount                        unsigned char
+     0x1  hasOptionalSource                  bool
+     0x2  isLoaded                           bool
+     0x4  routing                            MaterialVertexStreamRouting
+
+struct MaterialVertexShader  size=16
+     0x0  name                               char*
+     0x4  prog                               MaterialVertexShaderProgram
+
+struct MaterialVertexShaderProgram  size=12
+     0x4  loadDef                            GfxVertexShaderLoadDef
+       -  vs                                 void*
+
+struct MaterialVertexStreamRouting  size=None
+     0x0  data                               MaterialStreamRouting[16]
+       -  decl                               void*[VERTDECL_COUNT]
+
+struct menuDef_t  size=288
+     0x0  window                             windowDef_t
+    0x9c  font                               char*
+    0xa0  fullScreen                         int
+    0xa4  itemCount                          int
+    0xa8  fontIndex                          int
+    0xac  cursorItem                         int[1]
+    0xb0  fadeCycle                          int
+    0xb4  fadeClamp                          float
+    0xb8  fadeAmount                         float
+    0xbc  fadeInAmount                       float
+    0xc0  blurRadius                         float
+    0xc4  onOpen                             char*
+    0xc8  onFocus                            char*
+    0xcc  onClose                            char*
+    0xd0  onESC                              char*
+    0xd4  onKey                              ItemKeyHandler*
+    0xd8  visibleExp                         statement_s
+    0xe0  allowedBinding                     char*
+    0xe4  soundName                          char*
+    0xe8  imageTrack                         int
+    0xec  focusColor                         float[4]
+    0xfc  disableColor                       float[4]
+   0x10c  rectXExp                           statement_s
+   0x114  rectYExp                           statement_s
+   0x11c  items                              itemDef_s**
+
+struct MenuList  size=12
+     0x0  name                               char*
+     0x4  menuCount                          int
+     0x8  menus                              menuDef_t**
+
+struct ModelLodFade  size=4  align=4
+     0x0  value                              unsigned int
+
+struct multiDef_s  size=392
+     0x0  dvarList                           char*[32]
+    0x80  dvarStr                            char*[32]
+   0x100  dvarValue                          float[32]
+   0x180  count                              int
+   0x184  strDef                             int
+
+struct Operand  size=8
+     0x0  dataType                           expDataType
+     0x4  internals                          operandInternalDataUnion
+
+struct operandInternalDataUnion  size=4
+     0x0  intVal                             int
+     0x0  floatVal                           float
+     0x0  stringVal                          char*
+
+struct PackedTexCoords  size=4  align=4
+     0x0  packed                             unsigned int
+
+struct PackedUnitVec  size=4  align=4
+     0x0  packed                             unsigned int
+     0x0  array                              unsigned char[4]
+
+struct PackIndex  size=28
+     0x0  name                               char*
+     0x4  header                             PackIndexHeader
+    0x18  entries                            PackIndexEntry*
+
+struct PackIndexEntry  size=12  align=4
+     0x0  hash                               unsigned int
+     0x4  offset                             unsigned int
+     0x8  size                               unsigned int
+
+struct PackIndexHeader  size=20  align=4
+     0x0  magic                              unsigned int
+     0x4  timestamp                          unsigned int
+     0x8  count                              unsigned int
+     0xc  alignment                          unsigned int
+    0x10  data_start                         unsigned int
+
+struct pathbasenode_t  size=16  align=16
+     0x0  vOrigin                            float[3]
+     0xc  type                               unsigned int
+
+struct PathData  size=40
+     0x0  nodeCount                          unsigned int
+     0x4  nodes                              pathnode_t*
+     0x8  basenodes                          pathbasenode_t*
+     0xc  chainNodeCount                     unsigned int
+    0x10  chainNodeForNode                   uint16_t*
+    0x14  nodeForChainNode                   uint16_t*
+    0x18  visBytes                           int
+    0x1c  pathVis                            char*
+    0x20  nodeTreeCount                      int
+    0x24  nodeTree                           pathnode_tree_t*
+
+struct pathlink_s  size=12  align=4
+     0x0  fDist                              float
+     0x4  nodeNum                            uint16_t
+     0x6  disconnectCount                    char
+     0x7  negotiationLink                    char
+     0x8  ubBadPlaceCount                    char[4]
+
+struct pathnode_constant_t  size=68
+     0x0  type                               nodeType
+     0x4  spawnflags                         uint16_t
+     0x6  targetname                         uint16_t
+     0x8  script_linkName                    uint16_t
+     0xa  script_noteworthy                  uint16_t
+     0xc  target                             uint16_t
+     0xe  animscript                         uint16_t
+    0x10  animscriptfunc                     int
+    0x14  vOrigin                            float[3]
+    0x20  fAngle                             float
+    0x24  forward                            float[2]
+    0x2c  fRadius                            float
+    0x30  minUseDistSq                       float
+    0x34  wOverlapNode                       int16_t[2]
+    0x38  wChainId                           int16_t
+    0x3a  wChainDepth                        int16_t
+    0x3c  wChainParent                       int16_t
+    0x3e  totalLinkCount                     uint16_t
+    0x40  Links                              pathlink_s*
+
+struct pathnode_dynamic_t  size=None
+     0x4  iFreeTime                          int
+     0x8  iValidTime                         int[3]
+    0x14  inPlayerLOSTime                    int
+    0x18  wLinkCount                         int16_t
+    0x1a  wOverlapCount                      int16_t
+    0x1c  turretEntNumber                    int16_t
+    0x1e  userCount                          int16_t
+       -  pOwner                             void*
+
+struct pathnode_t  size=128
+     0x0  constant                           pathnode_constant_t
+    0x44  dynamic                            pathnode_dynamic_t
+       -  transient                          pathnode_transient_t
+
+struct pathnode_tree_info_t  size=8
+     0x0  child                              pathnode_tree_t*[2]
+     0x0  s                                  pathnode_tree_nodes_t
+
+struct pathnode_tree_nodes_t  size=8
+     0x0  nodeCount                          int
+     0x4  nodes                              uint16_t*
+
+struct pathnode_tree_t  size=16
+     0x0  axis                               int
+     0x4  dist                               float
+     0x8  u                                  pathnode_tree_info_t
+
+struct PhysConstraint  size=152
+     0x0  targetname                         ScriptString
+     0x4  type                               ConstraintType
+     0x8  attach_point_type1                 AttachPointType
+     0xc  target_index1                      int
+    0x10  target_ent1                        ScriptString
+    0x14  target_bone1                       char*
+    0x18  attach_point_type2                 AttachPointType
+    0x1c  target_index2                      int
+    0x20  target_ent2                        ScriptString
+    0x24  target_bone2                       char*
+    0x28  offset                             float[3]
+    0x34  pos                                float[3]
+    0x40  pos2                               float[3]
+    0x4c  dir                                float[3]
+    0x58  flags                              int
+    0x5c  timeout                            int
+    0x60  min_health                         int
+    0x64  max_health                         int
+    0x68  distance                           float
+    0x6c  damp                               float
+    0x70  power                              float
+    0x74  scale                              float[3]
+    0x80  spin_scale                         float
+    0x84  minAngle                           float
+    0x88  maxAngle                           float
+    0x8c  material                           Material*
+    0x90  constraintHandle                   int
+    0x94  rope_index                         int
+
+struct PhysConstraints  size=2440
+     0x0  name                               char*
+     0x4  count                              unsigned int
+     0x8  data                               PhysConstraint[16]
+
+struct PhysGeomInfo  size=68
+     0x0  brush                              BrushWrapper*
+     0x4  type                               int
+     0x8  orientation                        float[3][3]
+    0x2c  offset                             float[3]
+    0x38  halfLengths                        float[3]
+
+struct PhysGeomList  size=20
+     0x0  count                              unsigned int
+     0x4  geoms                              PhysGeomInfo*
+     0x8  mass                               PhysMass
+
+struct PhysMass  size=12  align=4
+     0x0  centerOfMass                       float[3]
+
+struct PhysPreset  size=48
+     0x0  name                               char*
+     0x4  type                               int
+     0x8  mass                               float
+     0xc  bounce                             float
+    0x10  friction                           float
+    0x14  bulletForceScale                   float
+    0x18  explosiveForceScale                float
+    0x1c  sndAliasPrefix                     char*
+    0x20  piecesSpreadFraction               float
+    0x24  piecesUpwardVelocity               float
+    0x28  canFloat                           int
+    0x2c  gravityScale                       float
+
+struct Picmip  size=2  align=1
+     0x0  platform                           char[2]
+
+struct PrimedSound  size=12
+     0x0  name                               char*
+     0x4  buffer                             unsigned char*
+     0x8  size                               unsigned int
+
+struct RawFile  size=12
+     0x0  name                               char*
+     0x4  len                                int
+     0x8  buffer                             char*
+
+struct rectDef_s  size=24  align=4
+     0x0  x                                  float
+     0x4  y                                  float
+     0x8  w                                  float
+     0xc  h                                  float
+    0x10  horzAlign                          int
+    0x14  vertAlign                          int
+
+struct snd_alias_list_name  size=4
+     0x0  soundName                          char*
+
+struct snd_alias_list_t  size=12
+     0x0  aliasName                          char*
+     0x4  head                               snd_alias_t*
+     0x8  count                              int
+
+struct snd_alias_t  size=184
+     0x0  aliasName                          char*
+     0x4  aliasNameHash                      int
+     0x8  subtitle                           char*
+     0xc  secondaryAliasName                 char*
+    0x10  chainAliasName                     char*
+    0x14  soundFile                          SoundFile*
+    0x18  sequence                           unsigned int
+    0x1c  volMin                             float
+    0x20  volMax                             float
+    0x24  pitchMin                           float
+    0x28  pitchMax                           float
+    0x2c  distMin                            float
+    0x30  distMax                            float
+    0x34  distReverbMax                      float
+    0x38  slavePercentage                    float
+    0x3c  probability                        float
+    0x40  lfePercentage                      float
+    0x44  centerPercentage                   float
+    0x48  envelopMin                         float
+    0x4c  envelopMax                         float
+    0x50  envelopPercentage                  float
+    0x54  minPriority                        float
+    0x58  maxPriority                        float
+    0x5c  minPriorityThreshold               float
+    0x60  maxPriorityThreshold               float
+    0x64  reverbSend                         float
+    0x68  gap2                               int
+    0x6c  gap3                               int
+    0x70  occlusionLevel                     float
+    0x74  occlusionWetDry                    float
+    0x78  moveTime                           unsigned int
+    0x7c  startDelay                         unsigned int
+    0x80  speakerMap                         unsigned int
+    0x84  flags                              int
+    0x88  volumeFalloffCurve                 unsigned int
+    0x8c  reverbFalloffCurve                 unsigned int
+    0x90  volumeMinFalloffCurve              unsigned int
+    0x94  reverbMinFalloffCurve              unsigned int
+    0x98  limitType                          snd_limit_type_t
+    0x9c  gap5                               int
+    0xa0  entityLimitCount                   unsigned int
+    0xa4  gap6                               int
+    0xa8  randomizeType                      snd_randomize_type_t
+    0xac  gap7                               int
+    0xb0  gap8                               int
+    0xb4  gap9                               int
+
+struct snd_asset  size=8
+     0x0  data                               char*
+     0x4  data_size                          int
+
+struct snd_bus_info_t  size=64  align=4
+     0x0  name                               char[32]
+    0x20  volumeMod                          float
+    0x24  maxVoices                          int
+    0x28  restricted                         int
+    0x2c  pausable                           int
+    0x30  stopOnDeath                        int
+    0x34  isMusic                            int
+    0x38  category                           snd_category_t
+    0x3c  voiceLimitType                     snd_limit_type_t
+
+struct snd_curve_t  size=100  align=4
+     0x0  name                               char[32]
+    0x20  pointCount                         int
+    0x24  points                             float[8][2]
+
+struct snd_master_effect_t  size=56  align=4
+     0x0  name                               char[32]
+    0x20  masterRingmod                      float
+    0x24  reverbRingmod                      float
+    0x28  masterLPRatio                      float
+    0x2c  masterLPDB                         float
+    0x30  masterHPRatio                      float
+    0x34  masterHPDB                         float
+
+struct snd_reverb_patch_t  size=80  align=4
+     0x0  name                               char[32]
+    0x20  room                               float
+    0x24  roomHF                             float
+    0x28  roomRolloffFactor                  float
+    0x2c  decayTime                          float
+    0x30  decayHFRatio                       float
+    0x34  reflections                        float
+    0x38  reflectionsDelay                   float
+    0x3c  reverb                             float
+    0x40  reverbDelay                        float
+    0x44  diffusion                          float
+    0x48  density                            float
+    0x4c  HFReference                        float
+
+struct snd_speaker_map  size=72  align=4
+     0x0  input_channel_count                int
+     0x4  output_channel_count               int
+     0x8  volumes                            float[16]
+
+struct snd_speaker_map_set  size=320  align=4
+     0x0  name                               char[32]
+    0x20  channelMaps                        snd_speaker_map[4]
+
+struct SndAliasCustom  size=4
+     0x0  name                               snd_alias_list_name*
+       -  sound                              snd_alias_list_t*
+
+struct SndDriverGlobals  size=23556
+     0x0  name                               char*
+     0x4  reverbPatches                      snd_reverb_patch_t[64]
+  0x1404  buses                              snd_bus_info_t[64]
+  0x2404  curves                             snd_curve_t[32]
+  0x3084  speakerMaps                        snd_speaker_map_set[32]
+  0x5884  masterEffects                      snd_master_effect_t[16]
+
+struct SoundFile  size=20
+     0x0  type                               unsigned char
+     0x1  exists                             unsigned char
+     0x4  u                                  SoundFileRef
+
+struct SoundFileRef  size=16
+     0x0  loadSnd                            LoadedSound*
+     0x0  streamSnd                          StreamedSound
+
+struct srfTriangles_t  size=16  align=4
+     0x0  vertexLayerData                    int
+     0x4  firstVertex                        int
+     0x8  vertexCount                        uint16_t
+     0xa  triCount                           uint16_t
+     0xc  baseIndex                          int
+
+struct statement_s  size=8
+     0x0  numEntries                         int
+     0x4  entries                            expressionEntry**
+
+struct StreamedSound  size=16
+     0x0  filename                           StreamFileName
+     0xc  primeSnd                           PrimedSound*
+
+struct StreamFileName  size=12
+     0x0  hash                               unsigned int
+     0x4  dir                                char*
+     0x8  name                               char*
+
+struct StringTable  size=16
+     0x0  name                               char*
+     0x4  columnCount                        int
+     0x8  rowCount                           int
+     0xc  values                             char**
+
+struct sunflare_t  size=96
+     0x0  hasValidData                       bool
+     0x4  spriteMaterial                     Material*
+     0x8  flareMaterial                      Material*
+     0xc  spriteSize                         float
+    0x10  flareMinSize                       float
+    0x14  flareMinDot                        float
+    0x18  flareMaxSize                       float
+    0x1c  flareMaxDot                        float
+    0x20  flareMaxAlpha                      float
+    0x24  flareFadeInTime                    int
+    0x28  flareFadeOutTime                   int
+    0x2c  blindMinDot                        float
+    0x30  blindMaxDot                        float
+    0x34  blindMaxDarken                     float
+    0x38  blindFadeInTime                    int
+    0x3c  blindFadeOutTime                   int
+    0x40  glareMinDot                        float
+    0x44  glareMaxDot                        float
+    0x48  glareMaxLighten                    float
+    0x4c  glareFadeInTime                    int
+    0x50  glareFadeOutTime                   int
+    0x54  sunFxPosition                      float[3]
+
+struct SunLightParseParams  size=136  align=4
+     0x0  name                               char[64]
+    0x40  ambientScale                       float
+    0x44  ambientColor                       float[3]
+    0x50  diffuseFraction                    float
+    0x54  sunLight                           float
+    0x58  sunColor                           float[3]
+    0x64  diffuseColor                       float[3]
+    0x70  diffuseColorHasBeenSet             bool
+    0x74  angles                             float[3]
+    0x80  treeScatterIntensity               float
+    0x84  treeScatterAmount                  float
+
+struct vec2_t  size=8  align=4
+     0x0  v                                  float[2]
+       -  ANON                               
+
+struct vec3_t  size=12  align=4
+     0x0  v                                  float[3]
+       -  ANON                               
+
+struct vec4_t  size=16  align=4
+     0x0  v                                  float[4]
+       -  ANON                               
+
+struct water_t  size=68
+     0x0  writable                           WaterWritable
+     0x4  H0                                 complex_s*
+     0x8  wTerm                              float*
+     0xc  M                                  int
+    0x10  N                                  int
+    0x14  Lx                                 float
+    0x18  Lz                                 float
+    0x1c  gravity                            float
+    0x20  windvel                            float
+    0x24  winddir                            float[2]
+    0x2c  amplitude                          float
+    0x30  codeConstant                       float[4]
+    0x40  image                              GfxImage*
+
+struct WaterWritable  size=4  align=4
+     0x0  floatTime                          float
+
+struct WeaponDef  size=2476
+     0x0  szInternalName                     char*
+     0x4  szDisplayName                      char*
+     0x8  szOverlayName                      char*
+     0xc  gunXModel                          XModel*[16]
+    0x4c  handXModel                         XModel*
+    0x50  szXAnims                           char*[35]
+    0xdc  szModeName                         char*
+    0xe0  hideTags                           uint16_t[8]
+    0xf0  notetrackSoundMapKeys              uint16_t[20]
+   0x118  notetrackSoundMapValues            uint16_t[20]
+   0x140  playerAnimType                     int
+   0x144  weapType                           weapType_t
+   0x148  weapClass                          weapClass_t
+   0x14c  penetrateType                      PenetrateType
+   0x150  impactType                         ImpactType
+   0x154  inventoryType                      weapInventoryType_t
+   0x158  fireType                           weapFireType_t
+   0x15c  clipType                           weapClipType_t
+   0x160  overheatWeapon                     int
+   0x164  overheatRate                       float
+   0x168  cooldownRate                       float
+   0x16c  overheatEndVal                     float
+   0x170  coolWhileFiring                    int
+   0x174  offhandClass                       OffhandClass
+   0x178  stance                             weapStance_t
+   0x17c  viewFlashEffect                    FxEffectDef*
+   0x180  worldFlashEffect                   FxEffectDef*
+   0x184  pickupSound                        SndAliasCustom
+   0x188  pickupSoundPlayer                  SndAliasCustom
+   0x18c  ammoPickupSound                    SndAliasCustom
+   0x190  ammoPickupSoundPlayer              SndAliasCustom
+   0x194  projectileSound                    SndAliasCustom
+   0x198  pullbackSound                      SndAliasCustom
+   0x19c  pullbackSoundPlayer                SndAliasCustom
+   0x1a0  fireSound                          SndAliasCustom
+   0x1a4  fireSoundPlayer                    SndAliasCustom
+   0x1a8  fireLoopSound                      SndAliasCustom
+   0x1ac  fireLoopSoundPlayer                SndAliasCustom
+   0x1b0  fireStopSound                      SndAliasCustom
+   0x1b4  fireStopSoundPlayer                SndAliasCustom
+   0x1b8  fireLastSound                      SndAliasCustom
+   0x1bc  fireLastSoundPlayer                SndAliasCustom
+   0x1c0  emptyFireSound                     SndAliasCustom
+   0x1c4  emptyFireSoundPlayer               SndAliasCustom
+   0x1c8  crackSound                         SndAliasCustom
+   0x1cc  whizbySound                        SndAliasCustom
+   0x1d0  meleeSwipeSound                    SndAliasCustom
+   0x1d4  meleeSwipeSoundPlayer              SndAliasCustom
+   0x1d8  meleeHitSound                      SndAliasCustom
+   0x1dc  meleeMissSound                     SndAliasCustom
+   0x1e0  rechamberSound                     SndAliasCustom
+   0x1e4  rechamberSoundPlayer               SndAliasCustom
+   0x1e8  reloadSound                        SndAliasCustom
+   0x1ec  reloadSoundPlayer                  SndAliasCustom
+   0x1f0  reloadEmptySound                   SndAliasCustom
+   0x1f4  reloadEmptySoundPlayer             SndAliasCustom
+   0x1f8  reloadStartSound                   SndAliasCustom
+   0x1fc  reloadStartSoundPlayer             SndAliasCustom
+   0x200  reloadEndSound                     SndAliasCustom
+   0x204  reloadEndSoundPlayer               SndAliasCustom
+   0x208  rotateLoopSound                    SndAliasCustom
+   0x20c  rotateLoopSoundPlayer              SndAliasCustom
+   0x210  deploySound                        SndAliasCustom
+   0x214  deploySoundPlayer                  SndAliasCustom
+   0x218  finishDeploySound                  SndAliasCustom
+   0x21c  finishDeploySoundPlayer            SndAliasCustom
+   0x220  breakdownSound                     SndAliasCustom
+   0x224  breakdownSoundPlayer               SndAliasCustom
+   0x228  finishBreakdownSound               SndAliasCustom
+   0x22c  finishBreakdownSoundPlayer         SndAliasCustom
+   0x230  detonateSound                      SndAliasCustom
+   0x234  detonateSoundPlayer                SndAliasCustom
+   0x238  nightVisionWearSound               SndAliasCustom
+   0x23c  nightVisionWearSoundPlayer         SndAliasCustom
+   0x240  nightVisionRemoveSound             SndAliasCustom
+   0x244  nightVisionRemoveSoundPlayer       SndAliasCustom
+   0x248  altSwitchSound                     SndAliasCustom
+   0x24c  altSwitchSoundPlayer               SndAliasCustom
+   0x250  raiseSound                         SndAliasCustom
+   0x254  raiseSoundPlayer                   SndAliasCustom
+   0x258  firstRaiseSound                    SndAliasCustom
+   0x25c  firstRaiseSoundPlayer              SndAliasCustom
+   0x260  putawaySound                       SndAliasCustom
+   0x264  putawaySoundPlayer                 SndAliasCustom
+   0x268  overheatSound                      SndAliasCustom
+   0x26c  overheatSoundPlayer                SndAliasCustom
+   0x270  bounceSound                        SndAliasCustom*
+   0x274  standMountedWeapdef                char*
+   0x278  crouchMountedWeapdef               char*
+   0x27c  proneMountedWeapdef                char*
+   0x280  standMountedIndex                  int
+   0x284  crouchMountedIndex                 int
+   0x288  proneMountedIndex                  int
+   0x28c  viewShellEjectEffect               FxEffectDef*
+   0x290  worldShellEjectEffect              FxEffectDef*
+   0x294  viewLastShotEjectEffect            FxEffectDef*
+   0x298  worldLastShotEjectEffect           FxEffectDef*
+   0x29c  reticleCenter                      Material*
+   0x2a0  reticleSide                        Material*
+   0x2a4  iReticleCenterSize                 int
+   0x2a8  iReticleSideSize                   int
+   0x2ac  iReticleMinOfs                     int
+   0x2b0  activeReticleType                  activeReticleType_t
+   0x2b4  vStandMove                         float[3]
+   0x2c0  vStandRot                          float[3]
+   0x2cc  vDuckedOfs                         float[3]
+   0x2d8  vDuckedMove                        float[3]
+   0x2e4  duckedSprintOfs                    float[3]
+   0x2f0  duckedSprintRot                    float[3]
+   0x2fc  duckedSprintBob                    float[2]
+   0x304  duckedSprintScale                  float
+   0x308  sprintOfs                          float[3]
+   0x314  sprintRot                          float[3]
+   0x320  sprintBob                          float[2]
+   0x328  sprintScale                        float
+   0x32c  vDuckedRot                         float[3]
+   0x338  vProneOfs                          float[3]
+   0x344  vProneMove                         float[3]
+   0x350  vProneRot                          float[3]
+   0x35c  fPosMoveRate                       float
+   0x360  fPosProneMoveRate                  float
+   0x364  fStandMoveMinSpeed                 float
+   0x368  fDuckedMoveMinSpeed                float
+   0x36c  fProneMoveMinSpeed                 float
+   0x370  fPosRotRate                        float
+   0x374  fPosProneRotRate                   float
+   0x378  fStandRotMinSpeed                  float
+   0x37c  fDuckedRotMinSpeed                 float
+   0x380  fProneRotMinSpeed                  float
+   0x384  worldModel                         XModel*[16]
+   0x3c4  worldClipModel                     XModel*
+   0x3c8  rocketModel                        XModel*
+   0x3cc  knifeModel                         XModel*
+   0x3d0  worldKnifeModel                    XModel*
+   0x3d4  mountedModel                       XModel*
+   0x3d8  hudIcon                            Material*
+   0x3dc  hudIconRatio                       weaponIconRatioType_t
+   0x3e0  ammoCounterIcon                    Material*
+   0x3e4  ammoCounterIconRatio               weaponIconRatioType_t
+   0x3e8  ammoCounterClip                    ammoCounterClipType_t
+   0x3ec  iStartAmmo                         int
+   0x3f0  szAmmoName                         char*
+   0x3f4  iAmmoIndex                         int
+   0x3f8  szClipName                         char*
+   0x3fc  iClipIndex                         int
+   0x400  iHeatIndex                         int
+   0x404  iMaxAmmo                           int
+   0x408  iClipSize                          int
+   0x40c  shotCount                          int
+   0x410  szSharedAmmoCapName                char*
+   0x414  iSharedAmmoCapIndex                int
+   0x418  iSharedAmmoCap                     int
+   0x41c  unlimitedAmmo                      int
+   0x420  damage                             int
+   0x424  damageDuration                     int
+   0x428  damageInterval                     int
+   0x42c  playerDamage                       int
+   0x430  iMeleeDamage                       int
+   0x434  iDamageType                        int
+   0x438  iFireDelay                         int
+   0x43c  iMeleeDelay                        int
+   0x440  meleeChargeDelay                   int
+   0x444  iDetonateDelay                     int
+   0x448  iFireTime                          int
+   0x44c  iRechamberTime                     int
+   0x450  iRechamberBoltTime                 int
+   0x454  iHoldFireTime                      int
+   0x458  iDetonateTime                      int
+   0x45c  iMeleeTime                         int
+   0x460  meleeChargeTime                    int
+   0x464  iReloadTime                        int
+   0x468  reloadShowRocketTime               int
+   0x46c  iReloadEmptyTime                   int
+   0x470  iReloadAddTime                     int
+   0x474  reloadEmptyAddTime                 int
+   0x478  iReloadStartTime                   int
+   0x47c  iReloadStartAddTime                int
+   0x480  iReloadEndTime                     int
+   0x484  iDropTime                          int
+   0x488  iRaiseTime                         int
+   0x48c  iAltDropTime                       int
+   0x490  iAltRaiseTime                      int
+   0x494  quickDropTime                      int
+   0x498  quickRaiseTime                     int
+   0x49c  iFirstRaiseTime                    int
+   0x4a0  iEmptyRaiseTime                    int
+   0x4a4  iEmptyDropTime                     int
+   0x4a8  sprintInTime                       int
+   0x4ac  sprintLoopTime                     int
+   0x4b0  sprintOutTime                      int
+   0x4b4  deployTime                         int
+   0x4b8  breakdownTime                      int
+   0x4bc  nightVisionWearTime                int
+   0x4c0  nightVisionWearTimeFadeOutEnd      int
+   0x4c4  nightVisionWearTimePowerUp         int
+   0x4c8  nightVisionRemoveTime              int
+   0x4cc  nightVisionRemoveTimePowerDown     int
+   0x4d0  nightVisionRemoveTimeFadeInStart   int
+   0x4d4  fuseTime                           int
+   0x4d8  aiFuseTime                         int
+   0x4dc  requireLockonToFire                int
+   0x4e0  noAdsWhenMagEmpty                  int
+   0x4e4  avoidDropCleanup                   int
+   0x4e8  autoAimRange                       float
+   0x4ec  aimAssistRange                     float
+   0x4f0  aimAssistRangeAds                  float
+   0x4f4  mountableWeapon                    int
+   0x4f8  aimPadding                         float
+   0x4fc  enemyCrosshairRange                float
+   0x500  crosshairColorChange               int
+   0x504  moveSpeedScale                     float
+   0x508  adsMoveSpeedScale                  float
+   0x50c  sprintDurationScale                float
+   0x510  fAdsZoomFov                        float
+   0x514  fAdsZoomInFrac                     float
+   0x518  fAdsZoomOutFrac                    float
+   0x51c  overlayMaterial                    Material*
+   0x520  overlayMaterialLowRes              Material*
+   0x524  overlayReticle                     weapOverlayReticle_t
+   0x528  overlayInterface                   WeapOverlayInterface_t
+   0x52c  overlayWidth                       float
+   0x530  overlayHeight                      float
+   0x534  fAdsBobFactor                      float
+   0x538  fAdsViewBobMult                    float
+   0x53c  fHipSpreadStandMin                 float
+   0x540  fHipSpreadDuckedMin                float
+   0x544  fHipSpreadProneMin                 float
+   0x548  hipSpreadStandMax                  float
+   0x54c  hipSpreadDuckedMax                 float
+   0x550  hipSpreadProneMax                  float
+   0x554  fHipSpreadDecayRate                float
+   0x558  fHipSpreadFireAdd                  float
+   0x55c  fHipSpreadTurnAdd                  float
+   0x560  fHipSpreadMoveAdd                  float
+   0x564  fHipSpreadDuckedDecay              float
+   0x568  fHipSpreadProneDecay               float
+   0x56c  fHipReticleSidePos                 float
+   0x570  iAdsTransInTime                    int
+   0x574  iAdsTransOutTime                   int
+   0x578  fAdsIdleAmount                     float
+   0x57c  fHipIdleAmount                     float
+   0x580  adsIdleSpeed                       float
+   0x584  hipIdleSpeed                       float
+   0x588  fIdleCrouchFactor                  float
+   0x58c  fIdleProneFactor                   float
+   0x590  fGunMaxPitch                       float
+   0x594  fGunMaxYaw                         float
+   0x598  swayMaxAngle                       float
+   0x59c  swayLerpSpeed                      float
+   0x5a0  swayPitchScale                     float
+   0x5a4  swayYawScale                       float
+   0x5a8  swayHorizScale                     float
+   0x5ac  swayVertScale                      float
+   0x5b0  swayShellShockScale                float
+   0x5b4  adsSwayMaxAngle                    float
+   0x5b8  adsSwayLerpSpeed                   float
+   0x5bc  adsSwayPitchScale                  float
+   0x5c0  adsSwayYawScale                    float
+   0x5c4  adsSwayHorizScale                  float
+   0x5c8  adsSwayVertScale                   float
+   0x5cc  bRifleBullet                       int
+   0x5d0  armorPiercing                      int
+   0x5d4  bBoltAction                        int
+   0x5d8  aimDownSight                       int
+   0x5dc  bRechamberWhileAds                 int
+   0x5e0  adsViewErrorMin                    float
+   0x5e4  adsViewErrorMax                    float
+   0x5e8  bCookOffHold                       int
+   0x5ec  bClipOnly                          int
+   0x5f0  canUseInVehicle                    int
+   0x5f4  noDropsOrRaises                    int
+   0x5f8  adsFireOnly                        int
+   0x5fc  cancelAutoHolsterWhenEmpty         int
+   0x600  suppressAmmoReserveDisplay         int
+   0x604  enhanced                           int
+   0x608  laserSightDuringNightvision        int
+   0x60c  bayonet                            int
+   0x610  killIcon                           Material*
+   0x614  killIconRatio                      weaponIconRatioType_t
+   0x618  flipKillIcon                       int
+   0x61c  dpadIcon                           Material*
+   0x620  dpadIconRatio                      weaponIconRatioType_t
+   0x624  bNoPartialReload                   int
+   0x628  bSegmentedReload                   int
+   0x62c  noADSAutoReload                    int
+   0x630  iReloadAmmoAdd                     int
+   0x634  iReloadStartAdd                    int
+   0x638  szAltWeaponName                    char*
+   0x63c  altWeaponIndex                     unsigned int
+   0x640  iDropAmmoMin                       int
+   0x644  iDropAmmoMax                       int
+   0x648  blocksProne                        int
+   0x64c  silenced                           int
+   0x650  iExplosionRadius                   int
+   0x654  iExplosionRadiusMin                int
+   0x658  iExplosionInnerDamage              int
+   0x65c  iExplosionOuterDamage              int
+   0x660  damageConeAngle                    float
+   0x664  iProjectileSpeed                   int
+   0x668  iProjectileSpeedUp                 int
+   0x66c  iProjectileSpeedForward            int
+   0x670  iProjectileActivateDist            int
+   0x674  projLifetime                       float
+   0x678  timeToAccelerate                   float
+   0x67c  projectileCurvature                float
+   0x680  projectileModel                    XModel*
+   0x684  projExplosion                      weapProjExposion_t
+   0x688  projExplosionEffect                FxEffectDef*
+   0x68c  projExplosionEffectForceNormalUp   int
+   0x690  projDudEffect                      FxEffectDef*
+   0x694  projExplosionSound                 SndAliasCustom
+   0x698  projDudSound                       SndAliasCustom
+   0x69c  mortarShellSound                   SndAliasCustom
+   0x6a0  tankShellSound                     SndAliasCustom
+   0x6a4  bProjImpactExplode                 int
+   0x6a8  stickiness                         WeapStickinessType
+   0x6ac  hasDetonator                       int
+   0x6b0  timedDetonation                    int
+   0x6b4  rotate                             int
+   0x6b8  holdButtonToThrow                  int
+   0x6bc  freezeMovementWhenFiring           int
+   0x6c0  lowAmmoWarningThreshold            float
+   0x6c4  parallelBounce                     float[31]
+   0x740  perpendicularBounce                float[31]
+   0x7bc  projTrailEffect                    FxEffectDef*
+   0x7c0  vProjectileColor                   float[3]
+   0x7cc  guidedMissileType                  guidedMissileType_t
+   0x7d0  maxSteeringAccel                   float
+   0x7d4  projIgnitionDelay                  int
+   0x7d8  projIgnitionEffect                 FxEffectDef*
+   0x7dc  projIgnitionSound                  SndAliasCustom
+   0x7e0  fAdsAimPitch                       float
+   0x7e4  fAdsCrosshairInFrac                float
+   0x7e8  fAdsCrosshairOutFrac               float
+   0x7ec  adsGunKickReducedKickBullets       int
+   0x7f0  adsGunKickReducedKickPercent       float
+   0x7f4  fAdsGunKickPitchMin                float
+   0x7f8  fAdsGunKickPitchMax                float
+   0x7fc  fAdsGunKickYawMin                  float
+   0x800  fAdsGunKickYawMax                  float
+   0x804  fAdsGunKickAccel                   float
+   0x808  fAdsGunKickSpeedMax                float
+   0x80c  fAdsGunKickSpeedDecay              float
+   0x810  fAdsGunKickStaticDecay             float
+   0x814  fAdsViewKickPitchMin               float
+   0x818  fAdsViewKickPitchMax               float
+   0x81c  fAdsViewKickYawMin                 float
+   0x820  fAdsViewKickYawMax                 float
+   0x824  fAdsViewKickCenterSpeed            float
+   0x828  fAdsViewScatterMin                 float
+   0x82c  fAdsViewScatterMax                 float
+   0x830  fAdsSpread                         float
+   0x834  hipGunKickReducedKickBullets       int
+   0x838  hipGunKickReducedKickPercent       float
+   0x83c  fHipGunKickPitchMin                float
+   0x840  fHipGunKickPitchMax                float
+   0x844  fHipGunKickYawMin                  float
+   0x848  fHipGunKickYawMax                  float
+   0x84c  fHipGunKickAccel                   float
+   0x850  fHipGunKickSpeedMax                float
+   0x854  fHipGunKickSpeedDecay              float
+   0x858  fHipGunKickStaticDecay             float
+   0x85c  fHipViewKickPitchMin               float
+   0x860  fHipViewKickPitchMax               float
+   0x864  fHipViewKickYawMin                 float
+   0x868  fHipViewKickYawMax                 float
+   0x86c  fHipViewKickCenterSpeed            float
+   0x870  fHipViewScatterMin                 float
+   0x874  fHipViewScatterMax                 float
+   0x878  fightDist                          float
+   0x87c  maxDist                            float
+   0x880  aiVsAiAccuracyGraphName            char*
+   0x884  aiVsPlayerAccuracyGraphName        char*
+   0x888  aiVsAiAccuracyGraphKnots           vec2_t*
+   0x88c  aiVsPlayerAccuracyGraphKnots       vec2_t*
+   0x890  originalAiVsAiAccuracyGraphKnots   vec2_t*
+   0x894  originalAiVsPlayerAccuracyGraphKnots vec2_t*
+   0x898  aiVsAiAccuracyGraphKnotCount       int
+   0x89c  aiVsPlayerAccuracyGraphKnotCount   int
+   0x8a0  originalAiVsAiAccuracyGraphKnotCount int
+   0x8a4  originalAiVsPlayerAccuracyGraphKnotCount int
+   0x8a8  iPositionReloadTransTime           int
+   0x8ac  leftArc                            float
+   0x8b0  rightArc                           float
+   0x8b4  topArc                             float
+   0x8b8  bottomArc                          float
+   0x8bc  accuracy                           float
+   0x8c0  aiSpread                           float
+   0x8c4  playerSpread                       float
+   0x8c8  minTurnSpeed                       float[2]
+   0x8d0  maxTurnSpeed                       float[2]
+   0x8d8  pitchConvergenceTime               float
+   0x8dc  yawConvergenceTime                 float
+   0x8e0  suppressTime                       float
+   0x8e4  maxRange                           float
+   0x8e8  fAnimHorRotateInc                  float
+   0x8ec  fPlayerPositionDist                float
+   0x8f0  szUseHintString                    char*
+   0x8f4  dropHintString                     char*
+   0x8f8  iUseHintStringIndex                int
+   0x8fc  dropHintStringIndex                int
+   0x900  horizViewJitter                    float
+   0x904  vertViewJitter                     float
+   0x908  szScript                           char*
+   0x90c  fOOPosAnimLength                   float[2]
+   0x914  minDamage                          int
+   0x918  minPlayerDamage                    int
+   0x91c  fMaxDamageRange                    float
+   0x920  fMinDamageRange                    float
+   0x924  destabilizationRateTime            float
+   0x928  destabilizationCurvatureMax        float
+   0x92c  destabilizeDistance                int
+   0x930  locationDamageMultipliers          float[HITLOC_COUNT]
+   0x97c  fireRumble                         char*
+   0x980  meleeImpactRumble                  char*
+   0x984  adsDofStart                        float
+   0x988  adsDofEnd                          float
+   0x98c  hipDofStart                        float
+   0x990  hipDofEnd                          float
+   0x994  flameTableFirstPerson              char*
+   0x998  flameTableThirdPerson              char*
+   0x99c  flameTableFirstPersonPtr           FlameTable*
+   0x9a0  flameTableThirdPersonPtr           FlameTable*
+   0x9a4  tagFx_preparationEffect            FxEffectDef*
+   0x9a8  tagFlash_preparationEffect         FxEffectDef*
+
+struct windowDef_t  size=156
+     0x0  name                               char*
+     0x4  rect                               rectDef_s
+    0x1c  rectClient                         rectDef_s
+    0x34  group                              char*
+    0x38  style                              int
+    0x3c  border                             int
+    0x40  ownerDraw                          int
+    0x44  ownerDrawFlags                     int
+    0x48  borderSize                         float
+    0x4c  staticFlags                        unsigned int
+    0x50  dynamicFlags                       unsigned int[1]
+    0x54  nextTime                           int
+    0x58  foreColor                          float[4]
+    0x68  backColor                          float[4]
+    0x78  borderColor                        float[4]
+    0x88  outlineColor                       float[4]
+    0x98  background                         Material*
+
+struct XAnimDeltaPart  size=8
+     0x0  trans                              XAnimPartTrans*
+     0x4  quat                               XAnimDeltaPartQuat*
+
+struct XAnimDeltaPartQuat  size=None
+     0x0  size                               uint16_t
+     0x4  u                                  XAnimDeltaPartQuatData
+
+struct XAnimDeltaPartQuatData  size=None
+     0x0  frames                             XAnimDeltaPartQuatDataFrames
+     0x0  frame0                             XQuat2
+
+struct XAnimDeltaPartQuatDataFrames  size=None
+     0x0  frames                             XQuat2*
+     0x4  indices                            XAnimDynamicIndicesQuat
+
+struct XAnimDynamicFrames  size=4
+     0x0  _1                                 ByteVec*
+     0x0  _2                                 UShortVec*
+
+struct XAnimDynamicIndicesQuat  size=2  align=2
+     0x0  _1                                 unsigned char[1]
+     0x0  _2                                 uint16_t[1]
+
+struct XAnimDynamicIndicesTrans  size=2  align=2
+     0x0  _1                                 unsigned char[1]
+     0x0  _2                                 uint16_t[1]
+
+struct XAnimIndices  size=4
+     0x0  _1                                 unsigned char*
+     0x0  _2                                 uint16_t*
+       -  data                               void*
+
+struct XAnimNotifyInfo  size=8  align=4
+     0x0  name                               ScriptString
+     0x4  time                               float
+
+struct XAnimParts  size=88
+     0x0  name                               char*
+     0x4  dataByteCount                      uint16_t
+     0x6  dataShortCount                     uint16_t
+     0x8  dataIntCount                       uint16_t
+     0xa  randomDataByteCount                uint16_t
+     0xc  randomDataIntCount                 uint16_t
+     0xe  numframes                          uint16_t
+    0x10  bLoop                              bool
+    0x11  bDelta                             bool
+    0x12  boneCount                          unsigned char[PART_TYPE_COUNT]
+    0x1c  notifyCount                        unsigned char
+    0x1d  assetType                          unsigned char
+    0x1e  isDefault                          bool
+    0x20  randomDataShortCount               unsigned int
+    0x24  indexCount                         unsigned int
+    0x28  framerate                          float
+    0x2c  frequency                          float
+    0x30  names                              ScriptString*
+    0x34  dataByte                           unsigned char*
+    0x38  dataShort                          int16_t*
+    0x3c  dataInt                            int*
+    0x40  randomDataShort                    int16_t*
+    0x44  randomDataByte                     unsigned char*
+    0x48  randomDataInt                      int*
+    0x4c  indices                            XAnimIndices
+    0x50  notify                             XAnimNotifyInfo*
+    0x54  deltaPart                          XAnimDeltaPart*
+
+struct XAnimPartTrans  size=None
+     0x0  size                               uint16_t
+     0x2  smallTrans                         unsigned char
+     0x4  u                                  XAnimPartTransData
+
+struct XAnimPartTransData  size=None
+     0x0  frames                             XAnimPartTransFrames
+     0x0  frame0                             vec3_t
+
+struct XAnimPartTransFrames  size=None
+     0x0  mins                               vec3_t
+     0xc  size                               vec3_t
+    0x18  frames                             XAnimDynamicFrames
+    0x1c  indices                            XAnimDynamicIndicesTrans
+
+struct XBoneInfo  size=40  align=4
+     0x0  bounds                             vec3_t[2]
+    0x18  offset                             vec3_t
+    0x24  radiusSquared                      float
+
+struct XModel  size=228
+     0x0  name                               char*
+     0x4  numBones                           unsigned char
+     0x5  numRootBones                       unsigned char
+     0x6  numsurfs                           unsigned char
+     0x7  lodRampType                        XModelLodRampType
+     0x8  boneNames                          ScriptString*
+     0xc  parentList                         unsigned char*
+    0x10  quats                              XModelQuat*
+    0x14  trans                              float*
+    0x18  partClassification                 unsigned char*
+    0x1c  baseMat                            DObjAnimMat*
+    0x20  surfs                              XSurface*
+    0x24  materialHandles                    Material**
+    0x28  lodInfo                            XModelLodInfo[4]
+    0x98  collSurfs                          XModelCollSurf_s*
+    0x9c  numCollSurfs                       int
+    0xa0  contents                           int
+    0xa4  boneInfo                           XBoneInfo*
+    0xa8  radius                             float
+    0xac  mins                               vec3_t
+    0xb8  maxs                               vec3_t
+    0xc4  numLods                            uint16_t
+    0xc6  collLod                            int16_t
+    0xc8  streamInfo                         XModelStreamInfo
+    0xcc  memUsage                           int
+    0xd0  flags                              unsigned char
+    0xd1  bad                                bool
+    0xd4  physPreset                         PhysPreset*
+    0xd8  physGeoms                          PhysGeomList*
+    0xdc  collmap                            PhysGeomList*
+    0xe0  physConstraints                    PhysConstraints*
+
+struct XModelCollSurf_s  size=44
+     0x0  collTris                           XModelCollTri_s*
+     0x4  numCollTris                        int
+     0x8  mins                               float[3]
+    0x14  maxs                               float[3]
+    0x20  boneIdx                            int
+    0x24  contents                           int
+    0x28  surfFlags                          int
+
+struct XModelCollTri_s  size=48  align=4
+     0x0  plane                              float[4]
+    0x10  svec                               float[4]
+    0x20  tvec                               float[4]
+
+struct XModelLodInfo  size=28  align=4
+     0x0  dist                               float
+     0x4  numsurfs                           uint16_t
+     0x6  surfIndex                          uint16_t
+     0x8  partBits                           int[4]
+    0x18  lod                                char
+    0x19  smcIndexPlusOne                    char
+    0x1a  smcAllocBits                       char
+    0x1b  unused                             char
+
+struct XModelPiece  size=16
+     0x0  model                              XModel*
+     0x4  offset                             float[3]
+
+struct XModelPieces  size=12
+     0x0  name                               char*
+     0x4  numpieces                          int
+     0x8  pieces                             XModelPiece*
+
+struct XModelQuat  size=8  align=2
+     0x0  v                                  int16_t[4]
+
+struct XModelStreamInfo  size=1  align=1
+     0x0  pad                                char
+
+struct XQuat2  size=4  align=4
+     0x0  value                              int16_t[2]
+
+struct XRigidVertList  size=12
+     0x0  boneOffset                         uint16_t
+     0x2  vertCount                          uint16_t
+     0x4  triOffset                          uint16_t
+     0x6  triCount                           uint16_t
+     0x8  collisionTree                      XSurfaceCollisionTree*
+
+struct XSurface  size=64
+     0x0  tileMode                           char
+     0x1  deformed                           bool
+     0x2  vertCount                          uint16_t
+     0x4  triCount                           uint16_t
+     0x6  zoneHandle                         char
+     0x8  baseTriIndex                       uint16_t
+     0xa  baseVertIndex                      uint16_t
+     0xc  triIndices                         XSurfaceTri16*
+    0x10  vertInfo                           XSurfaceVertexInfo
+    0x1c  verts0                             GfxPackedVertex*
+    0x24  vertListCount                      unsigned int
+    0x28  vertList                           XRigidVertList*
+    0x30  partBits                           int[4]
+       -  vb0                                void*
+       -  indexBuffer                        void*
+
+struct XSurfaceCollisionAabb  size=12  align=2
+     0x0  mins                               uint16_t[3]
+     0x6  maxs                               uint16_t[3]
+
+struct XSurfaceCollisionLeaf  size=2  align=2
+     0x0  triangleBeginIndex                 uint16_t
+
+struct XSurfaceCollisionNode  size=16  align=16
+     0x0  aabb                               XSurfaceCollisionAabb
+     0xc  childBeginIndex                    uint16_t
+     0xe  childCount                         uint16_t
+
+struct XSurfaceCollisionTree  size=40
+     0x0  trans                              vec3_t
+     0xc  scale                              vec3_t
+    0x18  nodeCount                          unsigned int
+    0x1c  nodes                              XSurfaceCollisionNode*
+    0x20  leafCount                          unsigned int
+    0x24  leafs                              XSurfaceCollisionLeaf*
+
+struct XSurfaceTri  size=6  align=2
+     0x0  i                                  uint16_t[3]
+
+struct XSurfaceVertexInfo  size=12
+     0x0  vertCount                          int16_t[4]
+     0x8  vertsBlend                         uint16_t*

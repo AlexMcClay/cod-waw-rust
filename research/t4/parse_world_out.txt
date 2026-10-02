@@ -1,0 +1,12 @@
+GfxWorld maps/nazi_zombie_prototype.d3dbsp header @ zone offset 41801463 (asset spans 41801463..56873697)
+vertexCount 91002 (vertices @ 52067078, 4004088 bytes = 91002 x 44)
+indexCount 203895 (indices @ 41802285, 407790 bytes)
+surfaces 3741, distinct materials 163, triangles 67965, out-of-range local indices 0
+bbox of referenced verts: (-6464.0 -5797.0 -188.0) .. (5824.0 5787.0 1472.0); GfxWorld mins/maxs [-6464.0, -5797.0, -188.0] [5824.0, 5787.0, 1472.0]
+normal length mean 1.0001 min 0.9942 max 1.0056
+triangles within 400u (xy) of player start: 19525; their z range -60.0..388.0
+brush models 145; model[0] surfs 0..3481 (dpvs.staticSurfaceCount 3481); models[1..5] (start,count) [(4294967295, 0), (3481, 4), (3485, 4), (3489, 5), (3494, 5)]
+nacht_world.obj: 3481 surfaces, 66729 tris, 88678 verts
+nacht_brushmodels.obj: 260 surfaces, 1236 tris (submodel verts are LOCAL; placed with MapEnts origin/angles)
+static model instances 1506, distinct xmodels 70; top: [('static_peleliu_rock_coral01_small', 321), ('foliage_pacific_grass07_clump01', 263), ('static_peleliu_sandbag', 118), ('foliage_pacific_grass_clump02', 104)]
+example smodel: {'model': 'static_peleliu_shelves_ammo', 'origin': [261.8999938964844, 1089.300048828125, 1.0], 'axis': [[0.9999862909317017, -0.005235949996858835, -0.0], [0.005235949996858835, 0.9999862909317017, 0.0], [0.0, -0.0, 1.0]], 'scale': 1.0, 'cullDist': 8000.0, 'flags': 0}

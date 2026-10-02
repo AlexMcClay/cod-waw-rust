@@ -1,0 +1,129 @@
+ber1.ff                                  {'anims': 291, 'unique': 291, 'nf>=256': 28, 'pooled16': 28}
+ber1_load.ff                             {}
+ber2.ff                                  {'anims': 368, 'unique': 221, 'nf>=256': 37, 'pooled16': 36}
+ber2_load.ff                             {}
+ber3.ff                                  {'anims': 325, 'unique': 138, 'nf>=256': 23, 'pooled16': 23}
+ber3_load.ff                             {}
+ber3b.ff                                 {'anims': 300, 'unique': 77, 'nf>=256': 36, 'pooled16': 31}
+ber3b_load.ff                            {}
+code_post_gfx.ff                         {'anims': 11, 'unique': 11}
+code_post_gfx_mp.ff                      {'anims': 2}
+common.ff                                {'anims': 1612, 'unique': 1612, 'nf>=256': 22, 'pooled16': 22}
+common_ignore.ff                         {}
+common_mp.ff                             {'anims': 1223, 'nf>=256': 12, 'pooled16': 12, 'unique': 530}
+credits.ff                               {'anims': 31, 'unique': 16}
+default.ff                               {}
+intro_pac.ff                             {}
+localized_code_post_gfx_mp.ff            {}
+localized_common_mp.ff                   {'anims': 8, 'unique': 8}
+localized_mp_airfield.ff                 {}
+localized_mp_asylum.ff                   {}
+localized_mp_bgate.ff                    {}
+localized_mp_castle.ff                   {}
+localized_mp_courtyard.ff                {}
+localized_mp_docks.ff                    {}
+localized_mp_dome.ff                     {}
+localized_mp_downfall.ff                 {}
+localized_mp_drum.ff                     {}
+localized_mp_hangar.ff                   {}
+localized_mp_kneedeep.ff                 {}
+localized_mp_kwai.ff                     {}
+localized_mp_makin.ff                    {}
+localized_mp_makin_day.ff                {}
+localized_mp_nachtfeuer.ff               {}
+localized_mp_outskirts.ff                {}
+localized_mp_roundhouse.ff               {}
+localized_mp_seelow.ff                   {}
+localized_mp_shrine.ff                   {}
+localized_mp_stalingrad.ff               {}
+localized_mp_suburban.ff                 {}
+localized_mp_subway.ff                   {}
+localized_mp_vodka.ff                    {}
+localized_nazi_zombie_asylum.ff          {}
+localized_nazi_zombie_factory.ff         {}
+localized_nazi_zombie_sumpf.ff           {}
+mak.ff                                   {'anims': 389, 'unique': 203, 'nf>=256': 43, 'pooled16': 43}
+mak_load.ff                              {}
+mp_airfield.ff                           {}
+mp_airfield_load.ff                      {}
+mp_asylum.ff                             {}
+mp_asylum_load.ff                        {}
+mp_bgate.ff                              {}
+mp_bgate_load.ff                         {}
+mp_castle.ff                             {}
+mp_castle_load.ff                        {}
+mp_courtyard.ff                          {}
+mp_courtyard_load.ff                     {}
+mp_docks.ff                              {}
+mp_docks_load.ff                         {}
+mp_dome.ff                               {}
+mp_dome_load.ff                          {}
+mp_downfall.ff                           {}
+mp_downfall_load.ff                      {}
+mp_drum.ff                               {}
+mp_drum_load.ff                          {}
+mp_hangar.ff                             {}
+mp_hangar_load.ff                        {}
+mp_kneedeep.ff                           {}
+mp_kneedeep_load.ff                      {}
+mp_kwai.ff                               {}
+mp_kwai_load.ff                          {}
+mp_makin.ff                              {}
+mp_makin_day.ff                          {}
+mp_makin_day_load.ff                     {}
+mp_makin_load.ff                         {}
+mp_nachtfeuer.ff                         {}
+mp_nachtfeuer_load.ff                    {}
+mp_outskirts.ff                          {}
+mp_outskirts_load.ff                     {}
+mp_roundhouse.ff                         {}
+mp_roundhouse_load.ff                    {}
+mp_seelow.ff                             {}
+mp_seelow_load.ff                        {}
+mp_shrine.ff                             {}
+mp_shrine_load.ff                        {}
+mp_stalingrad.ff                         {}
+mp_stalingrad_load.ff                    {}
+mp_suburban.ff                           {}
+mp_suburban_load.ff                      {}
+mp_subway.ff                             {}
+mp_subway_load.ff                        {}
+mp_vodka.ff                              {}
+mp_vodka_load.ff                         {}
+nazi_zombie_asylum.ff                    {'anims': 505, 'unique': 132, 'nf>=256': 6, 'pooled16': 6}
+nazi_zombie_asylum_load.ff               {}
+nazi_zombie_asylum_patch.ff              {}
+nazi_zombie_factory.ff                   {'anims': 582, 'unique': 154, 'nf>=256': 10, 'pooled16': 10}
+nazi_zombie_factory_load.ff              {}
+nazi_zombie_factory_patch.ff             {}
+nazi_zombie_prototype.ff                 {'anims': 364, 'nf>=256': 4, 'pooled16': 4}
+nazi_zombie_prototype_load.ff            {}
+nazi_zombie_sumpf.ff                     {'anims': 641, 'nf>=256': 6, 'pooled16': 6, 'unique': 37}
+nazi_zombie_sumpf_load.ff                {}
+nazi_zombie_sumpf_patch.ff               {}
+oki2.ff                                  {'anims': 284, 'nf>=256': 11, 'pooled16': 9, 'unique': 79}
+oki2_load.ff                             {}
+oki3.ff                                  {'anims': 315, 'nf>=256': 29, 'pooled16': 28, 'unique': 88}
+oki3_load.ff                             {}
+outro.ff                                 {}
+patch.ff                                 {'anims': 7, 'unique': 2}
+patch_mp.ff                              {}
+pby_fly.ff                               {'anims': 301, 'unique': 230, 'nf>=256': 31, 'pooled16': 26}
+pby_fly_load.ff                          {}
+pel1.ff                                  {'anims': 436, 'unique': 151, 'nf>=256': 51, 'pooled16': 51}
+pel1_load.ff                             {}
+pel1a.ff                                 {'anims': 392, 'nf>=256': 11, 'pooled16': 11, 'unique': 55}
+pel1a_load.ff                            {}
+pel1b.ff                                 {'anims': 379, 'nf>=256': 12, 'pooled16': 11, 'unique': 46}
+pel1b_load.ff                            {}
+pel2.ff                                  {'anims': 344, 'nf>=256': 37, 'pooled16': 36, 'unique': 59}
+pel2_load.ff                             {}
+see1.ff                                  {'anims': 309, 'unique': 70, 'nf>=256': 23, 'pooled16': 23}
+see1_load.ff                             {}
+see2.ff                                  {'anims': 319, 'nf>=256': 20, 'pooled16': 20, 'unique': 30}
+see2_load.ff                             {}
+sniper.ff                                {'anims': 604, 'unique': 313, 'nf>=256': 69, 'pooled16': 66}
+sniper_load.ff                           {}
+ui.ff                                    {}
+ui_mp.ff                                 {}
+TOTAL {'anims': 10342, 'unique': 4553, 'nf>=256': 521, 'pooled16': 502} checkpoints_ok True

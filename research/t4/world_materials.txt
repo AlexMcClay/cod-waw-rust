@@ -1,0 +1,975 @@
+*10n_10n  techset=l_sm_b0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_wall_concrete_grungy_edges_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*11n_10n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*11n_10n_10n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*11n_12  techset=l_sm_r0c0n0s0_sco_b1c1  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_grunge_scorched_wall_c inline_pixels=False
+*11n_12_10n  techset=l_sm_r0c0n0s0_sco_b1c1_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_grunge_scorched_wall_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*11n_26  techset=l_sm_r0c0n0s0_sco_b1c1  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_burntstain_02_c inline_pixels=False
+*11n_26_10n  techset=l_sm_r0c0n0s0_sco_b1c1_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_burntstain_02_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*11n_49  techset=l_sm_r0c0n0s0_sco_b1c1  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_grime_drip_c inline_pixels=False
+*11n_49_10n  techset=l_sm_r0c0n0s0_sco_b1c1_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_grime_drip_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*11n_49_49  techset=l_sm_r0c0n0s0_sco_b1c1_b2c2  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=,$identitynormalmap inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_grime_drip_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=decal_grime_drip_c inline_pixels=False
+*11n_61_10n  techset=l_sm_r0c0n0s0_sco_b1c1_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_burntstain_01_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*11n_83n_10n  techset=l_sm_r0c0n0s0_sco_t1c1n1s1_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=decal_damcrack_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_damcrack_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~decal_damcrack_s-rgb&decal_d~7144f6bd inline_pixels=False
+*11n_85_10n  techset=l_sm_r0c0n0s0_sco_b1c1s1_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_blood_hand_print_blend_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~decal_blood_hand_print_s-rgb~1a0b0835 inline_pixels=False
+*11n_94n  techset=l_sm_r0c0n0s0_sco_b1c1n1  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=decal_damage01_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_damage01_c inline_pixels=False
+*11n_94n_10n  techset=l_sm_r0c0n0s0_sco_b1c1n1_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=decal_damage01_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_damage01_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*1n_12  techset=l_sm_r0c0n0s0_sco_b1c1  colorMap=berlin_ceilings_plaster2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_ceilings_plaster2_s-r~b51130aa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_ceilings_plaster2_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_ceilings_plaster2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_grunge_scorched_wall_c inline_pixels=False
+*1n_26  techset=l_sm_r0c0n0s0_sco_b1c1  colorMap=berlin_ceilings_plaster2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_ceilings_plaster2_s-r~b51130aa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_ceilings_plaster2_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_ceilings_plaster2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_burntstain_02_c inline_pixels=False
+*1n_30n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=berlin_ceilings_plaster2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_ceilings_plaster2_s-r~b51130aa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_ceilings_plaster2_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_rubble_conc_chunks_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_ceilings_plaster2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_rubble_conc_chunks_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_rubble_conc_~7d0a0cf7 inline_pixels=False
+*1n_32n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1  colorMap=berlin_ceilings_plaster2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_ceilings_plaster2_s-r~b51130aa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_ceilings_plaster2_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=seelow_terrain_rubble_ash03_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_ceilings_plaster2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=seelow_terrain_rubble_ash03_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~seelow_terrain_rubble_ash03_~babb81a9 inline_pixels=False
+*26_10n  techset=l_sm_b0c0_b1c1n1s1_sco  colorMap=decal_burntstain_02_c
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=decal_burntstain_02_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*28n_27n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_crumbly_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_crumbly~9f5f58ed inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*28n_27n_29n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2  colorMap=peleliu_terrain_dirt_crumbly_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_crumbly~9f5f58ed inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*28n_29n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1  colorMap=peleliu_terrain_dirt_crumbly_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_crumbly~9f5f58ed inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+*28n_29n_30n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_b2c2n2s2_sco  colorMap=peleliu_terrain_dirt_crumbly_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_crumbly~9f5f58ed inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_terrain_rubble_conc_chunks_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_terrain_rubble_conc_chunks_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_terrain_rubble_conc_~7d0a0cf7 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+*28n_31n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_crumbly_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_crumbly~9f5f58ed inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_drymuddrk_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_drymuddrk_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_drymudd~ede0fc6f inline_pixels=False
+*28n_32n_31n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_b2c2n2s2_sco  colorMap=peleliu_terrain_dirt_crumbly_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_crumbly~9f5f58ed inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_terrain_dirt_drymuddrk_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=seelow_terrain_rubble_ash03_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=seelow_terrain_rubble_ash03_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_terrain_dirt_drymuddrk_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_terrain_dirt_drymudd~ede0fc6f inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~seelow_terrain_rubble_ash03_~babb81a9 inline_pixels=False
+*28n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_crumbly_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_crumbly~9f5f58ed inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*28n_35n_29n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2  colorMap=peleliu_terrain_dirt_crumbly_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_crumbly~9f5f58ed inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*28n_52n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_crumbly_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_crumbly~9f5f58ed inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_grass_patchy_dead_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_grass_patchy_dead_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_grass_patchy~76444889 inline_pixels=False
+*2n_12  techset=l_sm_r0c0n0s0_sco_b1c1  colorMap=berlin_floors_rock_tile2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_floors_rock_tile2_s-r~0bc1c2c8 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_floors_rock_tile2_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_floors_rock_tile2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_grunge_scorched_wall_c inline_pixels=False
+*2n_27n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=berlin_floors_rock_tile2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_floors_rock_tile2_s-r~0bc1c2c8 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_floors_rock_tile2_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_floors_rock_tile2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*2n_27n_26  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2  colorMap=berlin_floors_rock_tile2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_floors_rock_tile2_s-r~0bc1c2c8 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_floors_rock_tile2_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=,$identitynormalmap inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_floors_rock_tile2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=decal_burntstain_02_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*2n_27n_68  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2s2  colorMap=berlin_floors_rock_tile2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_floors_rock_tile2_s-r~0bc1c2c8 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_floors_rock_tile2_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=,$identitynormalmap inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_floors_rock_tile2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=decal_oil_stain_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~decal_oil_stain_s-rgb&decal_~9a3f583f inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*2n_27n_73n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_t2c2n2  colorMap=berlin_floors_rock_tile2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_floors_rock_tile2_s-r~0bc1c2c8 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_floors_rock_tile2_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=decal_papers_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_floors_rock_tile2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=decal_papers_german_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*2n_30n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=berlin_floors_rock_tile2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_floors_rock_tile2_s-r~0bc1c2c8 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_floors_rock_tile2_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_rubble_conc_chunks_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_floors_rock_tile2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_rubble_conc_chunks_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_rubble_conc_~7d0a0cf7 inline_pixels=False
+*2n_68  techset=l_sm_r0c0n0s0_sco_b1c1s1  colorMap=berlin_floors_rock_tile2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_floors_rock_tile2_s-r~0bc1c2c8 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_floors_rock_tile2_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_floors_rock_tile2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_oil_stain_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~decal_oil_stain_s-rgb&decal_~9a3f583f inline_pixels=False
+*2n_73n  techset=l_sm_r0c0n0s0_sco_t1c1n1  colorMap=berlin_floors_rock_tile2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_floors_rock_tile2_s-r~0bc1c2c8 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_floors_rock_tile2_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=decal_papers_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_floors_rock_tile2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_papers_german_c inline_pixels=False
+*2n_78  techset=l_sm_r0c0n0s0_sco_b1c1s1  colorMap=berlin_floors_rock_tile2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_floors_rock_tile2_s-r~0bc1c2c8 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_floors_rock_tile2_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_floors_rock_tile2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_blood_pool_blend_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~decal_blood_pool_s-rgb&decal~373eac49 inline_pixels=False
+*2n_78_30n  techset=l_sm_r0c0n0s0_sco_b1c1s1_b2c2n2s2_sco  colorMap=berlin_floors_rock_tile2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_floors_rock_tile2_s-r~0bc1c2c8 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_floors_rock_tile2_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_terrain_rubble_conc_chunks_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_floors_rock_tile2_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_blood_pool_blend_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_terrain_rubble_conc_chunks_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_terrain_rubble_conc_~7d0a0cf7 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~decal_blood_pool_s-rgb&decal~373eac49 inline_pixels=False
+*33n_27n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_drymuddrk_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_drymudd~ede0fc6f inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_drymuddrk_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_drymuddrk_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*33n_31n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_drymuddrk_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_drymudd~ede0fc6f inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_drymuddrk_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_drymuddrk_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_drymuddrk_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_drymuddrk_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_drymudd~ede0fc6f inline_pixels=False
+*33n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_drymuddrk_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_drymudd~ede0fc6f inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_drymuddrk_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_drymuddrk_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*34n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_riverbank_rocky_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_riverba~849c920a inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_riverbank_rocky_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_riverbank_rocky_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*34n_35n_6n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2_sco  colorMap=peleliu_terrain_dirt_riverbank_rocky_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_riverba~849c920a inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_riverbank_rocky_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_terrain_rock_jagged_reddish_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_riverbank_rocky_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_terrain_rock_jagged_reddish_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_terrain_rock_jagged_~8d8c36f0 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*34n_6n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_riverbank_rocky_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_riverba~849c920a inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_riverbank_rocky_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_rock_jagged_reddish_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_riverbank_rocky_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_rock_jagged_reddish_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_rock_jagged_~8d8c36f0 inline_pixels=False
+*36n_29n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1  colorMap=peleliu_terrain_mud_mortared_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_mud_mortared~16bf787d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_mud_mortared_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_mud_mortared_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+*36n_31n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_mud_mortared_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_mud_mortared~16bf787d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_mud_mortared_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_drymuddrk_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_mud_mortared_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_drymuddrk_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_drymudd~ede0fc6f inline_pixels=False
+*37n_38n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1  colorMap=peleliu_terrain_rock_jagged_reddish_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_jagged_~8d8c36f0 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_jagged_reddish_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_rock_wrinkly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_jagged_reddish_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_rock_wrinkly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_rock_wrinkly~42b35898 inline_pixels=False
+*37n_38n_39n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_b2c2n2s2_sco  colorMap=peleliu_terrain_rock_jagged_reddish_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_jagged_~8d8c36f0 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_jagged_reddish_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=okinawa_terrain_mud_puddledirtgreen_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_rock_wrinkly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_jagged_reddish_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_rock_wrinkly_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=okinawa_terrain_mud_puddledirtgreen_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~okinawa_terrain_mud_puddledi~ddba76bd inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_rock_wrinkly~42b35898 inline_pixels=False
+*37n_39n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_rock_jagged_reddish_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_jagged_~8d8c36f0 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_jagged_reddish_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=okinawa_terrain_mud_puddledirtgreen_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_jagged_reddish_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=okinawa_terrain_mud_puddledirtgreen_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~okinawa_terrain_mud_puddledi~ddba76bd inline_pixels=False
+*3n_10n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=okinawa_trim_concrete_rugged1_c
+    specularMap hash=34ecccb3 s..p image=~okinawa_trim_concrete_rugged~521c95b2 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=okinawa_trim_concrete_rugged1_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=okinawa_trim_concrete_rugged1_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*3n_49_10n  techset=l_sm_r0c0n0s0_sco_b1c1_b2c2n2s2_sco  colorMap=okinawa_trim_concrete_rugged1_c
+    specularMap hash=34ecccb3 s..p image=~okinawa_trim_concrete_rugged~521c95b2 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=okinawa_trim_concrete_rugged1_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=okinawa_trim_concrete_rugged1_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_grime_drip_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*40n_10n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_wall_concrete_grimey_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_grimey~bf735bfa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_grimey_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_grimey_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*40n_12  techset=l_sm_r0c0n0s0_sco_b1c1  colorMap=peleliu_wall_concrete_grimey_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_grimey~bf735bfa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_grimey_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_grimey_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_grunge_scorched_wall_c inline_pixels=False
+*49_10n  techset=l_sm_b0c0_b1c1n1s1_sco  colorMap=decal_grime_drip_c
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=decal_grime_drip_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*4n_27n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*4n_27n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2_sco  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*4n_29n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+*4n_29n_29n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_b2c2n2s2  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+*4n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*4n_35n_29n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*4n_52n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_grass_patchy_dead_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_grass_patchy_dead_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_grass_patchy~76444889 inline_pixels=False
+*4n_52n_27n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2_sco  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_grass_patchy_dead_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_grass_patchy_dead_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_grass_patchy~76444889 inline_pixels=False
+*4n_52n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2_sco  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_grass_patchy_dead_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_grass_patchy_dead_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_grass_patchy~76444889 inline_pixels=False
+*4n_5n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_rock_coral_dark_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_rock_coral_dark_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_rock_coral_d~8afe2cfa inline_pixels=False
+*4n_5n_6n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2_sco  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_terrain_rock_jagged_reddish_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_rock_coral_dark_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_rock_coral_dark_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_terrain_rock_jagged_reddish_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_terrain_rock_jagged_~8d8c36f0 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_rock_coral_d~8afe2cfa inline_pixels=False
+*4n_6n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_rock_jagged_reddish_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_rock_jagged_reddish_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_rock_jagged_~8d8c36f0 inline_pixels=False
+*52n_31n  techset=l_sm_b0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_grass_patchy_dead_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_grass_patchy~76444889 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_grass_patchy_dead_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_drymuddrk_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_grass_patchy_dead_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_drymuddrk_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_drymudd~ede0fc6f inline_pixels=False
+*53n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_layered_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_layered~a0ecf7c9 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_layered_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_layered_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*53n_52n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_layered_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_layered~a0ecf7c9 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_layered_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_grass_patchy_dead_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_layered_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_grass_patchy_dead_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_grass_patchy~76444889 inline_pixels=False
+*53n_52n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2_sco  colorMap=peleliu_terrain_dirt_layered_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_layered~a0ecf7c9 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_layered_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_grass_patchy_dead_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_layered_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_grass_patchy_dead_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_grass_patchy~76444889 inline_pixels=False
+*54n_27n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_packed_cracked_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_packed_~9a0a5fcb inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_packed_cracked_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_packed_cracked_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*54n_29n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1  colorMap=peleliu_terrain_dirt_packed_cracked_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_packed_~9a0a5fcb inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_packed_cracked_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_packed_cracked_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+*54n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_packed_cracked_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_packed_~9a0a5fcb inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_packed_cracked_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_packed_cracked_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*54n_35n_29n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2  colorMap=peleliu_terrain_dirt_packed_cracked_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_packed_~9a0a5fcb inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_packed_cracked_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_packed_cracked_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*55n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_rooted_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_rooted_~43184bcc inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_rooted_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_rooted_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*56n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_trckslight_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_trcksli~cb6a4595 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_trckslight_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_trckslight_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*57n_27n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_grass_patchy_dead_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_grass_patchy~0e7c220b inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_grass_patchy_dead_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_grass_patchy_dead_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*57n_27n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2_sco  colorMap=peleliu_terrain_grass_patchy_dead_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_grass_patchy~0e7c220b inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_grass_patchy_dead_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_mud_mort_footprints_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_grass_patchy_dead_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_mud_mort_footprints_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_mud_mort_foo~cf2e0303 inline_pixels=False
+*57n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_grass_patchy_dead_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_grass_patchy~0e7c220b inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_grass_patchy_dead_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_grass_patchy_dead_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*58n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_rock_coral_dark_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_coral_d~8afe2cfa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_coral_dark_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_coral_dark_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*5n_16n  techset=l_sm_b0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_rock_coral_dark_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_coral_d~8afe2cfa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_coral_dark_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_coral_dark_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_rock_cliff_w~cdb5b2a6 inline_pixels=False
+*63_12  techset=l_sm_r0c0s0_sco_b1c1  colorMap=peleliu_trim_metal_old_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_trim_metal_old_s-rgb~312af0a5 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_trim_metal_old_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_grunge_scorched_wall_c inline_pixels=False
+*77n_257  techset=l_sm_r0c0n0s0_b1c1s1  colorMap=okinawa_door_wood_heavy_c
+    specularMap hash=34ecccb3 s..p image=~okinawa_door_wood_heavy_s-rg~203bdb50 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=okinawa_door_wood_heavy_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=okinawa_door_wood_heavy_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_bloodsplat3_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~decal_bloodsplat3_s-rgb&deca~090e42a6 inline_pixels=False
+*93n_29n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1  colorMap=peleliu_terrain_dirt_rocks_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_rocks_s~21e98aec inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_rocks_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_rocks_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+*93n_35n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_terrain_dirt_rocks_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_rocks_s~21e98aec inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_rocks_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_rocks_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*93n_35n_29n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2  colorMap=peleliu_terrain_dirt_rocks_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_rocks_s~21e98aec inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_rocks_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=okinawa_terrain_dirt_drydirt_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_rocks_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=okinawa_terrain_dirt_drydirt_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~okinawa_floor_concrete_spott~c12191f9 inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+*9n_10n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_wall_concrete_bunker_chipped_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_bunker~bbb96da1 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_bunker_chipped_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_bunker_chipped_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*9n_10n_10n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_bunker_chipped_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_bunker~bbb96da1 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_bunker_chipped_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_bunker_chipped_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*9n_12_10n  techset=l_sm_r0c0n0s0_sco_b1c1_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_bunker_chipped_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_bunker~bbb96da1 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_bunker_chipped_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_bunker_chipped_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_grunge_scorched_wall_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*9n_26_10n  techset=l_sm_r0c0n0s0_sco_b1c1_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_bunker_chipped_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_bunker~bbb96da1 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_bunker_chipped_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_bunker_chipped_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_burntstain_02_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+*9n_30n  techset=l_sm_r0c0n0s0_sco_b1c1n1s1_sco  colorMap=peleliu_wall_concrete_bunker_chipped_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_bunker~bbb96da1 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_bunker_chipped_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=peleliu_terrain_rubble_conc_chunks_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_bunker_chipped_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=peleliu_terrain_rubble_conc_chunks_c inline_pixels=False
+    specularMap hash=d2866322 s..1 image=~peleliu_terrain_rubble_conc_~7d0a0cf7 inline_pixels=False
+*9n_61  techset=l_sm_r0c0n0s0_sco_b1c1  colorMap=peleliu_wall_concrete_bunker_chipped_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_bunker~bbb96da1 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_bunker_chipped_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_bunker_chipped_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_burntstain_01_c inline_pixels=False
+*9n_70  techset=l_sm_r0c0n0s0_sco_b1c1  colorMap=peleliu_wall_concrete_bunker_chipped_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_bunker~bbb96da1 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_bunker_chipped_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_bunker_chipped_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_drainstain_c inline_pixels=False
+*9n_70_10n  techset=l_sm_r0c0n0s0_sco_b1c1_b2c2n2s2_sco  colorMap=peleliu_wall_concrete_bunker_chipped_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_bunker~bbb96da1 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_bunker_chipped_n inline_pixels=False
+    normalMap   hash=9434aedd n..2 image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    normalMap   hash=9434aede n..1 image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_bunker_chipped_c inline_pixels=False
+    colorMap    hash=b60d1850 c..1 image=decal_drainstain_c inline_pixels=False
+    colorMap    hash=b60d1853 c..2 image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+    specularMap hash=d2866321 s..2 image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+wc/ascend_chalk  techset=wc_unlit  colorMap=ascend_chalk_c
+    colorMap    hash=a0ab1041 c..p image=ascend_chalk_c inline_pixels=False
+wc/bar_chalk  techset=wc_unlit  colorMap=bar_chalk_c
+    colorMap    hash=a0ab1041 c..p image=bar_chalk_c inline_pixels=False
+wc/berlin_ceilings_plaster2  techset=wc_l_sm_r0c0n0s0_sco  colorMap=berlin_ceilings_plaster2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_ceilings_plaster2_s-r~b51130aa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_ceilings_plaster2_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_ceilings_plaster2_c inline_pixels=False
+wc/berlin_floors_rock_tile2  techset=wc_l_sm_r0c0n0s0_sco  colorMap=berlin_floors_rock_tile2_c
+    specularMap hash=34ecccb3 s..p image=~berlin_floors_rock_tile2_s-r~0bc1c2c8 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_floors_rock_tile2_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_floors_rock_tile2_c inline_pixels=False
+wc/berlin_trim_metal  techset=wc_l_sm_r0c0n0s0_sco  colorMap=berlin_trim_metal_c
+    specularMap hash=34ecccb3 s..p image=~berlin_trim_metal_s-rgb&berl~5ce8fc87 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=berlin_trim_metal_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=berlin_trim_metal_c inline_pixels=False
+wc/caulk_shadow  techset=wc_tools  colorMap=caulk_shadow
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=caulk_shadow inline_pixels=False
+wc/chainlink_fence  techset=wc_l_sm_t0c0n0s0  colorMap=chainlink_fence_c
+    specularMap hash=34ecccb3 s..p image=~chainlink_fence_s-rgb&chainl~27d88b1a inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=chainlink_fence_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=chainlink_fence_c inline_pixels=False
+wc/db_shotgun_chalk  techset=wc_unlit  colorMap=db_shotgun_chalk_c
+    colorMap    hash=a0ab1041 c..p image=db_shotgun_chalk_c inline_pixels=False
+wc/decal_bloodsplat3  techset=,wc_l_sm_b0c0s0  colorMap=decal_bloodsplat3_c
+    specularMap hash=34ecccb3 s..p image=~decal_bloodsplat3_s-rgb&deca~090e42a6 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=decal_bloodsplat3_c inline_pixels=False
+wc/decal_burntstain_02  techset=,wc_l_sm_b0c0  colorMap=decal_burntstain_02_c
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=decal_burntstain_02_c inline_pixels=False
+wc/decal_drainstain  techset=,wc_l_sm_b0c0  colorMap=decal_drainstain_c
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=decal_drainstain_c inline_pixels=False
+wc/decal_grime_drip  techset=,wc_l_sm_b0c0  colorMap=decal_grime_drip_c
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=decal_grime_drip_c inline_pixels=False
+wc/decal_grunge_scorched_wall  techset=,wc_l_sm_b0c0  colorMap=decal_grunge_scorched_wall_c
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=decal_grunge_scorched_wall_c inline_pixels=False
+wc/decal_oil_stain  techset=,wc_l_sm_b0c0s0  colorMap=decal_oil_stain_c
+    specularMap hash=34ecccb3 s..p image=~decal_oil_stain_s-rgb&decal_~9a3f583f inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=decal_oil_stain_c inline_pixels=False
+wc/decal_papers_german  techset=wc_l_sm_t0c0n0  colorMap=decal_papers_german_c
+    normalMap   hash=59d30d0f n..p image=decal_papers_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=decal_papers_german_c inline_pixels=False
+wc/foliage_okinawa_deadtree_bark01  techset=wc_l_sm_r0c0n0s0_sco  colorMap=foliage_okinawa_deadtree_bark01_c
+    specularMap hash=34ecccb3 s..p image=~foliage_okinawa_deadtree_bar~8d188e97 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=foliage_okinawa_deadtree_bark01_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=foliage_okinawa_deadtree_bark01_c inline_pixels=False
+wc/global_black  techset=wc_l_sm_r0c0  colorMap=,global_black_c
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=,global_black_c inline_pixels=False
+wc/grenade_bag_chalk  techset=wc_unlit  colorMap=grenade_bag_chalk_c
+    colorMap    hash=a0ab1041 c..p image=grenade_bag_chalk_c inline_pixels=False
+wc/help_chalk  techset=wc_unlit  colorMap=help_chalk_c
+    colorMap    hash=a0ab1041 c..p image=help_chalk_c inline_pixels=False
+wc/k98_chalk  techset=wc_unlit  colorMap=k98_chalk_c
+    colorMap    hash=a0ab1041 c..p image=k98_chalk_c inline_pixels=False
+wc/m1carbine_chalk  techset=wc_unlit  colorMap=m1carbine_chalk_c
+    colorMap    hash=a0ab1041 c..p image=m1carbine_chalk_c inline_pixels=False
+wc/makin_door_wood2  techset=wc_l_sm_r0c0n0s0_sco  colorMap=makin_door_wood2_c
+    specularMap hash=34ecccb3 s..p image=~makin_door_wood2_s-rgb&makin~463b4602 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=makin_door_wood2_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=makin_door_wood2_c inline_pixels=False
+wc/makin_foliage_bark_palm_chipped  techset=wc_l_sm_r0c0n0s0_sco  colorMap=makin_foliage_bark_palm_chipped_c
+    specularMap hash=34ecccb3 s..p image=~makin_foliage_bark_palm_chip~88517152 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=makin_foliage_bark_palm_chipped_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=makin_foliage_bark_palm_chipped_c inline_pixels=False
+wc/makin_trim_metal  techset=wc_l_sm_r0c0n0s0  colorMap=makin_trim_metal_c
+    specularMap hash=34ecccb3 s..p image=~makin_trim_metal_s-rgb&makin~7ac6846b inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=makin_trim_metal_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=makin_trim_metal_c inline_pixels=False
+wc/makin_wall_wood_planks02  techset=wc_l_sm_r0c0n0s0_sco  colorMap=makin_wall_wood_planks02_c
+    specularMap hash=34ecccb3 s..p image=~makin_wall_wood_planks02_s-r~bc78c70b inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=makin_wall_wood_planks02_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=makin_wall_wood_planks02_c inline_pixels=False
+wc/okinawa_door_wood_heavy  techset=wc_l_sm_r0c0n0s0  colorMap=okinawa_door_wood_heavy_c
+    specularMap hash=34ecccb3 s..p image=~okinawa_door_wood_heavy_s-rg~203bdb50 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=okinawa_door_wood_heavy_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=okinawa_door_wood_heavy_c inline_pixels=False
+wc/okinawa_trim_concrete_rugged1  techset=wc_l_sm_r0c0n0s0_sco  colorMap=okinawa_trim_concrete_rugged1_c
+    specularMap hash=34ecccb3 s..p image=~okinawa_trim_concrete_rugged~521c95b2 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=okinawa_trim_concrete_rugged1_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=okinawa_trim_concrete_rugged1_c inline_pixels=False
+wc/okinawa_wall_concrete_grimy  techset=wc_l_sm_r0c0n0s0_sco  colorMap=okinawa_wall_concrete_grimy_c
+    specularMap hash=34ecccb3 s..p image=~okinawa_wall_concrete_grimy_~1b500b94 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=okinawa_wall_concrete_grimy_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=okinawa_wall_concrete_grimy_c inline_pixels=False
+wc/peleliu_decal_cloth_camo1  techset=wc_l_sm_t0c0n0s0  colorMap=peleliu_decal_cloth_camo1_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_decal_cloth_camo1_s-~6f601265 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_decal_cloth_camo1_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_decal_cloth_camo1_c inline_pixels=False
+wc/peleliu_door_metal_armored01  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_door_metal_armored01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_door_metal_armored01~6a4d6258 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_door_metal_armored01_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_door_metal_armored01_c inline_pixels=False
+wc/peleliu_misc_cloth_rope  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_misc_cloth_rope_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_misc_cloth_rope_s-rg~bb1ac844 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=,peleliu_misc_cloth_rope_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_misc_cloth_rope_c inline_pixels=False
+wc/peleliu_terrain_asphalt_runway_crack_blend  techset=wc_l_sm_b0c0n0s0_sco  colorMap=peleliu_terrain_asphalt_runway_crack_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_asphalt_runw~4f7e78b7 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_asphalt_runway_crack_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_asphalt_runway_crack_c inline_pixels=False
+wc/peleliu_terrain_dirt_crumbly  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_dirt_crumbly_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_crumbly~9f5f58ed inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+wc/peleliu_terrain_dirt_crumbly_blend4  techset=wc_l_sm_b0c0n0s0_sco  colorMap=peleliu_terrain_dirt_crumbly_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_crumbly~42b35898 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_crumbly_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_crumbly_c inline_pixels=False
+wc/peleliu_terrain_dirt_drymudddrk  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_dirt_drymuddrk_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_drymudd~ede0fc6f inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_drymuddrk_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_drymuddrk_c inline_pixels=False
+wc/peleliu_terrain_dirt_drymudddrk_blend  techset=wc_l_sm_b0c0n0s0_sco  colorMap=peleliu_terrain_dirt_drymuddrk_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_drymudd~ede0fc6f inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_drymuddrk_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_drymuddrk_c inline_pixels=False
+wc/peleliu_terrain_dirt_layered  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_dirt_layered_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_layered~a0ecf7c9 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_layered_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_layered_c inline_pixels=False
+wc/peleliu_terrain_dirt_packed_cracked  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_dirt_packed_cracked_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_packed_~9a0a5fcb inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_packed_cracked_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_packed_cracked_c inline_pixels=False
+wc/peleliu_terrain_dirt_rocks  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_dirt_rocks_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_rocks_s~21e98aec inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_rocks_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_rocks_c inline_pixels=False
+wc/peleliu_terrain_dirt_trckslight  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_dirt_trckslight_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_dirt_trcksli~cb6a4595 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_dirt_trckslight_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_dirt_trckslight_c inline_pixels=False
+wc/peleliu_terrain_grass_patchy_dead  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_grass_patchy_dead_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_grass_patchy~0e7c220b inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_grass_patchy_dead_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_grass_patchy_dead_c inline_pixels=False
+wc/peleliu_terrain_mud_mortared  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_mud_mortared_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_mud_mortared~16bf787d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_mud_mortared_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_mud_mortared_c inline_pixels=False
+wc/peleliu_terrain_rock_cliff_wall01  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_rock_cliff_wall01_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_cliff_w~954a937d inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_cliff_wall01_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_cliff_wall01_c inline_pixels=False
+wc/peleliu_terrain_rock_coral_dark  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_rock_coral_dark_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_coral_d~8afe2cfa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_coral_dark_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_coral_dark_c inline_pixels=False
+wc/peleliu_terrain_rock_coral_dark_blend4  techset=wc_l_sm_b0c0n0s0_sco  colorMap=peleliu_terrain_rock_coral_dark_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_coral_d~8afe2cfa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_coral_dark_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_coral_dark_c inline_pixels=False
+wc/peleliu_terrain_rock_jagged_reddish  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_rock_jagged_reddish_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_jagged_~8d8c36f0 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_jagged_reddish_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_jagged_reddish_c inline_pixels=False
+wc/peleliu_terrain_rock_jagged_reddish_blend  techset=wc_l_sm_b0c0n0s0_sco  colorMap=peleliu_terrain_rock_jagged_reddish_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rock_jagged_~8d8c36f0 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rock_jagged_reddish_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rock_jagged_reddish_c inline_pixels=False
+wc/peleliu_terrain_rubble_conc_chunks  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_terrain_rubble_conc_chunks_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rubble_conc_~7d0a0cf7 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rubble_conc_chunks_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rubble_conc_chunks_c inline_pixels=False
+wc/peleliu_terrain_rubble_conc_chunks_blend  techset=wc_l_sm_b0c0n0s0_sco  colorMap=peleliu_terrain_rubble_conc_chunks_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_terrain_rubble_conc_~7d0a0cf7 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_terrain_rubble_conc_chunks_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_terrain_rubble_conc_chunks_c inline_pixels=False
+wc/peleliu_trim_concrete_broken  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_trim_concrete_broken_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_trim_concrete_broken~42b35898 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_trim_concrete_broken_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_trim_concrete_broken_c inline_pixels=False
+wc/peleliu_trim_metal_old  techset=wc_l_sm_r0c0s0_sco  colorMap=peleliu_trim_metal_old_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_trim_metal_old_s-rgb~312af0a5 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_trim_metal_old_c inline_pixels=False
+wc/peleliu_trim_rusted_metal  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_trim_rusted_metal_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_trim_rusted_metal_s-~45cff935 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_trim_rusted_metal_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_trim_rusted_metal_c inline_pixels=False
+wc/peleliu_trim_wood_exposed_broken  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_trim_wood_exposed_broken_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_trim_wood_exposed_br~9a596b57 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_trim_wood_exposed_broken_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_trim_wood_exposed_broken_c inline_pixels=False
+wc/peleliu_wall_concrete_bunker_chipped  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_wall_concrete_bunker_chipped_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_bunker~bbb96da1 inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_bunker_chipped_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_bunker_chipped_c inline_pixels=False
+wc/peleliu_wall_concrete_grimey  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_wall_concrete_grimey_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_grimey~bf735bfa inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_grimey_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_grimey_c inline_pixels=False
+wc/peleliu_wall_concrete_grungy_edges_blend  techset=wc_l_sm_b0c0n0s0_sco  colorMap=peleliu_wall_concrete_grungy_edges_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_grungy~f3a1df7c inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_grungy_edges_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_grungy_edges_c inline_pixels=False
+wc/peleliu_wall_concrete_smooth_dirty  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_wall_concrete_smooth_dirty_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_concrete_smooth~509183cd inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_concrete_smooth_dirty_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_concrete_smooth_dirty_c inline_pixels=False
+wc/peleliu_wall_metal_pillbx  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_wall_metal_pillbx_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_metal_pillbx_s-~1fef4b7f inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_metal_pillbx_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_metal_pillbx_c inline_pixels=False
+wc/peleliu_wall_wood_trench_palm  techset=wc_l_sm_r0c0n0s0_sco  colorMap=peleliu_wall_wood_trench_palm_c
+    specularMap hash=34ecccb3 s..p image=~peleliu_wall_wood_trench_pal~cdfb45ca inline_pixels=False
+    normalMap   hash=59d30d0f n..p image=peleliu_wall_wood_trench_palm_n inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=peleliu_wall_wood_trench_palm_c inline_pixels=False
+wc/puddle_muddy_green  techset=wc_water  colorMap=case64blue
+    normalMap   hash=59d30d0f n..p image=test_mitton_water inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=case64blue inline_pixels=False
+wc/salvation_chalk  techset=wc_unlit  colorMap=salvation_chalk_c
+    colorMap    hash=a0ab1041 c..p image=salvation_chalk_c inline_pixels=False
+wc/sawedoff_chalk  techset=wc_unlit  colorMap=sawedoff_chalk_c
+    colorMap    hash=a0ab1041 c..p image=sawedoff_chalk_c inline_pixels=False
+wc/sky_mak1  techset=wc_sky  colorMap=makin1_ft
+    colorMap    hash=a0ab1041 c..p image=makin1_ft inline_pixels=False
+wc/thompson_chalk  techset=wc_unlit  colorMap=tommy_chalk_c
+    colorMap    hash=a0ab1041 c..p image=tommy_chalk_c inline_pixels=False
+wc/trans_barbedfence_3b  techset=wc_l_sm_t0c0  colorMap=barbedfence_3b_c#0
+    normalMap   hash=59d30d0f n..p image=,$identitynormalmap inline_pixels=False
+    colorMap    hash=a0ab1041 c..p image=barbedfence_3b_c#0 inline_pixels=False
+wc/trenchgun_chalk  techset=wc_unlit  colorMap=trenchgun_chalk_c
+    colorMap    hash=a0ab1041 c..p image=trenchgun_chalk_c inline_pixels=False
+wc/unknown_chalk  techset=wc_unlit  colorMap=unknown_chalk_c
+    colorMap    hash=a0ab1041 c..p image=unknown_chalk_c inline_pixels=False
+wc/zombie_foliage_pinewall  techset=wc_unlit  colorMap=zombie_foliage_pinewall_c
+    colorMap    hash=a0ab1041 c..p image=zombie_foliage_pinewall_c inline_pixels=False
