@@ -50,9 +50,9 @@ enum Target {
     Crate,
 }
 
-fn roll_crate(defs: &[weapons::WeaponDef], loadout: &Loadout) -> usize {
+fn roll_crate(defs: &[weapons::WeaponDef], only: Option<&[&str]>, loadout: &Loadout) -> usize {
     let pool: Vec<(usize, u32)> =
-        weapons::crate_pool(defs).into_iter().filter(|(i, _)| loadout.has(*i).is_none()).collect();
+        weapons::crate_pool(defs, only).into_iter().filter(|(i, _)| loadout.has(*i).is_none()).collect();
     let total: u32 = pool.iter().map(|p| p.1).sum();
     if total == 0 {
         return weapons::START_PISTOL;
@@ -225,7 +225,7 @@ fn interact(
                 prompt.0 = format!("Press F for a Random Weapon [Cost: {}]", rules::CRATE_COST);
                 if press {
                     if try_spend(&mut score, &mut points, rules::CRATE_COST) {
-                        let result = roll_crate(&defs.0, &loadout);
+                        let result = roll_crate(&defs.0, level_ref.crate_weapons, &loadout);
                         mcrate.0 = CrateState::Rolling { t: 0.0, result, shown: result, tick: 0.0 };
                         // The lid opens to the music box jingle.
                         let at = crate::v3(level_ref.crate_box.center());
@@ -256,7 +256,7 @@ fn interact(
 
 fn crate_tick(time: Res<Time>, defs: Res<Defs>, level: Res<LevelRes>, mut mcrate: ResMut<MysteryCrate>, mut alias: EventWriter<PlayAlias>) {
     let dt = time.delta_secs();
-    let pool = weapons::crate_pool(&defs.0);
+    let pool = weapons::crate_pool(&defs.0, level.0.crate_weapons);
     mcrate.0 = match mcrate.0 {
         CrateState::Rolling { t, result, shown, tick } => {
             let t = t + dt;
