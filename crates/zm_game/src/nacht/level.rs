@@ -114,6 +114,8 @@ pub fn build_level(scene: &NachtScene) -> Level {
         doors,
         wall_buys,
         crate_box,
+        // The box model collides through the map's collision mesh.
+        crate_solid: real_box.is_none(),
         areas: Vec::new(),
         player_start: (start.x, start.z),
         player_start_y: start.y,
