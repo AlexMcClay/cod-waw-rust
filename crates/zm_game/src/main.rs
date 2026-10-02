@@ -377,8 +377,9 @@ fn autopilot(
     mut health: ResMut<player::Health>,
     state: Res<State<GameState>>,
     mut next: ResMut<NextState<GameState>>,
-    mut player: Query<(&Transform, &mut player::PlayerCtl), With<player::Player>>,
+    mut player: Query<(&mut Transform, &mut player::PlayerCtl), With<player::Player>>,
     zq: Query<(&Transform, &zombies::Zombie), Without<player::Player>>,
+    (level, mut mcrate): (Res<LevelRes>, ResMut<interact::MysteryCrate>),
 ) {
     *frame += 1;
     // Ignore real input while the bot plays (the window may have focus).
@@ -419,6 +420,24 @@ fn autopilot(
         return;
     }
     keys.release(KeyCode::Enter);
+    // Optional: stand in front of the box and roll it at 5 s.
+    if std::env::var_os("UNDEAD_TEST_BOX").is_some() {
+        if let Ok((mut pt, mut ctl)) = player.single_mut() {
+            let c = v3(level.0.crate_box.center());
+            let (sx, sz) = level.0.player_start;
+            let away = Vec3::new(sx - c.x, 0.0, sz - c.z).normalize_or_zero();
+            let feet = Vec3::new(c.x, level.0.crate_box.min.y, c.z) + away * 1.7;
+            ctl.feet_y = feet.y;
+            pt.translation = feet + Vec3::Y * ctl.eye;
+            let d = (c + Vec3::Y * 0.4 - pt.translation).normalize();
+            ctl.yaw = (-d.x).atan2(-d.z);
+            ctl.pitch = d.y.asin();
+        }
+        if t >= 5.0 && t - time.delta_secs() < 5.0 {
+            mcrate.0 = interact::CrateState::Rolling { t: 0.0, result: 3, shown: 3, tick: 0.0 };
+        }
+        return;
+    }
     // Optional: cycle the stances (crouch at 6 s, prone at 10 s, up at 14/16 s).
     if std::env::var_os("UNDEAD_TEST_STANCE").is_some() {
         let dt = time.delta_secs();

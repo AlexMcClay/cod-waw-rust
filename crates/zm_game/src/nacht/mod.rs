@@ -57,6 +57,9 @@ pub struct NachtAssets {
     pub scene_entities: Vec<waw_assets::mapents::Entity>,
     /// Brush submodels already used by gameplay (boards, doors) by number.
     pub gameplay_submodels: Vec<usize>,
+    pub chest: Option<build::SceneChest>,
+    /// Our weapon id -> world model name (in `models`).
+    pub weapon_world_models: HashMap<String, String>,
 }
 
 /// A model skinned to its own skeleton, uploaded.
@@ -200,6 +203,7 @@ impl Plugin for NachtPlugin {
             .add_systems(OnEnter(GameState::Loading), start_load)
             .add_systems(Update, poll_load)
             .add_systems(Update, follow_sky)
+            .add_systems(Update, chest_visuals.run_if(resource_exists::<NachtActive>))
             .add_systems(Update, ambience.run_if(in_state(GameState::Playing).and(resource_exists::<NachtActive>)));
     }
 }
@@ -290,7 +294,7 @@ fn poll_load(
     info!("Nacht nav graph: {} nodes, {} links", nav.nodes.len(), nav.edges.iter().map(Vec::len).sum::<usize>() / 2);
 
     let NachtScene {
-        images: imgs, lightmap, materials: mdefs, world, submodels, models, static_models, sky_model, collision, entities, sounds, weapon_sounds, weapon_names, map, characters, view_models: vms, zombie_anims, view_rig: vr, ..
+        images: imgs, lightmap, materials: mdefs, world, submodels, models, static_models, sky_model, collision, entities, sounds, weapon_sounds, weapon_names, weapon_world_models, chest, map, characters, view_models: vms, zombie_anims, view_rig: vr, ..
     } = scene;
     let image_handles: HashMap<String, Handle<Image>> = imgs.into_iter().map(|(k, v)| (k, images.add(v))).collect();
     let lightmap = lightmap.map(|l| images.add(l));
@@ -393,6 +397,8 @@ fn poll_load(
         level,
         scene_entities: entities,
         gameplay_submodels,
+        chest,
+        weapon_world_models,
     });
 }
 
@@ -443,9 +449,11 @@ pub fn spawn_scene(
             });
         }
     }
-    // Script models (barrels, props), except door blockers which are dynamic.
+    // Script models (barrels, props), except door blockers which are
+    // dynamic and the box lid, which opens.
+    let lid_name = assets.chest.as_ref().map(|c| c.lid_model.as_str());
     for e in &assets.scene_entities {
-        if e.classname() != "script_model" || e.targetname().starts_with("upstairs_blocker") {
+        if e.classname() != "script_model" || e.targetname().starts_with("upstairs_blocker") || e.get("model") == lid_name {
             continue;
         }
         let Some(model) = e.get("model") else { continue };
@@ -516,7 +524,21 @@ pub fn spawn_dynamic(
             }
         }
     }
-    crate::world::spawn_crate(&mut commands, level, &mats, &mut meshes);
+    match &assets.chest {
+        // The map's own box: animate its lid and float the weapons above it.
+        Some(chest) => {
+            if let Some(parts) = assets.models.get(&chest.lid_model) {
+                spawn_model(&mut commands, parts, chest.lid, (ChestLid { base: chest.lid, open: 0.0 }, Dynamic));
+            }
+            commands.spawn((chest.weapon, Visibility::Hidden, ChestWeapon { base: chest.weapon, shown: None }, Dynamic)).with_children(|p| {
+                p.spawn((
+                    PointLight { color: Color::srgb(0.75, 0.85, 1.0), intensity: 25_000.0, range: 3.0, shadows_enabled: false, ..default() },
+                    Transform::from_xyz(0.0, 0.3, 0.0),
+                ));
+            });
+        }
+        None => crate::world::spawn_crate(&mut commands, level, &mats, &mut meshes),
+    }
 }
 
 enum DoorPart {
@@ -616,5 +638,72 @@ fn ambience(
         let ab = line.b - line.a;
         let k = ((p - line.a).dot(ab) / ab.length_squared().max(1e-4)).clamp(0.0, 1.0);
         t.translation = line.a + ab * k;
+    }
+}
+
+/// The box lid script model (rolls open 105 degrees in 0.5 s).
+#[derive(Component)]
+struct ChestLid {
+    base: Transform,
+    open: f32,
+}
+
+/// The weapon floating out of the box while it cycles.
+#[derive(Component)]
+struct ChestWeapon {
+    base: Transform,
+    shown: Option<usize>,
+}
+
+/// Opens and closes the real box lid and shows the cycling weapon models,
+/// rising out of the box as the box script moves them.
+#[allow(clippy::type_complexity)]
+fn chest_visuals(
+    time: Res<Time>,
+    mcrate: Res<crate::interact::MysteryCrate>,
+    defs: Res<crate::Defs>,
+    assets: Option<Res<NachtAssets>>,
+    mut lid: Query<(&mut Transform, &mut ChestLid), Without<ChestWeapon>>,
+    mut weapon: Query<(Entity, &mut Transform, &mut Visibility, &mut ChestWeapon, Option<&Children>), Without<ChestLid>>,
+    meshes: Query<(), With<Mesh3d>>,
+    mut commands: Commands,
+) {
+    use crate::interact::CrateState;
+    let Some(assets) = assets else { return };
+    let dt = time.delta_secs();
+    let (open, shown, rise) = match mcrate.0 {
+        CrateState::Idle => (false, None, 0.0),
+        CrateState::Rolling { t, shown, .. } => {
+            // MoveTo over 3 s, accelerating for 2 s, decelerating for 0.9.
+            let k = (t / 3.0).clamp(0.0, 1.0);
+            (true, Some(shown), k * k * (3.0 - 2.0 * k))
+        }
+        CrateState::Ready { def, .. } => (true, Some(def), 1.0),
+    };
+    for (mut t, mut l) in &mut lid {
+        let target = if open { 1.0 } else { 0.0 };
+        l.open += (target - l.open).clamp(-dt * 2.0, dt * 2.0);
+        let k = l.open * l.open * (3.0 - 2.0 * l.open);
+        *t = l.base;
+        t.rotation = l.base.rotation * Quat::from_rotation_x((105f32).to_radians() * k);
+    }
+    for (e, mut t, mut vis, mut w, children) in &mut weapon {
+        *vis = if shown.is_some() { Visibility::Inherited } else { Visibility::Hidden };
+        t.translation = w.base.translation + Vec3::Y * 40.0 * build::INCH * rise;
+        if w.shown != shown {
+            w.shown = shown;
+            for c in children.into_iter().flatten() {
+                if meshes.get(*c).is_ok() {
+                    commands.entity(*c).despawn();
+                }
+            }
+            if let Some(model) = shown.and_then(|d| assets.weapon_world_models.get(defs.0[d].id)).and_then(|n| assets.models.get(n)) {
+                commands.entity(e).with_children(|p| {
+                    for (mesh, mat) in &model.parts {
+                        p.spawn((Mesh3d(mesh.clone()), MeshMaterial3d(mat.clone()), NotShadowCaster));
+                    }
+                });
+            }
+        }
     }
 }

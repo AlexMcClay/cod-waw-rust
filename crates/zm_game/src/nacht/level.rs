@@ -99,13 +99,11 @@ pub fn build_level(scene: &NachtScene) -> Level {
         .filter(|w| zm_core::weapons::find(&zm_core::weapons::default_weapons(), &w.weapon).is_some())
         .map(|w| WallBuy { weapon_id: w.weapon.clone(), cost: w.cost, pos: v3(to_bevy(w.origin)), facing: (0.0, 0.0) })
         .collect();
-    let crate_box = m
-        .chest
-        .as_ref()
-        .map(|c| {
+    let real_box = scene.chest.as_ref().map(|c| Aabb::new(v3(c.bounds.0), v3(c.bounds.1)));
+    let crate_box = real_box.or_else(|| m.chest.as_ref().map(|c| {
             let p = to_bevy(c.origin);
             Aabb::new(V3::new(p.x - 0.5, p.y - 0.5, p.z - 0.5), V3::new(p.x + 0.5, p.y + 0.4, p.z + 0.5))
-        })
+        }))
         .unwrap_or(Aabb::new(V3::new(1000.0, -100.0, 1000.0), V3::new(1001.0, -99.0, 1001.0)));
 
     let yaw = m.player_yaw.to_radians();

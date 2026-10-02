@@ -200,6 +200,11 @@ pub struct XModelInfo {
     pub lods: Vec<LodInfo>,
     pub mins: [f32; 3],
     pub maxs: [f32; 3],
+    /// Collision surfaces; 0 means the model is not solid.
+    pub num_coll_surfs: u32,
+    pub contents: i32,
+    /// LOD whose geometry the game collides with (-1 = none).
+    pub coll_lod: i16,
 }
 
 impl XModelInfo {

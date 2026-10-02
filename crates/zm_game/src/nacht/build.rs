@@ -239,6 +239,18 @@ pub const ZOMBIE_HEADS: &[&str] = &[
 ];
 
 /// One model (LOD 0) as meshes in Bevy space, plus its bind-pose bones.
+/// The mystery box: its static base, the lid script model the trigger
+/// targets, and the point the weapon rises from.
+#[derive(Clone)]
+pub struct SceneChest {
+    /// World bounds of the box model (Bevy space).
+    pub bounds: (Vec3, Vec3),
+    pub lid_model: String,
+    pub lid: Transform,
+    /// Where the weapon appears, facing as the script turns it.
+    pub weapon: Transform,
+}
+
 pub struct SceneModel {
     pub surfaces: Vec<SceneMesh>,
 }
@@ -264,6 +276,10 @@ pub struct NachtScene {
     pub weapon_sounds: HashMap<String, WeaponSounds>,
     /// Our weapon id -> the game's display name ("Colt M1911").
     pub weapon_names: HashMap<String, String>,
+    /// Our weapon id -> its third-person (world) model, shown by the box.
+    pub weapon_world_models: HashMap<String, String>,
+    /// The mystery box as the map builds it.
+    pub chest: Option<SceneChest>,
     pub characters: Vec<SceneCharacter>,
     pub zombie_anims: Vec<AnimClip>,
     pub view_rig: Option<SceneViewRig>,
@@ -672,6 +688,28 @@ const WEAPON_SOUND_FIELDS: &[&str] = &[
     "meleeHitSound",
 ];
 
+/// A model's collision triangles in its own (Bevy) space, if the game
+/// treats it as solid. Uses the model's collision LOD (else its lowest).
+fn model_collision(zones: &[&ZoneData], name: &str) -> Option<Vec<[Vec3; 3]>> {
+    let name = name.trim_start_matches(',');
+    let (zd, info) = zones.iter().find_map(|zd| zd.xmodels.iter().find(|m| m.name == name && !m.surfs.is_empty()).map(|m| (*zd, m)))?;
+    if info.num_coll_surfs == 0 || info.lods.is_empty() {
+        return None;
+    }
+    let lod = if info.coll_lod >= 0 { (info.coll_lod as usize).min(info.lods.len() - 1) } else { info.lods.len() - 1 };
+    let mut out = Vec::new();
+    for s in info.lod_surfs(lod) {
+        let dm = decode::model_surface(zd, &info.surfs[s]);
+        for t in &dm.triangles {
+            let v = |i: u16| dm.vertices.get(i as usize).map(|v| to_bevy(v.pos));
+            if let (Some(a), Some(b), Some(c)) = (v(t[0]), v(t[1]), v(t[2])) {
+                out.push([a, b, c]);
+            }
+        }
+    }
+    (!out.is_empty()).then_some(out)
+}
+
 /// The zone's weapon name for one of our weapon ids.
 fn zone_weapon_name(id: &str) -> &str {
     match id {
@@ -886,7 +924,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         extra.push(n.to_string());
     }
     for w in &nacht.weapons {
-        for m in [w.view_model, w.hand_model].into_iter().flatten() {
+        for m in [w.view_model, w.hand_model, w.world_model].into_iter().flatten() {
             extra.push(nacht.xmodels[m as usize].name.trim_start_matches(',').to_string());
         }
     }
@@ -912,7 +950,88 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
             }
         }
     }
+    // Props: static and script models the game treats as solid (they have
+    // collision surfaces; foliage and wires don't), collided with through
+    // the LOD the game uses for collision.
+    let mut prop_tris: HashMap<String, Option<Vec<[Vec3; 3]>>> = HashMap::new();
+    let mut add_model = |name: &str, t: &Transform, tris: &mut Vec<Tri>| {
+        let local = prop_tris.entry(name.to_string()).or_insert_with(|| model_collision(&zones, name));
+        for tri in local.iter().flatten() {
+            let p = tri.map(|v| t.transform_point(v)).map(|v| V3::new(v.x, v.y, v.z));
+            if let Some(tri) = Tri::new(p[0], p[1], p[2]) {
+                tris.push(tri);
+            }
+        }
+    };
+    for (name, t) in &static_models {
+        add_model(name, t, &mut tris);
+    }
+    for e in entities.iter().filter(|e| e.classname() == "script_model" && !e.targetname().starts_with("upstairs_blocker")) {
+        if let Some(model) = e.get("model") {
+            let t = Transform::from_translation(to_bevy(e.origin())).with_rotation(angles_to_quat(e.angles()));
+            add_model(model, &t, &mut tris);
+        }
+    }
+    // Scenery brush models (not boards or debris, which come and go).
+    let gameplay: std::collections::HashSet<usize> =
+        map.windows.iter().flat_map(|w| w.boards.iter().map(|b| b.submodel)).chain(map.doors.iter().flat_map(|d| d.blockers.iter().copied())).collect();
+    for e in &entities {
+        let Some(n) = e.submodel() else { continue };
+        if gameplay.contains(&n) || e.classname().starts_with("trigger") {
+            continue;
+        }
+        let Some(bm) = world.models.get(n) else { continue };
+        let t = Transform::from_translation(to_bevy(e.origin())).with_rotation(angles_to_quat(e.angles()));
+        for si in bm.start_surface as usize..(bm.start_surface + bm.surface_count) as usize {
+            let Some(surf) = world.surfaces.get(si) else { continue };
+            let solid = surf.material.and_then(|m| b.material(0, m)).is_some_and(|m| b.materials[m].blend != Blend::Blend && !b.materials[m].unlit);
+            if !solid {
+                continue;
+            }
+            for tri in decode::world_triangles(&nacht, world, surf) {
+                let p: Vec<V3> = tri
+                    .iter()
+                    .map(|&v| decode::world_vertex(&nacht, world, v).map(|x| t.transform_point(to_bevy(x.pos))).unwrap_or(Vec3::ZERO))
+                    .map(|v| V3::new(v.x, v.y, v.z))
+                    .collect();
+                if let Some(tri) = Tri::new(p[0], p[1], p[2]) {
+                    tris.push(tri);
+                }
+            }
+        }
+    }
     let collision = TriMesh::new(tris, 2.0);
+
+    // The mystery box: trigger -> lid script model -> weapon script origin
+    // (as the box script walks them), with the box model next to it.
+    let chest = entities.iter().find(|e| e.targetname() == "treasure_chest_use").and_then(|trig| {
+        let lid = entities.iter().find(|e| !trig.target().is_empty() && e.targetname() == trig.target())?;
+        let org = entities.iter().find(|e| !lid.target().is_empty() && e.targetname() == lid.target())?;
+        let lid_t = Transform::from_translation(to_bevy(lid.origin())).with_rotation(angles_to_quat(lid.angles()));
+        let a = org.angles();
+        let weapon = Transform::from_translation(to_bevy(org.origin())).with_rotation(angles_to_quat([a[0], a[1] + 90.0, a[2]]));
+        // Bounds from the nearest box model instance.
+        let near = static_models
+            .iter()
+            .filter(|(n, _)| n == "zombie_treasure_box")
+            .min_by(|a, b| a.1.translation.distance(lid_t.translation).total_cmp(&b.1.translation.distance(lid_t.translation)))
+            .and_then(|(n, t)| b.find_model(n).map(|(_, info)| (info.mins, info.maxs, *t)));
+        let bounds = match near {
+            Some((lo, hi, t)) => {
+                let mut mn = Vec3::splat(f32::MAX);
+                let mut mx = Vec3::splat(f32::MIN);
+                for i in 0..8 {
+                    let c = [if i & 1 == 0 { lo[0] } else { hi[0] }, if i & 2 == 0 { lo[1] } else { hi[1] }, if i & 4 == 0 { lo[2] } else { hi[2] }];
+                    let p = t.transform_point(to_bevy(c));
+                    mn = mn.min(p);
+                    mx = mx.max(p);
+                }
+                (mn, mx)
+            }
+            None => (lid_t.translation - Vec3::new(0.6, 0.5, 0.6), lid_t.translation + Vec3::new(0.6, 0.1, 0.6)),
+        };
+        Some(SceneChest { bounds, lid_model: lid.get("model")?.to_string(), lid: lid_t, weapon })
+    });
 
     let sun = Vec3::from(sun_color) * sun_light * 0.6;
     let lightmap = bake_lightmap(&nacht, sun);
@@ -972,6 +1091,22 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     aliases.dedup();
     let sounds = collect_sounds(&zones, iwd, &aliases);
     let localized = |key: &str| zones.iter().find_map(|z| z.localized(key).or_else(|| z.localized(key.trim_start_matches('&'))).map(str::to_string));
+    let weapon_world_models: HashMap<String, String> = wanted
+        .weapon_ids
+        .iter()
+        .filter_map(|&id| {
+            let (zd, w) = zones.iter().find_map(|z| z.weapon(zone_weapon_name(id)).map(|w| (*z, w)))?;
+            let name = zd.xmodels[w.world_model? as usize].name.trim_start_matches(',').to_string();
+            Some((id.to_string(), name))
+        })
+        .collect();
+    for name in weapon_world_models.values() {
+        if !models.contains_key(name) {
+            if let Some(m) = b.model(name) {
+                models.insert(name.clone(), m);
+            }
+        }
+    }
     let weapon_names = wanted
         .weapon_ids
         .iter()
@@ -999,6 +1134,8 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         sounds,
         weapon_sounds,
         weapon_names,
+        weapon_world_models,
+        chest,
         characters,
         zombie_anims,
         view_rig,

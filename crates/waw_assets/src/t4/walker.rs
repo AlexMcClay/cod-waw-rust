@@ -712,7 +712,18 @@ impl<'a> Walker<'a> {
             })
             .collect();
         let idx = self.out.xmodels.len() as u32;
-        self.out.xmodels.push(XModelInfo { name: name.clone(), bones, surfs, materials, lods, mins: h.vec3(0xac), maxs: h.vec3(0xb8) });
+        self.out.xmodels.push(XModelInfo {
+            name: name.clone(),
+            bones,
+            surfs,
+            materials,
+            lods,
+            mins: h.vec3(0xac),
+            maxs: h.vec3(0xb8),
+            num_coll_surfs: h.i32(0x9c).max(0) as u32,
+            contents: h.i32(0xa0),
+            coll_lod: h.u16(0xc6) as i16,
+        });
         Ok((AssetRef::XModel(idx), name))
     }
 
