@@ -53,8 +53,7 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
 - Scoped weapons show their scope overlay (`adsOverlayShader`) instead of the gun when fully aimed.
 - Models sample the light grid in their own shader (model_material.rs): Bevy's IrradianceVolume
   dropped screen tiles for a map-sized volume (black, flickering blocks). Effect lights go through a
-  pool of 8 (hundreds of particle lights crowded the light-grid volume
-  out of Bevy's clusters: black, flickering blocks on models). Decal sort layers get a depth offset.
+  pool of 8, like the game's few dynamic lights. Decal sort layers get a depth offset.
 - Test runs (`UNDEAD_CAPTURE`, `UNDEAD_TEST_*`) hand control to the player on their first input;
   `UNDEAD_TEST_ADS=1` holds aim.
   `UNDEAD_COLLISION_MAP=<file.ppm>` maps what stops the player around the start.
