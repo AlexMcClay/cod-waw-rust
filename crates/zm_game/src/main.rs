@@ -16,6 +16,7 @@ mod interact;
 mod menu;
 mod nacht;
 mod player;
+mod panning;
 mod postfx;
 mod powerups;
 mod round;

@@ -8,7 +8,10 @@
 //! extracted folder. Anything missing falls back to a procedurally generated
 //! sound, so the game always runs.
 
-use bevy::audio::Volume;
+use crate::panning::{MonoCache, Pan, PanGains, PannedSound};
+use bevy::audio::{AddAudioSource, Volume};
+use bevy::ecs::system::SystemParam;
+use std::sync::Arc;
 use bevy::prelude::*;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -426,9 +429,19 @@ struct LoopVoice(Entity);
 /// Distance falloff applied every frame to a positional sound.
 #[derive(Component)]
 struct Falloff {
-    volume: f32,
     near: f32,
     far: f32,
+}
+
+/// What positional voices need: the sounds, their mono copies and the
+/// listener (the camera) and emitter transforms.
+#[derive(SystemParam)]
+struct Voices<'w, 's> {
+    sources: Res<'w, Assets<AudioSource>>,
+    cache: ResMut<'w, MonoCache>,
+    panned: ResMut<'w, Assets<PannedSound>>,
+    ear: Query<'w, 's, &'static GlobalTransform, With<SpatialListener>>,
+    globals: Query<'w, 's, &'static GlobalTransform>,
 }
 
 /// Sounds waiting for their delay.
@@ -468,8 +481,10 @@ impl Plugin for AudioPlugin {
             .add_event::<PlayAlias>()
             .init_resource::<ZoneSounds>()
             .init_resource::<PendingSounds>()
+            .init_resource::<MonoCache>()
+            .add_audio_source::<PannedSound>()
             .add_systems(PreStartup, load_sounds)
-            .add_systems(PostUpdate, (play_aliases, play_sounds, start_loops, stop_loops, apply_falloff).chain());
+            .add_systems(PostUpdate, (play_aliases, play_sounds, start_loops, stop_loops, apply_pan).chain());
     }
 }
 
@@ -594,9 +609,11 @@ fn is_music(alias: &str) -> bool {
 }
 
 /// Spawns one variant of an alias and returns the audio entity.
+/// Positional (3D) aliases play through [`PannedSound`].
 #[allow(clippy::too_many_arguments)]
 fn spawn_alias(
     commands: &mut Commands,
+    voices: &mut Voices,
     sound: &AliasSound,
     alias: &str,
     req_volume: f32,
@@ -608,27 +625,38 @@ fn spawn_alias(
     let lerp = |(a, b): (f32, f32)| a + (b - a) * fastrand::f32();
     let base = lerp(sound.volume) * req_volume * if is_music(alias) { settings.music() } else { settings.sfx() };
     let mut playback = if looping { PlaybackSettings::LOOP } else { PlaybackSettings::DESPAWN };
-    playback = playback.with_speed(lerp(sound.pitch));
+    playback = playback.with_speed(lerp(sound.pitch)).with_volume(Volume::Linear(base));
     let positional = sound.spatial && (at.is_some() || on.is_some());
-    let mut e = commands.spawn((AudioPlayer::new(sound.handle.clone()), crate::Dynamic));
-    if positional {
-        // Bevy pans; the game's linear falloff is applied by `apply_falloff`
-        // (a tiny spatial scale keeps Bevy's own attenuation out of it).
-        playback = playback
-            .with_spatial(true)
-            .with_spatial_scale(bevy::audio::SpatialScale::new(0.001))
-            .with_volume(Volume::Linear(0.0));
-        e.insert((
-            Transform::from_translation(at.unwrap_or(Vec3::ZERO)),
-            Falloff { volume: base, near: sound.distance.0, far: sound.distance.1.max(sound.distance.0 + 1.0) },
-        ));
-        if let Some(parent) = on {
-            e.insert(ChildOf(parent));
+    let mono = if positional { voices.cache.get(&sound.handle, &voices.sources) } else { None };
+    let mut e = commands.spawn(crate::Dynamic);
+    match mono {
+        Some((mono, rate)) => {
+            let (near, far) = (sound.distance.0, sound.distance.1.max(sound.distance.0 + 1.0));
+            // Gains for where it starts, so the first samples are placed.
+            let gains = Arc::new(PanGains::default());
+            let local = at.unwrap_or(Vec3::ZERO);
+            let world = match on {
+                Some(p) => voices.globals.get(p).ok().map(|g| g.transform_point(local)),
+                None => at,
+            };
+            if let (Ok(ear), Some(w)) = (voices.ear.single(), world) {
+                let (l, r) = crate::panning::gains(ear, w, falloff(w.distance(ear.translation()), near, far));
+                gains.set(l, r);
+            }
+            let handle = voices.panned.add(PannedSound { mono, rate, gains: gains.clone(), looping });
+            // The voice loops itself (so its panning keeps updating).
+            if looping {
+                playback.mode = bevy::audio::PlaybackMode::Despawn;
+            }
+            e.insert((AudioPlayer(handle), playback, Transform::from_translation(local), Falloff { near, far }, Pan(gains)));
+            if let Some(parent) = on {
+                e.insert(ChildOf(parent));
+            }
         }
-    } else {
-        playback = playback.with_volume(Volume::Linear(base));
+        None => {
+            e.insert((AudioPlayer::new(sound.handle.clone()), playback));
+        }
     }
-    e.insert(playback);
     e.id()
 }
 
@@ -646,6 +674,7 @@ fn play_aliases(
     alive: Query<(), With<Transform>>,
     mut sfx: EventWriter<PlaySfx>,
     mut commands: Commands,
+    mut voices: Voices,
 ) {
     let dt = time.delta_secs();
     let mut due: Vec<PlayAlias> = Vec::new();
@@ -676,7 +705,7 @@ fn play_aliases(
                     pending.0.push(PlayAlias { delay: s.start_delay, started: true, ..ev.clone() });
                     continue;
                 }
-                spawn_alias(&mut commands, s, &ev.alias, ev.volume, ev.at, ev.on, false, &settings);
+                spawn_alias(&mut commands, &mut voices, s, &ev.alias, ev.volume, ev.at, ev.on, false, &settings);
                 // Layers play with it, chains after it.
                 if ev.depth < 8 {
                     if let Some(sec) = &s.secondary {
@@ -704,10 +733,11 @@ fn start_loops(
     settings: Res<UserSettings>,
     added: Query<(Entity, &AliasLoop, Option<&Transform>), Without<LoopVoice>>,
     mut commands: Commands,
+    mut voices: Voices,
 ) {
     for (e, l, t) in &added {
         let Some(list) = zone.aliases.get(&l.alias).filter(|l| !l.is_empty()) else { continue };
-        let voice = spawn_alias(&mut commands, pick(list), &l.alias, l.volume, t.map(|_| Vec3::ZERO), t.map(|_| e), true, &settings);
+        let voice = spawn_alias(&mut commands, &mut voices, pick(list), &l.alias, l.volume, t.map(|_| Vec3::ZERO), t.map(|_| e), true, &settings);
         commands.entity(e).insert(LoopVoice(voice));
     }
 }
@@ -722,13 +752,18 @@ fn stop_loops(mut removed: RemovedComponents<AliasLoop>, voices: Query<&LoopVoic
     }
 }
 
-fn apply_falloff(listener: Query<&GlobalTransform, With<SpatialListener>>, mut sounds: Query<(&GlobalTransform, &Falloff, Option<&mut SpatialAudioSink>)>) {
-    let Ok(l) = listener.single() else { return };
-    for (t, f, sink) in &mut sounds {
-        if let Some(mut sink) = sink {
-            let v = f.volume * falloff(t.translation().distance(l.translation()), f.near, f.far);
-            sink.set_volume(Volume::Linear(v));
-        }
+/// Places every positional voice for this frame: panning by direction and
+/// the game's distance falloff.
+fn apply_pan(ear: Query<&GlobalTransform, With<SpatialListener>>, voices: Query<(&GlobalTransform, &Falloff, &Pan)>, mut told: Local<bool>) {
+    let Ok(ear) = ear.single() else { return };
+    if !*told && !voices.is_empty() {
+        *told = true;
+        info!("positional sound: {} voice(s) panned", voices.iter().count());
+    }
+    for (t, f, pan) in &voices {
+        let at = t.translation();
+        let (l, r) = crate::panning::gains(ear, at, falloff(at.distance(ear.translation()), f.near, f.far));
+        pan.0.set(l, r);
     }
 }
 
