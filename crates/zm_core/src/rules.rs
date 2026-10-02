@@ -132,6 +132,18 @@ pub const NACHT_ATTACKS: [TimedAnim; 4] = [
     },
 ];
 
+/// Crawlers (zombies that lost a leg; `level.scr_anim["zombie"]["crawl1..3"]`):
+/// the crawl, its death (`death3` for the first, `death4` for the others),
+/// and the melee (`level._zombie_melee_crawl`, `fire` notetracks).
+pub const NACHT_CRAWLS: [(&str, &str); 3] =
+    [("ai_zombie_crawl", "ai_zombie_crawl_death_v1"), ("ai_zombie_crawl_v1", "ai_zombie_crawl_death_v2"), ("ai_zombie_crawl_sprint", "ai_zombie_crawl_death_v2")];
+pub const NACHT_CRAWL_ATTACKS: [TimedAnim; 2] = [
+    TimedAnim { name: "ai_zombie_attack_crawl", len: 79.0 / 30.0, events: &[24.0 / 30.0, 54.0 / 30.0] },
+    TimedAnim { name: "ai_zombie_attack_crawl_lunge", len: 43.0 / 30.0, events: &[12.0 / 30.0] },
+];
+/// Falling to the floor when a leg goes (left, right).
+pub const NACHT_TO_CRAWL: [&str; 2] = ["ai_zombie_shot_leg_left_2_crawl", "ai_zombie_shot_leg_right_2_crawl"];
+
 /// The board-pulling anims (one board each, `board` notetrack). The game
 /// picks by board height (high above 70 units over the zombie's feet, low
 /// under 40, else left/right at random).

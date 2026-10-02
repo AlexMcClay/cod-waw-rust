@@ -54,6 +54,12 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
 - Models sample the light grid in their own shader (model_material.rs): Bevy's IrradianceVolume
   dropped screen tiles for a map-sized volume (black, flickering blocks). Effect lights go through a
   pool of 8, like the game's few dynamic lights. Decal sort layers get a depth offset.
+- Dismemberment from the game's scripts: characters (AI type -> character -> xmodelalias) give the
+  body/head and the gib models; arms, legs, guts and heads come off by the spawner/death script
+  rules (head pops at <=10% health and bleed out, kill-shot gibs, explosions by nearest joint),
+  severed parts fly with blood trails, and a zombie that loses a leg crawls (crawl, crawl melee,
+  crawl vault, crawl death). Per-bone hit boxes, solid zombie bodies, blended animations.
+- Directional sound: our own stereo panning for 3D aliases (Bevy's spatial audio is inverted/weak).
 - Test runs (`UNDEAD_CAPTURE`, `UNDEAD_TEST_*`) hand control to the player on their first input;
   `UNDEAD_TEST_ADS=1` holds aim.
   `UNDEAD_COLLISION_MAP=<file.ppm>` maps what stops the player around the start.
@@ -68,7 +74,7 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
 
 - About 20 small outdoor path-node clusters are not linked to the rest (no spawner uses them).
 - Ray Gun self-damage.
-- Not yet from the rules: crawlers from explosive gibs, burning damage, the stuck-zombie cleanup.
+- Not yet from the rules: burning damage, the stuck-zombie cleanup.
 - FX gaps: trails drawn as sprites, no particle collision, IWI format 9 textures (light beams),
   distortion (heat haze) elements and character blood decals are not drawn.
 - Perks/power (Verrückt and later maps), co-op.

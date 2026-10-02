@@ -4,6 +4,7 @@
 //! runtime. The modules are deliberately engine-independent so they can be
 //! unit tested and reused by the command-line tools in `examples/`.
 
+pub mod character;
 pub mod install;
 pub mod iwd;
 pub mod look;

@@ -50,11 +50,35 @@ pub struct Zombie {
     pub climb_from: f32,
     /// Which window-vault animation this zombie uses.
     pub climb_anim: usize,
+    /// Health when it spawned (for the head-gib threshold).
+    pub max_hp: f32,
+    /// Crawling (lost a leg): which crawl (`NACHT_CRAWLS`).
+    pub crawl: Option<usize>,
+    /// Falling to the floor when a leg goes: (side, seconds into it).
+    pub to_crawl: Option<(usize, f32)>,
 }
 
 impl Zombie {
     pub fn alive(&self) -> bool {
         self.state != ZState::Dying
+    }
+
+    /// Height of its body for collision (a crawler is low).
+    pub fn body_height(&self) -> f32 {
+        (if self.crawl.is_some() { 0.7 } else { BODY_HEIGHT }) * self.scale
+    }
+
+    /// Lost a leg: drops to the floor and crawls on at `speed`
+    /// (`zombie_gib_on_damage`).
+    pub fn start_crawling(&mut self, gib: crate::gibs::Gib, which: usize, speed: f32) {
+        if self.crawl.is_some() {
+            return;
+        }
+        self.crawl = Some(which % rules::NACHT_CRAWLS.len());
+        let side = if gib == crate::gibs::Gib::RightLeg { 1 } else { 0 };
+        self.to_crawl = Some((side, 0.0));
+        self.speed = speed;
+        self.swing = 0.0;
     }
 }
 
@@ -67,7 +91,7 @@ pub struct Limb {
 /// A real zombie model and its animation state.
 #[derive(Component)]
 pub struct ZombieRig {
-    joints: Vec<crate::nacht::Joint>,
+    pub(crate) joints: Vec<crate::nacht::Joint>,
     /// Which walk/attack variant this zombie uses.
     variant: usize,
     clip: usize,
@@ -96,7 +120,7 @@ const BLEND_TIME: f32 = 0.2;
 pub struct Hitboxes(pub Vec<(Entity, crate::nacht::build::BoneHit)>);
 
 impl Hitboxes {
-    fn add(&mut self, part: &crate::nacht::PartAssets, joints: &[crate::nacht::Joint]) {
+    pub(crate) fn add(&mut self, part: &crate::nacht::PartAssets, joints: &[crate::nacht::Joint]) {
         for ((name, ..), hit) in part.bones.iter().zip(&part.hits) {
             let (Some(hit), Some(j)) = (hit, joints.iter().find(|j| j.0 == *name)) else { continue };
             self.0.push((j.1, *hit));
@@ -173,19 +197,26 @@ fn spawn_real_model(commands: &mut Commands, root: Entity, models: &crate::nacht
     if models.chars.is_empty() {
         return false;
     }
-    let ch = &models.chars[fastrand::usize(..models.chars.len())];
+    // A character (as the AI type picks one), a body and a head from it.
+    let ci = fastrand::usize(..models.chars.len());
+    let ch = &models.chars[ci];
+    if ch.bodies.is_empty() {
+        return false;
+    }
+    let body = &ch.bodies[fastrand::usize(..ch.bodies.len())];
     // Models face +X; our zombies face -Z.
     let model = commands.spawn((Transform::from_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)), Visibility::default(), ChildOf(root))).id();
     let mut joints = Vec::new();
     let mut boxes = Hitboxes::default();
-    crate::nacht::spawn_part(commands, &ch.body, &mut joints, model, model);
-    boxes.add(&ch.body, &joints);
-    if !ch.heads.is_empty() {
-        let head = &ch.heads[fastrand::usize(..ch.heads.len())];
-        crate::nacht::spawn_part(commands, head, &mut joints, model, model);
-        boxes.add(head, &joints);
+    let body_meshes = crate::nacht::spawn_part(commands, body, &mut joints, model, model);
+    boxes.add(body, &joints);
+    let head_i = (!ch.heads.is_empty()).then(|| fastrand::usize(..ch.heads.len()));
+    let mut head_meshes = Vec::new();
+    if let Some(h) = head_i {
+        head_meshes = crate::nacht::spawn_part(commands, &ch.heads[h], &mut joints, model, model);
+        boxes.add(&ch.heads[h], &joints);
     }
-    commands.entity(root).insert(boxes);
+    commands.entity(root).insert((boxes, crate::gibs::ZombieBody::new(ci, model, head_i, body_meshes, head_meshes)));
     commands.entity(root).insert(ZombieRig { joints, variant: fastrand::usize(..12), clip: usize::MAX, time: 0.0, rate: 1.0, map: Vec::new(), prev: None });
     true
 }
@@ -193,7 +224,7 @@ fn spawn_real_model(commands: &mut Commands, root: Entity, models: &crate::nacht
 /// Developer aid: `UNDEAD_PREVIEW=<anim>` shows a zombie in front of the
 /// player playing one animation in place, without AI.
 #[derive(Component)]
-pub struct Preview(usize, f32);
+pub struct Preview(pub usize, pub f32);
 
 pub fn spawn_preview(
     mut commands: Commands,
@@ -272,8 +303,17 @@ fn animate_rigs(
         let timed = |list: &[rules::TimedAnim]| list.get(z.act % list.len().max(1)).and_then(|a| models.clip(a.name));
         let mut sync = None;
         let (want, rate) = match z.state {
-            ZState::Dying => (find(&["ai_zombie_death_v1", "ai_zombie_death_v2"], v), 1.3),
-            ZState::Climbing => match times.traverse(z.climb_anim) {
+            ZState::Dying => match z.crawl {
+                Some(c) => (models.clip(rules::NACHT_CRAWLS[c].1), 1.0),
+                None => (find(&["ai_zombie_death_v1", "ai_zombie_death_v2"], v), 1.3),
+            },
+            // Falling to the floor when a leg goes.
+            _ if z.to_crawl.is_some() => {
+                let (side, t) = z.to_crawl.unwrap_or_default();
+                sync = Some(t);
+                (models.clip(rules::NACHT_TO_CRAWL[side]), 1.0)
+            }
+            ZState::Climbing => match times.vault(z) {
                 // The AI's clock (seconds into the vault), at normal speed.
                 Some(c) => {
                     sync = Some(z.timer);
@@ -283,11 +323,19 @@ fn animate_rigs(
             },
             _ if z.swing > 0.0 => {
                 sync = Some(z.act_t.max(0.0));
-                (timed(rules.attacks), 1.0)
+                match z.crawl {
+                    Some(_) => (timed(&rules::NACHT_CRAWL_ATTACKS), 1.0),
+                    None => (timed(rules.attacks), 1.0),
+                }
             }
             ZState::AtWindow => {
                 sync = Some(z.act_t.max(0.0));
                 (timed(rules.tears), 1.0)
+            }
+            _ if z.crawl.is_some() => {
+                let c = models.clip(rules::NACHT_CRAWLS[z.crawl.unwrap_or(0)].0);
+                let rs = c.map(|c| models.clips[c].root_speed).unwrap_or(1.0).max(0.05);
+                (c, (z.speed * z.scale.recip() / rs).clamp(0.4, 2.5))
             }
             _ => {
                 let names: &[&str] = match z.gait {
@@ -387,6 +435,10 @@ pub struct AnimTimes {
     /// The window-vault animations (`ai_zombie_traverse*`), whose root
     /// motion carries the zombie through the window.
     traverses: Vec<std::sync::Arc<crate::nacht::build::AnimClip>>,
+    /// Crawlers: their melee, their vault and the fall to the floor.
+    crawl_attacks: Vec<Timed>,
+    crawl_traverse: Option<std::sync::Arc<crate::nacht::build::AnimClip>>,
+    to_crawl: [f32; 2],
     from_clips: bool,
 }
 
@@ -401,6 +453,31 @@ impl AnimTimes {
 
     fn traverse(&self, i: usize) -> Option<&crate::nacht::build::AnimClip> {
         (!self.traverses.is_empty()).then(|| &*self.traverses[i % self.traverses.len()])
+    }
+
+    /// The vault this zombie plays (crawlers have their own).
+    fn vault(&self, z: &Zombie) -> Option<&crate::nacht::build::AnimClip> {
+        match (z.crawl, &self.crawl_traverse) {
+            (Some(_), Some(c)) => Some(c),
+            _ => self.traverse(z.climb_anim),
+        }
+    }
+
+    /// The swing a zombie is playing (crawlers have their own melee).
+    fn swing(&self, z: &Zombie, rules: &rules::ZombieRules) -> Timed {
+        match z.crawl {
+            Some(_) => self
+                .crawl_attacks
+                .get(z.act % self.crawl_attacks.len().max(1))
+                .cloned()
+                .unwrap_or_else(|| Self::from_rules(&rules::NACHT_CRAWL_ATTACKS).get(z.act % 2).cloned().unwrap_or_default()),
+            None => self.attack(z.act % rules.attacks.len().max(1), rules),
+        }
+    }
+
+    /// Seconds of the fall to the floor on one side.
+    pub fn to_crawl_len(&self, side: usize) -> f32 {
+        self.to_crawl.get(side).copied().unwrap_or(1.5)
     }
 
     fn tear(&self, i: usize, rules: &rules::ZombieRules) -> Timed {
@@ -428,6 +505,9 @@ fn build_anim_times(models: Option<Res<crate::nacht::ZombieModels>>, round: Res<
     let rules = &round.0.rules;
     times.attacks = read(rules.attacks, "fire");
     times.tears = read(rules.tears, "board");
+    times.crawl_attacks = read(&rules::NACHT_CRAWL_ATTACKS, "fire");
+    times.crawl_traverse = models.clips.iter().find(|c| c.name.to_ascii_lowercase().starts_with("ai_zombie_traverse_crawl")).cloned();
+    times.to_crawl = rules::NACHT_TO_CRAWL.map(|n| models.clip(n).map_or(1.5, |i| models.clips[i].duration));
     // (The crawl variant is for legless crawlers, which aren't in yet.)
     times.traverses = models
         .clips
@@ -610,6 +690,9 @@ pub fn spawn_zombie(
                 mover: Mover::at(pos),
                 climb_from: 0.0,
                 climb_anim: fastrand::usize(..64),
+                max_hp: spec.health,
+                crawl: None,
+                to_crawl: None,
             },
             Dynamic,
         ))
@@ -1144,6 +1227,14 @@ fn ai(
         }
         z.attack_cd = (z.attack_cd - dt).max(0.0);
         z.groan_cd -= dt;
+        // Falling to the floor after losing a leg: nothing else meanwhile.
+        if let Some((side, t)) = z.to_crawl {
+            let t = t + dt;
+            z.to_crawl = (t < times.to_crawl_len(side)).then_some((side, t));
+            if z.to_crawl.is_some() {
+                continue;
+            }
+        }
         let pos = Vec3::new(t.translation.x, 0.0, t.translation.z);
         let to_player = ppos - pos;
         let dist_player = to_player.length();
@@ -1164,7 +1255,7 @@ fn ai(
         // A melee anim in progress: every `fire` notetrack is a `melee()`
         // that hits the player if still within reach.
         if z.swing > 0.0 {
-            let anim = times.attack(z.act % rules.attacks.len().max(1), rules);
+            let anim = times.swing(&z, rules);
             let before = z.act_t;
             z.act_t += dt;
             z.swing -= dt;
@@ -1268,7 +1359,7 @@ fn ai(
                     z.climb_from = t.translation.y;
                 }
                 z.timer += dt;
-                let (k, rise) = match times.traverse(z.climb_anim) {
+                let (k, rise) = match times.vault(&z) {
                     Some(c) => {
                         let (r, e) = (c.root_at(z.timer), c.root_at(c.duration));
                         let f = if e[0].abs() > 1.0 { (r[0] / e[0]).clamp(0.0, 1.0) } else { (z.timer / c.duration).min(1.0) };
@@ -1358,6 +1449,13 @@ fn ai(
 
 /// Starts a melee anim, picked at random like `pick_zombie_melee_anim`.
 fn start_attack(z: &mut Zombie, rules: &rules::ZombieRules, times: &AnimTimes) {
+    if z.crawl.is_some() {
+        // A crawler's own melee (`level._zombie_melee_crawl`).
+        z.act = fastrand::usize(..rules::NACHT_CRAWL_ATTACKS.len());
+        z.act_t = 0.0;
+        z.swing = times.swing(z, rules).len;
+        return;
+    }
     if rules.attacks.is_empty() {
         return;
     }
@@ -1395,7 +1493,7 @@ fn separate(world: Res<World>, mut zq: Query<(Entity, &mut Transform, &Zombie)>,
         if let Some((pp, pf, ph)) = me {
             let d = at - pp;
             let (l, min) = (d.length(), crate::player::RADIUS + BODY_RADIUS * z.scale);
-            if l < min && l > 1e-4 && pf < t.translation.y + BODY_HEIGHT * z.scale && ph > t.translation.y {
+            if l < min && l > 1e-4 && pf < t.translation.y + z.body_height() && ph > t.translation.y {
                 push += d / l * (min - l);
             }
         }

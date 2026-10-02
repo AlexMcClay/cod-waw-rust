@@ -494,7 +494,7 @@ fn fire(
     (zs, mut alias, mut fx): (Res<ZoneSounds>, EventWriter<PlayAlias>, EventWriter<crate::fx::FxEvent>),
     mut commands: Commands,
     mats: Res<Mats>,
-    (boxes, globals): (Query<&zombies::Hitboxes>, Query<&GlobalTransform>),
+    (boxes, globals, mut hurt_ev): (Query<&zombies::Hitboxes>, Query<&GlobalTransform>, EventWriter<crate::gibs::ZombieHurt>),
 ) {
     let dt = time.delta_secs();
     gun.cooldown = (gun.cooldown - dt).max(0.0);
@@ -571,8 +571,6 @@ fn fire(
     gun.spread_scale = (gun.spread_scale + def.spread.fire_add).min(1.0);
     let insta = pu.insta_kill > 0.0;
     let round_no = round.0.round.max(1);
-    // Pistol-class weapons never gib heads (`head_should_gib`).
-    let gibs = !matches!(def.kind, Kind::Pistol | Kind::Wonder);
     let mut any_hit = false;
     let mut any_head = false;
 
@@ -604,21 +602,25 @@ fn fire(
             let dmg = def.bullet_damage(d, loc) * remaining;
             let at = origin + dir * d;
             let lethal = z.hp <= dmg;
+            let before = z.hp;
             let mut dead = zombies::apply_damage(&mut z, dmg, insta);
             if !dead && def.is_projectile() {
                 // The zombie damage script adds `round * RandomInt(100, 500)`
                 // to projectile hits (RandomInt takes one argument).
                 dead = zombies::apply_damage(&mut z, round_no as f32 * fastrand::u32(0..100) as f32, false);
             }
+            // Dismemberment decides from the hit (see `gibs`).
+            let by = if def.is_projectile() {
+                crate::gibs::HurtBy::Projectile
+            } else {
+                crate::gibs::HurtBy::Bullet { pistol: def.kind == Kind::Pistol, shotgun: def.kind == Kind::Shotgun }
+            };
+            hurt_ev.write(crate::gibs::ZombieHurt { zombie: e, amount: before - z.hp.max(-1e6), hp_after: z.hp, by, loc: Some(loc), from: origin, point: at, dir });
             if dead {
                 // Kill bonus by hit location: head 100, neck 70, torso 60, limbs 50.
                 let kind = if def.is_projectile() { KillKind::Explosive } else { KillKind::from_hit(loc) };
                 if loc.is_head() {
                     score.headshots += 1;
-                }
-                if gibs && loc.gibs_head() {
-                    // The head pops.
-                    alias.write(PlayAlias::at("zombie_head_gib", at).or(Sfx::Headshot).volume(0.8));
                 }
                 earn(&mut score, &mut points, &pu, rules::kill_points_with(kind, insta, lethal));
                 killed.write(ZombieKilled { pos: at, drop_allowed: true });
@@ -649,7 +651,7 @@ fn fire(
             let at = end - dir * 0.05;
             spawn_burst(&mut commands, &mats, at, &mats.glow_green, 14, 4.0);
             fx.write(crate::fx::FxEvent::Explosion { weapon: def.id, pos: at });
-            for (_, t, mut z) in zq.iter_mut() {
+            for (ze, t, mut z) in zq.iter_mut() {
                 if !z.alive() {
                     continue;
                 }
@@ -664,10 +666,13 @@ fn fire(
                         continue;
                     }
                 }
+                let before = z.hp;
                 let mut dead = zombies::apply_damage(&mut z, dmg, insta);
                 if !dead {
                     dead = zombies::apply_damage(&mut z, round_no as f32 * fastrand::u32(0..100) as f32, false);
                 }
+                let to = (feet + Vec3::Y * 0.9 - at).normalize_or(dir);
+                hurt_ev.write(crate::gibs::ZombieHurt { zombie: ze, amount: before - z.hp.max(-1e6), hp_after: z.hp, by: crate::gibs::HurtBy::Projectile, loc: None, from: origin, point: at, dir: to });
                 if dead {
                     earn(&mut score, &mut points, &pu, rules::kill_points(KillKind::Explosive));
                     killed.write(ZombieKilled { pos: feet, drop_allowed: true });

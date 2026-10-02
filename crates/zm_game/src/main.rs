@@ -10,6 +10,7 @@
 
 mod audio;
 mod fx;
+mod gibs;
 mod grenades;
 mod hud;
 mod interact;
@@ -302,6 +303,7 @@ fn main() {
             nacht::NachtPlugin,
             postfx::PostFxPlugin,
             fx::FxPlugin,
+            gibs::GibsPlugin,
         ))
         .add_systems(Startup, move |mut next: ResMut<NextState<GameState>>| {
             if start_map.is_some() {

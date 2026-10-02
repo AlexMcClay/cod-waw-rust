@@ -90,8 +90,13 @@ pub struct PartAssets {
 
 /// A skinned zombie model ready to instantiate.
 pub struct CharAssets {
-    pub body: PartAssets,
+    pub bodies: Vec<PartAssets>,
     pub heads: Vec<PartAssets>,
+    /// Gib models (see [`build::SceneCharacter`]).
+    pub torso: [Vec<PartAssets>; 5],
+    pub legs: [Vec<PartAssets>; 4],
+    pub spawns: [Option<(Vec<PartAssets>, String)>; 5],
+    pub behead: Option<PartAssets>,
 }
 
 /// The game's display names of our weapons ("Colt M1911", "Kar98k").
@@ -112,7 +117,7 @@ pub type Joint = (String, Entity, Transform);
 
 /// Spawns `part`'s skeleton under `root` (sharing joints already in
 /// `joints` by name) and its skinned meshes under `mesh_parent`.
-pub fn spawn_part(commands: &mut Commands, part: &PartAssets, joints: &mut Vec<Joint>, root: Entity, mesh_parent: Entity) {
+pub fn spawn_part(commands: &mut Commands, part: &PartAssets, joints: &mut Vec<Joint>, root: Entity, mesh_parent: Entity) -> Vec<Entity> {
     let mut mine: Vec<Entity> = Vec::with_capacity(part.bones.len());
     for (name, parent, local) in &part.bones {
         if let Some((_, e, _)) = joints.iter().find(|j| j.0 == *name) {
@@ -124,18 +129,23 @@ pub fn spawn_part(commands: &mut Commands, part: &PartAssets, joints: &mut Vec<J
         joints.push((name.clone(), e, *local));
         mine.push(e);
     }
-    for (mesh, mat) in &part.meshes {
-        commands.spawn((
-            Mesh3d(mesh.clone()),
-            MeshMaterial3d(mat.clone()),
-            bevy::render::mesh::skinning::SkinnedMesh { inverse_bindposes: part.inverse_bindposes.clone(), joints: mine.clone() },
-            NotShadowCaster,
-            // Bind-pose bounds don't follow the skeleton (heads are modelled
-            // around their own origin), so don't frustum-cull skinned parts.
-            bevy::render::view::NoFrustumCulling,
-            ChildOf(mesh_parent),
-        ));
-    }
+    part.meshes
+        .iter()
+        .map(|(mesh, mat)| {
+            commands
+                .spawn((
+                    Mesh3d(mesh.clone()),
+                    MeshMaterial3d(mat.clone()),
+                    bevy::render::mesh::skinning::SkinnedMesh { inverse_bindposes: part.inverse_bindposes.clone(), joints: mine.clone() },
+                    NotShadowCaster,
+                    // Bind-pose bounds don't follow the skeleton (heads are
+                    // modelled around their own origin): don't frustum-cull.
+                    bevy::render::view::NoFrustumCulling,
+                    ChildOf(mesh_parent),
+                ))
+                .id()
+        })
+        .collect()
 }
 
 /// For each track of `clip`, the index of the joint it drives.
@@ -374,7 +384,17 @@ fn poll_load(
             meshes: p.meshes.into_iter().map(|s| (meshes.add(s.mesh), mat_handles[s.material].clone())).collect(),
         }
     };
-    zombie_models.chars = characters.into_iter().map(|c| CharAssets { body: upload(c.body), heads: c.heads.into_iter().map(&mut upload).collect() }).collect();
+    zombie_models.chars = characters
+        .into_iter()
+        .map(|c| CharAssets {
+            bodies: c.bodies.into_iter().map(&mut upload).collect(),
+            heads: c.heads.into_iter().map(&mut upload).collect(),
+            torso: c.torso.map(|l| l.into_iter().map(&mut upload).collect()),
+            legs: c.legs.map(|l| l.into_iter().map(&mut upload).collect()),
+            spawns: c.spawns.map(|s| s.map(|(l, tag)| (l.into_iter().map(&mut upload).collect(), tag))),
+            behead: c.behead.map(&mut upload),
+        })
+        .collect();
     zombie_models.clips = zombie_anims.into_iter().map(Arc::new).collect();
     if let Some(vr) = vr {
         view_rig.arms = Some(upload(vr.arms));

@@ -138,10 +138,21 @@ pub struct SkinnedPart {
     pub meshes: Vec<SceneMesh>,
 }
 
-/// A zombie: body plus interchangeable heads (merged by bone name).
+/// A zombie character (merged by bone name): bodies and heads to pick
+/// from, and the models it is swapped to when it loses parts (see
+/// `waw_assets::character`).
 pub struct SceneCharacter {
-    pub body: SkinnedPart,
+    pub bodies: Vec<SkinnedPart>,
     pub heads: Vec<SkinnedPart>,
+    /// `torsoDmg1..5`: upper body clean, right arm off, left arm off,
+    /// guts, beheaded.
+    pub torso: [Vec<SkinnedPart>; 5],
+    /// `legDmg1..4`: lower body clean, right leg off, left leg off, none.
+    pub legs: [Vec<SkinnedPart>; 4],
+    /// `gibSpawn1..5`: the severed part and the joint it leaves from.
+    pub spawns: [Option<(Vec<SkinnedPart>, String)>; 5],
+    /// The neck stump a popped head is replaced with.
+    pub behead: Option<SkinnedPart>,
 }
 
 /// First-person rig: arms plus a gun per weapon (gun root `j_gun` hangs off
@@ -308,17 +319,6 @@ fn rot_to_bevy(q: [f32; 4]) -> Quat {
     let c = Mat3::from_cols(Vec3::X, Vec3::NEG_Z, Vec3::Y);
     Quat::from_mat3(&(c * g * c.transpose())).normalize()
 }
-
-/// The zombie body and head models (from the map's character scripts).
-pub const ZOMBIE_BODIES: &[&str] = &["char_ger_honorgd_body1_1", "char_ger_honorgd_body2_1", "char_ger_honorgd_body1_2", "char_ger_honorgd_body2_2"];
-pub const ZOMBIE_HEADS: &[&str] = &[
-    "char_ger_honorgd_zombiehead1_1",
-    "char_ger_honorgd_zombiehead2_1",
-    "char_ger_honorgd_zombiehead3_1",
-    "char_ger_honorgd_zombiehead4_1",
-    "char_ger_honorgd_zombiehead1_2",
-    "char_ger_honorgd_zombiehead2_3",
-];
 
 /// One model (LOD 0) as meshes in Bevy space, plus its bind-pose bones.
 /// The mystery box: its static base, the lid script model the trigger
@@ -607,10 +607,18 @@ impl<'a> Builder<'a> {
     }
 
     /// A body model and the heads that can be attached to it.
-    fn character(&mut self, body: &str, heads: &[&str]) -> Option<SceneCharacter> {
-        let body = self.skinned(body)?;
-        let heads = heads.iter().filter_map(|h| self.skinned(h)).collect();
-        Some(SceneCharacter { body, heads })
+    fn character(&mut self, def: &waw_assets::character::CharacterDef, behead: Option<&str>) -> Option<SceneCharacter> {
+        let mut load = |list: &[String]| -> Vec<SkinnedPart> { list.iter().filter_map(|n| self.skinned(n)).collect() };
+        let bodies = load(&def.bodies);
+        if bodies.is_empty() {
+            return None;
+        }
+        let heads = load(&def.heads);
+        let torso = def.torso_dmg.clone().map(|l| load(&l));
+        let legs = def.leg_dmg.clone().map(|l| load(&l));
+        let spawns = def.gib_spawn.clone().map(|s| s.map(|(m, tag)| (load(&m), tag)).filter(|(m, _)| !m.is_empty()));
+        let behead = behead.and_then(|n| self.skinned(n));
+        Some(SceneCharacter { bodies, heads, torso, legs, spawns, behead })
     }
 
     /// A weapon's first-person model. Parts parked far from the gun in the
@@ -1308,16 +1316,18 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         zones.push(c);
     }
     // The round/zombie rules: patch.ff's scripts override the map's.
-    let rules = {
-        let patch = read("patch").ok();
-        let mut script_zones: Vec<&ZoneData> = patch.iter().collect();
-        script_zones.push(&nacht);
-        zombie_rules("nazi_zombie_prototype", &script_zones, common.as_ref())
-    };
+    let patch = read("patch").ok();
+    let mut script_zones: Vec<&ZoneData> = patch.iter().collect();
+    script_zones.push(&nacht);
+    let rules = zombie_rules("nazi_zombie_prototype", &script_zones, common.as_ref());
     let world = nacht.world.as_ref().ok_or("map has no world geometry")?;
     let text = nacht.map_ents.as_deref().ok_or("map has no entities")?;
     let entities = mapents::parse(text);
     let map = ZombieMap::from_entities(&entities);
+    // The zombies' models and how they come apart, from the spawners' AI
+    // type and character scripts.
+    let raw = |name: &str| script_zones.iter().copied().chain(common.as_ref()).find_map(|z| z.rawfile(name));
+    let (char_defs, behead) = zombie_characters(&entities, &raw);
 
     let mut b = Builder { zones: zones.clone(), iwd, bc, materials: Vec::new(), mat_index: HashMap::new(), images: HashMap::new() };
 
@@ -1605,7 +1615,12 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         }
         SceneViewRig { arms, guns, anims }
     });
-    let characters: Vec<SceneCharacter> = ZOMBIE_BODIES.iter().filter_map(|body| b.character(body, ZOMBIE_HEADS)).collect();
+    let characters: Vec<SceneCharacter> = char_defs.iter().filter_map(|d| b.character(d, behead.as_deref())).collect();
+    info!(
+        "zombie characters: {} ({:?})",
+        characters.len(),
+        characters.iter().map(|c| (c.bodies.len(), c.heads.len(), c.torso.iter().map(Vec::len).sum::<usize>() + c.legs.iter().map(Vec::len).sum::<usize>(), c.spawns.iter().flatten().count(), c.behead.is_some())).collect::<Vec<_>>()
+    );
     // Sounds: configured, scripted, weapon fields and notetracks, zombie
     // animation notetracks (`sndnt#alias`) and the map's ambient emitters.
     let weapon_sounds = weapon_sounds(&zones, &wanted.weapon_ids);
@@ -1718,6 +1733,44 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
 /// the zombie mode script its level script runs (and of the power-up
 /// script), with `mp/zombiemode.csv` overrides, and the power-ups it
 /// includes. `script_zones` are searched in order (patch first).
+/// The zombie spawners' characters (AI type script -> character scripts
+/// -> model alias lists) and the model a popped head is replaced with
+/// (attached by the zombie spawner script's head gib).
+fn zombie_characters(entities: &[mapents::Entity], raw: &dyn Fn(&str) -> Option<String>) -> (Vec<waw_assets::character::CharacterDef>, Option<String>) {
+    use waw_assets::character as ch;
+    let mut classes: Vec<&str> = entities.iter().filter(|e| e.classname().starts_with("actor_") && e.targetname().starts_with("zombie_spawner")).map(|e| e.classname()).collect();
+    classes.sort_unstable();
+    classes.dedup();
+    let mut defs: Vec<ch::CharacterDef> = Vec::new();
+    for class in classes {
+        let Some(ai) = ch::aitype_script(class).and_then(|p| raw(&p)) else {
+            warn!("no AI type script for {class}");
+            continue;
+        };
+        for path in ch::aitype_characters(&ai) {
+            if defs.iter().any(|d| d.name == path) {
+                continue;
+            }
+            match raw(&path) {
+                Some(text) => defs.push(ch::parse_character(&path, &text, |n| raw(&format!("xmodelalias/{n}.gsc")))),
+                None => warn!("no character script {path}"),
+            }
+        }
+    }
+    // The spawner script the zombie mode uses (`maps\_zombiemode_spawner*`).
+    let level = raw("maps/nazi_zombie_prototype.gsc").unwrap_or_default();
+    let mode = zm_core::rules::zombiemode_script_name(&level).and_then(|m| raw(&m)).unwrap_or_default();
+    let spawner = mode
+        .find("maps\\_zombiemode_spawner")
+        .and_then(|i| mode[i..].split("::").next().map(|n| format!("{}.gsc", n.replace('\\', "/"))))
+        .and_then(|p| raw(&p))
+        .or_else(|| raw("maps/_zombiemode_spawner.gsc"))
+        .unwrap_or_default();
+    let behead = spawner.lines().filter(|l| l.contains("Attach(") && l.contains("behead")).find_map(|l| l.split('"').nth(1).map(str::to_string));
+    info!("zombie characters: {:?}, head gib model {behead:?}", defs.iter().map(|d| &d.name).collect::<Vec<_>>());
+    (defs, behead)
+}
+
 fn zombie_rules(map: &str, script_zones: &[&ZoneData], common: Option<&ZoneData>) -> zm_core::rules::ZombieRules {
     use zm_core::rules::{self, ZombieRules};
     let raw = |name: &str| script_zones.iter().find_map(|z| z.rawfile(name));

@@ -37,8 +37,6 @@ const GRAVITY: f32 = 800.0 * U;
 const PROJ_RADIUS: f32 = 0.04;
 /// A grenade in hand explodes this far in front of the eye.
 const HAND: Vec3 = Vec3::new(0.12, -0.12, -0.35);
-/// Head gibs: an explosion within 55 units of the head (`head_should_gib`).
-const HEAD_GIB_DIST: f32 = 55.0 * U;
 
 pub struct GrenadesPlugin;
 
@@ -209,8 +207,8 @@ fn throw_input(
                 let target = boom
                     .zq
                     .iter()
-                    .filter(|(_, z)| z.alive() && matches!(z.state, zombies::ZState::Chase | zombies::ZState::AtWindow | zombies::ZState::Climbing))
-                    .map(|(t, _)| t.translation)
+                    .filter(|(_, _, z)| z.alive() && matches!(z.state, zombies::ZState::Chase | zombies::ZState::AtWindow | zombies::ZState::Climbing))
+                    .map(|(_, t, _)| t.translation)
                     .filter(|p| (4.0..15.0).contains(&p.distance(eye)) && line_clear(&world, eye, *p + Vec3::Y))
                     .min_by(|a, b| a.distance(eye).total_cmp(&b.distance(eye)));
                 if let Some(p) = target {
@@ -463,7 +461,8 @@ struct ExplodeParams<'w, 's> {
     pu: Res<'w, ActivePowerups>,
     score: ResMut<'w, Score>,
     health: ResMut<'w, Health>,
-    zq: Query<'w, 's, (&'static Transform, &'static mut Zombie), (Without<Player>, Without<Projectile>)>,
+    zq: Query<'w, 's, (Entity, &'static Transform, &'static mut Zombie), (Without<Player>, Without<Projectile>)>,
+    hurt_ev: EventWriter<'w, crate::gibs::ZombieHurt>,
     points: EventWriter<'w, PointsEvent>,
     killed: EventWriter<'w, ZombieKilled>,
     alias: EventWriter<'w, PlayAlias>,
@@ -480,7 +479,7 @@ fn explode(at: Vec3, def: &GrenadeDef, b: &mut ExplodeParams, commands: &mut Com
     let round = b.round.0.round.max(1);
     let mut kills = 0;
     let mut hurt = 0;
-    for (t, mut z) in b.zq.iter_mut() {
+    for (ze, t, mut z) in b.zq.iter_mut() {
         if !z.alive() {
             continue;
         }
@@ -502,18 +501,14 @@ fn explode(at: Vec3, def: &GrenadeDef, b: &mut ExplodeParams, commands: &mut Com
             // `round + RandomInt(100, 500)`; RandomInt takes one argument.
             dead = zombies::apply_damage(&mut z, round as f32 + fastrand::u32(0..100) as f32, false);
         }
+        // Explosions gib by the nearest joint (see `gibs`).
+        let dir = (feet + Vec3::Y * 0.9 - at).normalize_or(Vec3::Y);
+        b.hurt_ev.write(crate::gibs::ZombieHurt { zombie: ze, amount: before - z.hp.max(-1e6), hp_after: z.hp, by: crate::gibs::HurtBy::Explosive, loc: None, from: at, point: at, dir });
         if dead {
             kills += 1;
             earn(&mut b.score, &mut b.points, &b.pu, rules::kill_points(KillKind::Explosive));
             b.killed.write(ZombieKilled { pos: feet, drop_allowed: true });
             spawn_burst(commands, mats, feet + Vec3::Y * 1.0, &mats.blood, 12, 3.5);
-            // The head pops if the blast was close to it; otherwise a big
-            // enough hit tears limbs off.
-            if head.distance(at) <= HEAD_GIB_DIST {
-                b.alias.write(PlayAlias::at("zombie_head_gib", head).or(Sfx::Headshot).volume(0.8));
-            } else if dmg >= before * 0.1 {
-                b.alias.write(PlayAlias::at("death_gibs", feet + Vec3::Y));
-            }
         } else {
             earn(&mut b.score, &mut b.points, &b.pu, rules::POINTS_HIT);
             spawn_burst(commands, mats, feet + Vec3::Y * 1.0, &mats.blood, 5, 2.0);

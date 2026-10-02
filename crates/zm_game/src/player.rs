@@ -349,7 +349,7 @@ fn movement(
         // Zombies are solid bodies too.
         for (zt, zb) in &zombies {
             let zf = zt.translation.y;
-            if !zb.alive() || zf > head || zf + crate::zombies::BODY_HEIGHT * zb.scale < feet {
+            if !zb.alive() || zf > head || zf + zb.body_height() < feet {
                 continue;
             }
             let d = Vec2::new(x - zt.translation.x, z - zt.translation.z);

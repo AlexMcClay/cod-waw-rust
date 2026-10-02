@@ -506,15 +506,7 @@ fn handle_events(
                         commands.spawn((FxInstance::new(def.clone(), frame, None, 0.0), Dynamic));
                     }
                 }
-                // The scripts pop the head with their own blood.
-                if *head && *fatal {
-                    for key in ["headshot", "headshot_nochunks"] {
-                        if let Some(def) = lib.effect(key) {
-                            let frame = Frame { origin: to_game(*pos), axes: axes_from_forward(d, None) };
-                            commands.spawn((FxInstance::new(def.clone(), frame, None, 0.0), Dynamic));
-                        }
-                    }
-                }
+                // (A popped head's own blood is played by `gibs`.)
             }
             FxEvent::Explosion { weapon, pos } => {
                 let w = lib.data.weapons.get(*weapon);
