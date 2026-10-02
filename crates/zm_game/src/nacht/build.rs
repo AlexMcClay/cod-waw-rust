@@ -168,6 +168,23 @@ pub struct AnimClip {
     pub root_rise: f32,
     /// Notetracks (name, fraction of the clip).
     pub notify: Vec<(String, f32)>,
+    /// Root motion (the anim's delta track) per frame: seconds and the
+    /// offset from the start in the anim's own frame (game units: x
+    /// forward, y left, z up).
+    pub root: Vec<(f32, [f32; 3])>,
+}
+
+impl AnimClip {
+    /// Root motion at `t` seconds (clamped to the clip).
+    pub fn root_at(&self, t: f32) -> [f32; 3] {
+        let Some(i) = self.root.iter().position(|(s, _)| *s >= t) else { return self.root.last().map_or([0.0; 3], |r| r.1) };
+        if i == 0 {
+            return self.root[0].1;
+        }
+        let ((s0, a), (s1, b)) = (self.root[i - 1], self.root[i]);
+        let k = if s1 > s0 { (t - s0) / (s1 - s0) } else { 1.0 };
+        [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k]
+    }
 }
 
 #[derive(Clone)]
@@ -198,6 +215,7 @@ impl AnimClip {
             root_speed: c.root_speed() * INCH,
             root_rise: end[2] * INCH,
             notify: c.notify.clone(),
+            root: (0..=c.numframes as usize).map(|f| (f as f32 / (c.numframes as f32).max(1.0) * c.duration(), c.root_trans(f as f32))).collect(),
         }
     }
 

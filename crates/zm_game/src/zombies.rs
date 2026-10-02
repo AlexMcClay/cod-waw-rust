@@ -48,6 +48,8 @@ pub struct Zombie {
     pub mover: Mover,
     /// Ground height where a window vault started.
     pub climb_from: f32,
+    /// Which window-vault animation this zombie uses.
+    pub climb_anim: usize,
 }
 
 impl Zombie {
@@ -251,6 +253,7 @@ fn animate_rigs(
     mut zq: Query<(Entity, &Zombie, &mut ZombieRig)>,
     mut tq: Query<&mut Transform>,
     mut alias: EventWriter<PlayAlias>,
+    times: Res<AnimTimes>,
 ) {
     let Some(models) = models else { return };
     if models.clips.is_empty() {
@@ -270,7 +273,14 @@ fn animate_rigs(
         let mut sync = None;
         let (want, rate) = match z.state {
             ZState::Dying => (find(&["ai_zombie_death_v1", "ai_zombie_death_v2"], v), 1.3),
-            ZState::Climbing => (find(&["ai_zombie_traverse_v1", "ai_zombie_traverse_v2"], v), 2.0),
+            ZState::Climbing => match times.traverse(z.climb_anim) {
+                // The AI's clock (seconds into the vault), at normal speed.
+                Some(c) => {
+                    sync = Some(z.timer);
+                    (models.clip(&c.name), 1.0)
+                }
+                None => (find(&["ai_zombie_traverse_v1", "ai_zombie_traverse_v2"], v), 1.0),
+            },
             _ if z.swing > 0.0 => {
                 sync = Some(z.act_t.max(0.0));
                 (timed(rules.attacks), 1.0)
@@ -374,6 +384,9 @@ pub struct Timed {
 pub struct AnimTimes {
     attacks: Vec<Timed>,
     tears: Vec<Timed>,
+    /// The window-vault animations (`ai_zombie_traverse*`), whose root
+    /// motion carries the zombie through the window.
+    traverses: Vec<std::sync::Arc<crate::nacht::build::AnimClip>>,
     from_clips: bool,
 }
 
@@ -384,6 +397,10 @@ impl AnimTimes {
 
     fn attack(&self, i: usize, rules: &rules::ZombieRules) -> Timed {
         self.attacks.get(i).cloned().unwrap_or_else(|| Self::from_rules(rules.attacks).get(i).cloned().unwrap_or_default())
+    }
+
+    fn traverse(&self, i: usize) -> Option<&crate::nacht::build::AnimClip> {
+        (!self.traverses.is_empty()).then(|| &*self.traverses[i % self.traverses.len()])
     }
 
     fn tear(&self, i: usize, rules: &rules::ZombieRules) -> Timed {
@@ -411,6 +428,20 @@ fn build_anim_times(models: Option<Res<crate::nacht::ZombieModels>>, round: Res<
     let rules = &round.0.rules;
     times.attacks = read(rules.attacks, "fire");
     times.tears = read(rules.tears, "board");
+    // (The crawl variant is for legless crawlers, which aren't in yet.)
+    times.traverses = models
+        .clips
+        .iter()
+        .filter(|c| {
+            let n = c.name.to_ascii_lowercase();
+            n.starts_with("ai_zombie_traverse") && !n.contains("crawl")
+        })
+        .cloned()
+        .collect();
+    for c in &times.traverses {
+        let e = c.root_at(c.duration);
+        info!("zombie vault {}: {:.2}s, root motion {:.0} forward, {:.0} up at the end", c.name, c.duration, e[0], e[2]);
+    }
     times.from_clips = true;
 }
 
@@ -578,6 +609,7 @@ pub fn spawn_zombie(
                 slot: (fastrand::f32() - 0.5) * 0.5,
                 mover: Mover::at(pos),
                 climb_from: 0.0,
+                climb_anim: fastrand::usize(..64),
             },
             Dynamic,
         ))
@@ -1229,15 +1261,29 @@ fn ai(
                 }
             }
             ZState::Climbing => {
-                // A quick vault from the outside point to the inside point.
+                // Through the window on the vault animation's own root
+                // motion (seconds in `timer`), fitted to run from the
+                // outside point to the inside one.
                 if z.timer == 0.0 {
                     z.climb_from = t.translation.y;
                 }
-                z.timer += dt / 0.9;
-                let k = z.timer.min(1.0);
+                z.timer += dt;
+                let (k, rise) = match times.traverse(z.climb_anim) {
+                    Some(c) => {
+                        let (r, e) = (c.root_at(z.timer), c.root_at(c.duration));
+                        let f = if e[0].abs() > 1.0 { (r[0] / e[0]).clamp(0.0, 1.0) } else { (z.timer / c.duration).min(1.0) };
+                        // The anim's own up-and-over, ending level.
+                        let done = z.timer >= c.duration;
+                        (if done { 1.0 } else { f.min(0.999) }, (r[2] - e[2] * f) * crate::nacht::build::INCH * z.scale)
+                    }
+                    None => {
+                        let k = (z.timer / 0.9).min(1.0);
+                        (k, (k * std::f32::consts::PI).sin() * 0.75)
+                    }
+                };
                 let p = outside.lerp(inside, k);
                 let base = z.climb_from + (floor_in - z.climb_from) * k;
-                t.translation = Vec3::new(p.x, base + (k * std::f32::consts::PI).sin() * 0.75, p.z);
+                t.translation = Vec3::new(p.x, base + rise.max(0.0), p.z);
                 face(&mut t, inside - outside, dt, 10.0);
                 if k >= 1.0 {
                     t.translation.y = floor_in;
