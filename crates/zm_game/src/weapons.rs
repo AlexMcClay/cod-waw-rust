@@ -494,6 +494,7 @@ fn fire(
     (zs, mut alias, mut fx): (Res<ZoneSounds>, EventWriter<PlayAlias>, EventWriter<crate::fx::FxEvent>),
     mut commands: Commands,
     mats: Res<Mats>,
+    (boxes, globals): (Query<&zombies::Hitboxes>, Query<&GlobalTransform>),
 ) {
     let dt = time.delta_secs();
     gun.cooldown = (gun.cooldown - dt).max(0.0);
@@ -584,7 +585,14 @@ fn fire(
         let mut hits: Vec<(f32, HitLoc, Entity)> = zq
             .iter()
             .filter(|(_, _, z)| z.alive())
-            .filter_map(|(e, t, z)| zombies::hit_location(origin, dir, t, z, wall_t).map(|(d, loc)| (d, loc, e)))
+            .filter_map(|(e, t, z)| {
+                // The model's own bone boxes when it has them.
+                let hit = match boxes.get(e) {
+                    Ok(b) if !b.0.is_empty() => zombies::hit_location_boxes(origin, dir, b, &globals, wall_t),
+                    _ => zombies::hit_location(origin, dir, t, z, wall_t),
+                };
+                hit.map(|(d, loc)| (d, loc, e))
+            })
             .collect();
         hits.sort_by(|a, b| a.0.total_cmp(&b.0));
         let mut remaining = 1.0;

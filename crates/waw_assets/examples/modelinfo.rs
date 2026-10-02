@@ -17,6 +17,11 @@ fn main() {
                 }
             }
             println!("{zone}/{}: verts bounds {:?}..{:?} bones {:?}", m.name, lo, hi, m.bones.iter().take(8).map(|b| (&b.name, b.base_trans)).collect::<Vec<_>>());
+            if std::env::var_os("HITBOXES").is_some() {
+                for b in m.bones.iter().filter(|b| b.hit_loc != 0 || b.hit_box.is_some()) {
+                    println!("    {:<20} hitloc {:>2} box {:?}", b.name, b.hit_loc, b.hit_box);
+                }
+            }
         }
     }
 }

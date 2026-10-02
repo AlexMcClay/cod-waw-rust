@@ -424,7 +424,8 @@ fn watch_for_user(
     motion: Res<bevy::input::mouse::AccumulatedMouseMotion>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) {
-    if user_took_over() || std::env::var_os("UNDEAD_CAPTURE").is_none() && std::env::var_os("UNDEAD_TEST_WALK").is_none() {
+    // `UNDEAD_NO_TAKEOVER`: automated runs that must not be interrupted.
+    if user_took_over() || std::env::var_os("UNDEAD_NO_TAKEOVER").is_some() || std::env::var_os("UNDEAD_CAPTURE").is_none() && std::env::var_os("UNDEAD_TEST_WALK").is_none() {
         return;
     }
     let Ok(mut w) = windows.single_mut() else { return };

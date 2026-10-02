@@ -225,6 +225,7 @@ fn movement(
     held: Res<crate::weapons::HeldWeapon>,
     mut walk: Option<ResMut<TestWalk>>,
     mut q: Query<(&mut Transform, &mut PlayerCtl), With<Player>>,
+    zombies: Query<(&Transform, &crate::zombies::Zombie), Without<Player>>,
 ) {
     let Ok((mut t, mut c)) = q.single_mut() else { return };
     let cpu = std::time::Instant::now();
@@ -343,6 +344,20 @@ fn movement(
             if let Some((nx, nz)) = solid.push_circle(x, z, RADIUS) {
                 x = nx;
                 z = nz;
+            }
+        }
+        // Zombies are solid bodies too.
+        for (zt, zb) in &zombies {
+            let zf = zt.translation.y;
+            if !zb.alive() || zf > head || zf + crate::zombies::BODY_HEIGHT * zb.scale < feet {
+                continue;
+            }
+            let d = Vec2::new(x - zt.translation.x, z - zt.translation.z);
+            let (l, min) = (d.length(), RADIUS + crate::zombies::BODY_RADIUS * zb.scale);
+            if l < min {
+                let n = if l > 1e-4 { d / l } else { -c.vel.normalize_or(Vec2::X) };
+                x = zt.translation.x + n.x * min;
+                z = zt.translation.z + n.y * min;
             }
         }
     }

@@ -209,6 +209,12 @@ pub struct Bone {
     /// Bind pose in model space.
     pub base_quat: [f32; 4],
     pub base_trans: [f32; 3],
+    /// Hit location of the bone (`partClassification`, the engine's
+    /// `hitLocation_t`: 0 none, 1 helmet, 2 head, 3 neck, ...).
+    pub hit_loc: u8,
+    /// The bone's hit box in its own space (`XBoneInfo.bounds`, inches), if
+    /// it has one.
+    pub hit_box: Option<([f32; 3], [f32; 3])>,
 }
 
 #[derive(Debug, Clone)]

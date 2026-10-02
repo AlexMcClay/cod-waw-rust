@@ -70,7 +70,100 @@ pub struct ZombieRig {
     variant: usize,
     clip: usize,
     time: f32,
+    rate: f32,
     map: Vec<Option<usize>>,
+    /// The clip being faded out after a change, blended into the new one
+    /// (as the game blends between animations).
+    prev: Option<FadingClip>,
+}
+
+struct FadingClip {
+    clip: usize,
+    time: f32,
+    rate: f32,
+    map: Vec<Option<usize>>,
+    age: f32,
+}
+
+/// Seconds to blend from one zombie animation into the next.
+const BLEND_TIME: f32 = 0.2;
+
+/// The hit boxes of a real zombie model: each bone's box from the model,
+/// on the joint that carries it (tested in the joint's animated pose).
+#[derive(Component, Default)]
+pub struct Hitboxes(pub Vec<(Entity, crate::nacht::build::BoneHit)>);
+
+impl Hitboxes {
+    fn add(&mut self, part: &crate::nacht::PartAssets, joints: &[crate::nacht::Joint]) {
+        for ((name, ..), hit) in part.bones.iter().zip(&part.hits) {
+            let (Some(hit), Some(j)) = (hit, joints.iter().find(|j| j.0 == *name)) else { continue };
+            self.0.push((j.1, *hit));
+        }
+    }
+}
+
+/// Ray vs a real zombie's bone boxes, as the game traces bullets: the
+/// nearest box hit and its bone's hit location.
+pub fn hit_location_boxes(origin: Vec3, dir: Vec3, boxes: &Hitboxes, globals: &Query<&GlobalTransform>, max: f32) -> Option<(f32, zm_core::weapons::HitLoc)> {
+    use zm_core::weapons::HitLoc;
+    let mut best: Option<(f32, HitLoc)> = None;
+    for (joint, b) in &boxes.0 {
+        let Ok(g) = globals.get(*joint) else { continue };
+        let Some(loc) = HitLoc::ALL.get(b.loc as usize).copied().filter(|l| *l != HitLoc::None && *l != HitLoc::Gun) else { continue };
+        // Into the bone's space; the ray parameter stays in world units.
+        let inv = g.affine().inverse();
+        let (o, d) = (inv.transform_point3(origin), inv.transform_vector3(dir));
+        let (mut t0, mut t1) = (0.0f32, best.map_or(max, |b| b.0));
+        let mut hit = true;
+        for k in 0..3 {
+            if d[k].abs() < 1e-8 {
+                if o[k] < b.min[k] || o[k] > b.max[k] {
+                    hit = false;
+                    break;
+                }
+                continue;
+            }
+            let (a, c) = ((b.min[k] - o[k]) / d[k], (b.max[k] - o[k]) / d[k]);
+            t0 = t0.max(a.min(c));
+            t1 = t1.min(a.max(c));
+            if t0 > t1 {
+                hit = false;
+                break;
+            }
+        }
+        if hit {
+            best = Some((t0, loc));
+        }
+    }
+    best
+}
+
+/// F3 toggles drawing every zombie's hit boxes (red head/neck, yellow
+/// torso, green limbs), to compare them with the model.
+fn draw_hitboxes(keys: Res<ButtonInput<KeyCode>>, mut on: Local<bool>, zq: Query<&Hitboxes>, globals: Query<&GlobalTransform>, mut gizmos: Gizmos) {
+    use zm_core::weapons::HitLoc;
+    if keys.just_pressed(KeyCode::F3) {
+        *on = !*on;
+    }
+    *on |= std::env::var_os("UNDEAD_SHOW_HITBOXES").is_some() && !keys.pressed(KeyCode::F3);
+    if !*on {
+        return;
+    }
+    for boxes in &zq {
+        for (joint, b) in &boxes.0 {
+            let Ok(g) = globals.get(*joint) else { continue };
+            let loc = HitLoc::ALL.get(b.loc as usize).copied().unwrap_or(HitLoc::None);
+            let color = if loc.is_head() || loc == HitLoc::Neck {
+                Color::srgb(1.0, 0.2, 0.2)
+            } else if matches!(loc, HitLoc::TorsoUpper | HitLoc::TorsoLower) {
+                Color::srgb(1.0, 0.9, 0.2)
+            } else {
+                Color::srgb(0.3, 1.0, 0.3)
+            };
+            let local = Transform::from_translation((b.min + b.max) * 0.5).with_scale(b.max - b.min);
+            gizmos.cuboid(g.mul_transform(local), color);
+        }
+    }
 }
 
 /// Spawns a real zombie model (skinned, from the install) under `root`.
@@ -82,11 +175,16 @@ fn spawn_real_model(commands: &mut Commands, root: Entity, models: &crate::nacht
     // Models face +X; our zombies face -Z.
     let model = commands.spawn((Transform::from_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2)), Visibility::default(), ChildOf(root))).id();
     let mut joints = Vec::new();
+    let mut boxes = Hitboxes::default();
     crate::nacht::spawn_part(commands, &ch.body, &mut joints, model, model);
+    boxes.add(&ch.body, &joints);
     if !ch.heads.is_empty() {
-        crate::nacht::spawn_part(commands, &ch.heads[fastrand::usize(..ch.heads.len())], &mut joints, model, model);
+        let head = &ch.heads[fastrand::usize(..ch.heads.len())];
+        crate::nacht::spawn_part(commands, head, &mut joints, model, model);
+        boxes.add(head, &joints);
     }
-    commands.entity(root).insert(ZombieRig { joints, variant: fastrand::usize(..12), clip: usize::MAX, time: 0.0, map: Vec::new() });
+    commands.entity(root).insert(boxes);
+    commands.entity(root).insert(ZombieRig { joints, variant: fastrand::usize(..12), clip: usize::MAX, time: 0.0, rate: 1.0, map: Vec::new(), prev: None });
     true
 }
 
@@ -195,10 +293,16 @@ fn animate_rigs(
         };
         let Some(want) = want else { continue };
         if rig.clip != want {
+            // Keep the old clip playing while it fades out.
+            if rig.clip != usize::MAX && rig.clip < models.clips.len() {
+                let map = std::mem::take(&mut rig.map);
+                rig.prev = Some(FadingClip { clip: rig.clip, time: rig.time, rate: rig.rate, map, age: 0.0 });
+            }
             rig.clip = want;
             rig.time = 0.0;
             rig.map = crate::nacht::track_map(&models.clips[want], &rig.joints);
         }
+        rig.rate = rate;
         let clip = &models.clips[want];
         let before = if rig.time == 0.0 { -1.0 } else { clip.frame_at(rig.time) / clip.numframes.max(1.0) };
         // Timed anims follow the AI's clock (restarting for the next board
@@ -217,20 +321,108 @@ fn animate_rigs(
                 alias.write(PlayAlias::on(name, entity));
             }
         }
-        let ZombieRig { joints, map, .. } = &*rig;
-        crate::nacht::pose_mapped(clip, frame, joints, map, &mut tq, None);
+        let ZombieRig { joints, map, prev, .. } = &mut *rig;
+        let pose = crate::nacht::sample_mapped(clip, frame, joints, map);
+        let fading = prev.as_mut().and_then(|p| {
+            p.age += dt;
+            p.time += dt * p.rate;
+            let w = p.age / BLEND_TIME;
+            (w < 1.0).then(|| {
+                let old = &models.clips[p.clip];
+                (crate::nacht::sample_mapped(old, old.frame_at(p.time), joints, &p.map), w * w * (3.0 - 2.0 * w))
+            })
+        });
+        if fading.is_none() {
+            *prev = None;
+        }
+        // Smoothstep from the fading pose to the new one, joint by joint.
+        let mut out: Vec<(usize, Quat, Vec3)> = match fading {
+            Some((old, w)) => {
+                let mut blended: std::collections::HashMap<usize, (Quat, Vec3)> = old.into_iter().map(|(j, r, t)| (j, (r, t))).collect();
+                for (j, r, t) in pose {
+                    let e = blended.entry(j).or_insert((r, t));
+                    *e = (e.0.slerp(r, w), e.1.lerp(t, w));
+                }
+                blended.into_iter().map(|(j, (r, t))| (j, r, t)).collect()
+            }
+            None => pose,
+        };
+        for (j, r, t) in out.drain(..) {
+            if let Ok(mut tr) = tq.get_mut(joints[j].1) {
+                tr.rotation = r;
+                tr.translation = t;
+            }
+        }
     }
+}
+
+/// An attack or board-tearing anim as the AI times it: its length and the
+/// moments its notetracks fire (seconds).
+#[derive(Debug, Clone, Default)]
+pub struct Timed {
+    pub len: f32,
+    pub events: Vec<f32>,
+    /// The animation is loaded (it can be shown).
+    pub shown: bool,
+}
+
+/// The attack and tear timings, read from the loaded animations' own
+/// notetracks (`fire` for a hit, `board` for a pulled board) so damage and
+/// boards land on the frames the animation shows; the rules' numbers when
+/// the animations aren't loaded.
+#[derive(Resource, Default)]
+pub struct AnimTimes {
+    attacks: Vec<Timed>,
+    tears: Vec<Timed>,
+    from_clips: bool,
+}
+
+impl AnimTimes {
+    fn from_rules(list: &[rules::TimedAnim]) -> Vec<Timed> {
+        list.iter().map(|a| Timed { len: a.len, events: a.events.to_vec(), shown: false }).collect()
+    }
+
+    fn attack(&self, i: usize, rules: &rules::ZombieRules) -> Timed {
+        self.attacks.get(i).cloned().unwrap_or_else(|| Self::from_rules(rules.attacks).get(i).cloned().unwrap_or_default())
+    }
+
+    fn tear(&self, i: usize, rules: &rules::ZombieRules) -> Timed {
+        self.tears.get(i).cloned().unwrap_or_else(|| Self::from_rules(rules.tears).get(i).cloned().unwrap_or_default())
+    }
+}
+
+fn build_anim_times(models: Option<Res<crate::nacht::ZombieModels>>, round: Res<Round>, mut times: ResMut<AnimTimes>) {
+    let Some(models) = models.filter(|m| !m.clips.is_empty()) else { return };
+    if times.from_clips && !models.is_changed() {
+        return;
+    }
+    let read = |list: &[rules::TimedAnim], note: &str| -> Vec<Timed> {
+        list.iter()
+            .map(|a| match models.clip(a.name).map(|i| &models.clips[i]) {
+                Some(c) => {
+                    let events: Vec<f32> = c.notify.iter().filter(|(n, _)| n.eq_ignore_ascii_case(note)).map(|(_, f)| f * c.duration).collect();
+                    info!("zombie anim {}: {:.2}s, {note} at {:?}", a.name, c.duration, events.iter().map(|e| (e * 100.0).round() / 100.0).collect::<Vec<_>>());
+                    Timed { len: c.duration, events: if events.is_empty() { a.events.to_vec() } else { events }, shown: true }
+                }
+                None => Timed { len: a.len, events: a.events.to_vec(), shown: false },
+            })
+            .collect()
+    };
+    let rules = &round.0.rules;
+    times.attacks = read(rules.attacks, "fire");
+    times.tears = read(rules.tears, "board");
+    times.from_clips = true;
 }
 
 pub struct ZombiesPlugin;
 
 impl Plugin for ZombiesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.init_resource::<AnimTimes>().add_systems(
             Update,
-            (update_field, ai, separate, animate, animate_rigs).chain().run_if(in_state(GameState::Playing)),
+            (build_anim_times, update_field, ai, separate, animate, animate_rigs).chain().run_if(in_state(GameState::Playing)),
         )
-        .add_systems(Update, (dying, animate_previews))
+        .add_systems(Update, (dying, animate_previews, draw_hitboxes))
         .add_systems(Update, debug_paths.after(separate).run_if(in_state(GameState::Playing).and(path_debug)))
         .add_systems(Update, open_doors_for_test.run_if(in_state(GameState::Playing).and(|| std::env::var_os("UNDEAD_TEST_OPEN_DOORS").is_some())))
         .add_systems(OnEnter(GameState::Playing), spawn_preview.run_if(|| std::env::var_os("UNDEAD_PREVIEW").is_some()));
@@ -903,6 +1095,7 @@ fn ai(
     mut sfx: EventWriter<PlaySfx>,
     (mut alias, zs, round): (EventWriter<PlayAlias>, Res<crate::audio::ZoneSounds>, Res<Round>),
     mut commands: Commands,
+    times: Res<AnimTimes>,
 ) {
     let dt = time.delta_secs().min(0.05);
     let rules = &round.0.rules;
@@ -939,14 +1132,14 @@ fn ai(
         // A melee anim in progress: every `fire` notetrack is a `melee()`
         // that hits the player if still within reach.
         if z.swing > 0.0 {
-            let anim = rules.attacks[z.act % rules.attacks.len()];
+            let anim = times.attack(z.act % rules.attacks.len().max(1), rules);
             let before = z.act_t;
             z.act_t += dt;
             z.swing -= dt;
             let reach = if z.state == ZState::Chase { rules.melee_range } else { rules.melee_range + 0.4 };
             // On a real map a chase swing only lands on the same floor.
             let level_ok = nav.is_none() || z.state != ZState::Chase || (goal.y - z.mover.ground).abs() < 1.2;
-            for &hit in anim.events {
+            for &hit in &anim.events {
                 if hit > before && hit <= z.act_t && dist_player < reach && level_ok {
                     if zs.aliases.is_empty() {
                         sfx.write(PlaySfx::at(Sfx::ZombieAttack, 0.8));
@@ -1005,11 +1198,11 @@ fn ai(
                 // Nacht's zombies ignore the player until they are in
                 // (Verrückt's hit through the window).
                 if rules.attack_through_windows && inside.distance(ppos) < 1.2 && z.swing <= 0.0 {
-                    start_attack(&mut z, rules);
+                    start_attack(&mut z, rules, &times);
                 }
                 // One board per tear anim, pulled off on its `board`
                 // notetrack; in through the window once none are left.
-                let tear = rules.tears[z.act % rules.tears.len()];
+                let tear = times.tear(z.act % rules.tears.len().max(1), rules);
                 let before = z.act_t;
                 if z.swing <= 0.0 {
                     z.act_t += dt;
@@ -1059,7 +1252,7 @@ fn ai(
                 let level_with = (goal.y - feet.y).abs() < 1.2;
                 // Melee from 64 units; the swings repeat while in reach.
                 if dist_player < rules.melee_range && level_with && z.swing <= 0.0 {
-                    start_attack(&mut z, rules);
+                    start_attack(&mut z, rules, &times);
                 }
                 let near = flat(goal - feet) < 1.1 && level_with;
                 if near {
@@ -1088,7 +1281,7 @@ fn ai(
                     None
                 };
                 if dist_player < rules.melee_range && z.swing <= 0.0 {
-                    start_attack(&mut z, rules);
+                    start_attack(&mut z, rules, &times);
                 }
                 if dist_player < 1.1 {
                     face(&mut t, to_player, dt, 10.0);
@@ -1118,19 +1311,28 @@ fn ai(
 }
 
 /// Starts a melee anim, picked at random like `pick_zombie_melee_anim`.
-fn start_attack(z: &mut Zombie, rules: &rules::ZombieRules) {
+fn start_attack(z: &mut Zombie, rules: &rules::ZombieRules, times: &AnimTimes) {
     if rules.attacks.is_empty() {
         return;
     }
-    z.act = fastrand::usize(..rules.attacks.len());
+    // Only swings whose animation is loaded, so every hit is seen.
+    let shown: Vec<usize> = (0..rules.attacks.len()).filter(|&i| times.attacks.get(i).is_some_and(|t| t.shown)).collect();
+    z.act = if shown.is_empty() { fastrand::usize(..rules.attacks.len()) } else { shown[fastrand::usize(..shown.len())] };
     z.act_t = 0.0;
-    z.swing = rules.attacks[z.act].len;
+    z.swing = times.attack(z.act, rules).len;
 }
 
 /// Push zombies apart so they crowd instead of stacking.
 /// Push zombies apart so they crowd instead of stacking (only zombies on
 /// the same floor), then back out of any wall the push moved them into.
-fn separate(world: Res<World>, mut zq: Query<(Entity, &mut Transform, &Zombie)>) {
+/// A zombie's body for collision (the engine's actor radius, 15 units) and
+/// its height.
+pub const BODY_RADIUS: f32 = 15.0 * 0.0254;
+pub const BODY_HEIGHT: f32 = 1.8;
+
+fn separate(world: Res<World>, mut zq: Query<(Entity, &mut Transform, &Zombie)>, player: Query<(&Transform, &player::PlayerCtl), (With<Player>, Without<Zombie>)>) {
+    // The player's body: zombies stop against it rather than walk in.
+    let me = player.single().ok().map(|(t, c)| (Vec2::new(t.translation.x, t.translation.z), c.feet_y, c.feet_y + c.stance.height()));
     let real = world.mesh.is_some();
     let pts: Vec<(Entity, Vec3, ZState)> = zq
         .iter()
@@ -1142,8 +1344,16 @@ fn separate(world: Res<World>, mut zq: Query<(Entity, &mut Transform, &Zombie)>)
             continue;
         }
         let ground = if real { z.mover.ground } else { 0.0 };
-        let me = Vec2::new(t.translation.x, t.translation.z);
+        let at = Vec2::new(t.translation.x, t.translation.z);
         let mut push = Vec2::ZERO;
+        if let Some((pp, pf, ph)) = me {
+            let d = at - pp;
+            let (l, min) = (d.length(), crate::player::RADIUS + BODY_RADIUS * z.scale);
+            if l < min && l > 1e-4 && pf < t.translation.y + BODY_HEIGHT * z.scale && ph > t.translation.y {
+                push += d / l * (min - l);
+            }
+        }
+        let me = at;
         for (oe, op, os) in &pts {
             if *oe == e || *os == ZState::Dying || (op.y - ground).abs() > 1.2 {
                 continue;

@@ -582,7 +582,7 @@ impl<'a> Walker<'a> {
         let parents_p = self.reusable(h.u32(0xc), 1, nchild)?;
         let quats_p = self.reusable(h.u32(0x10), 2, 8 * nchild)?;
         let trans_p = self.reusable(h.u32(0x14), 4, 16 * nchild)?;
-        self.reusable(h.u32(0x18), 1, nb)?;
+        let class_p = self.reusable(h.u32(0x18), 1, nb)?;
         let base_p = self.reusable(h.u32(0x1c), 4, 32 * nb)?;
 
         let mut surfs = Vec::with_capacity(nsurf);
@@ -643,7 +643,7 @@ impl<'a> Walker<'a> {
                 self.inline(c.u32(0), 4, 48 * c.i32(4).max(0) as usize)?;
             }
         }
-        self.inline(h.u32(0xa4), 4, 40 * nb)?;
+        let bone_info_p = self.inline(h.u32(0xa4), 4, 40 * nb)?;
         self.asset(AssetType::PhysPreset, h.u32(0xd4), None)?;
         for o in [0xd8, 0xdc] {
             if h.u32(o) == FOLLOW {
@@ -704,7 +704,14 @@ impl<'a> Walker<'a> {
                     ([rdf(o), rdf(o + 4), rdf(o + 8), rdf(o + 12)], [rdf(o + 16), rdf(o + 20), rdf(o + 24)])
                 })
                 .unwrap_or(([0.0, 0.0, 0.0, 1.0], [0.0; 3]));
-            bones.push(Bone { name: bname, parent, local_quat: lq, local_trans: lt, base_quat: bq, base_trans: bt });
+            let hit_loc = class_p.map(|p| z[p + i]).unwrap_or(0);
+            // XBoneInfo: bounds[2] (min, max), offset, radiusSquared.
+            let hit_box = bone_info_p.map(|p| p + 40 * i).and_then(|o| {
+                let (a, b) = ([rdf(o), rdf(o + 4), rdf(o + 8)], [rdf(o + 12), rdf(o + 16), rdf(o + 20)]);
+                let r2 = rdf(o + 36);
+                (r2 > 0.0 && (0..3).all(|k| a[k] <= b[k] && a[k].is_finite() && b[k].is_finite())).then_some((a, b))
+            });
+            bones.push(Bone { name: bname, parent, local_quat: lq, local_trans: lt, base_quat: bq, base_trans: bt, hit_loc, hit_box });
         }
         let num_lods = (h.u16(0xc4) as usize).min(4);
         let lods = (0..num_lods)

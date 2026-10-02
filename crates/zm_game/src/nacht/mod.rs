@@ -82,6 +82,8 @@ pub enum WorldMat {
 pub struct PartAssets {
     /// (bone name, parent index, bind pose relative to the parent)
     pub bones: Vec<(String, Option<usize>, Transform)>,
+    /// Each bone's hit box (same order as `bones`).
+    pub hits: Vec<Option<build::BoneHit>>,
     pub inverse_bindposes: Handle<SkinnedMeshInverseBindposes>,
     pub meshes: Vec<(Handle<Mesh>, Handle<ModelMaterial>)>,
 }
@@ -163,6 +165,16 @@ pub fn pose_mapped(
             tr.translation = bind.translation + t.offset(frame);
         }
     }
+}
+
+/// `clip`'s pose at `frame` as (joint index, rotation, translation) for the
+/// joints it drives, without applying it (for blending).
+pub fn sample_mapped(clip: &build::AnimClip, frame: f32, joints: &[Joint], map: &[Option<usize>]) -> Vec<(usize, Quat, Vec3)> {
+    clip.tracks
+        .iter()
+        .zip(map)
+        .filter_map(|(t, j)| j.map(|j| (j, t.rotation(frame), joints[j].2.translation + t.offset(frame))))
+        .collect()
 }
 
 /// First-person gun models by weapon id, once the install has been read.
@@ -357,6 +369,7 @@ fn poll_load(
         let inv: Vec<Mat4> = p.bones.iter().map(|b| b.inv_bind).collect();
         PartAssets {
             bones: p.bones.iter().map(|b| (b.name.clone(), b.parent, b.local)).collect(),
+            hits: p.bones.iter().map(|b| b.hit).collect(),
             inverse_bindposes: bindposes.add(SkinnedMeshInverseBindposes::from(inv)),
             meshes: p.meshes.into_iter().map(|s| (meshes.add(s.mesh), mat_handles[s.material].clone())).collect(),
         }

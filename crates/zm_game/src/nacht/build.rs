@@ -117,6 +117,19 @@ pub struct SceneBone {
     /// Bind pose relative to the parent (or the model root).
     pub local: Transform,
     pub inv_bind: Mat4,
+    /// The bone's hit box, if the model gives it one.
+    pub hit: Option<BoneHit>,
+}
+
+/// A bone's hit box as the game traces bullets against it: the model's
+/// `XBoneInfo` bounds in the bone's own space (here in Bevy axes, metres)
+/// and its hit location (`partClassification`, the engine's
+/// `hitLocation_t`).
+#[derive(Debug, Clone, Copy)]
+pub struct BoneHit {
+    pub loc: u8,
+    pub min: Vec3,
+    pub max: Vec3,
 }
 
 /// A model skinned to its own skeleton.
@@ -153,8 +166,7 @@ pub struct AnimClip {
     pub root_speed: f32,
     #[allow(dead_code)] // for root-motion window climbs
     pub root_rise: f32,
-    /// Notetracks (name, frame fraction); not used by the game yet.
-    #[allow(dead_code)]
+    /// Notetracks (name, fraction of the clip).
     pub notify: Vec<(String, f32)>,
 }
 
@@ -557,7 +569,11 @@ impl<'a> Builder<'a> {
                     Some(p) if p < i => Transform { translation: to_bevy(b.local_trans), rotation: rot_to_bevy(b.local_quat).normalize(), scale: Vec3::ONE },
                     _ => globals[i],
                 };
-                SceneBone { name: b.name.to_ascii_lowercase(), parent: b.parent.filter(|&p| p < i), local, inv_bind: g.inverse() }
+                let hit = b.hit_box.filter(|_| b.hit_loc != 0).map(|(lo, hi)| {
+                    let (a, c) = (to_bevy(lo), to_bevy(hi));
+                    BoneHit { loc: b.hit_loc, min: a.min(c), max: a.max(c) }
+                });
+                SceneBone { name: b.name.to_ascii_lowercase(), parent: b.parent.filter(|&p| p < i), local, inv_bind: g.inverse(), hit }
             })
             .collect()
     }
@@ -1539,7 +1555,18 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
             waw_assets::t4::anim::decode(zd, a).map(|c| AnimClip::from_clip(&c)).map_err(|e| eprintln!("anim {name}: {e}")).ok()
         })
     };
-    let zombie_anims: Vec<AnimClip> = ZOMBIE_ANIMS.iter().filter_map(|n| clip(n)).collect();
+    // Every zombie animation the map's zones carry (all walk, attack, tear
+    // and death variants the scripts may pick), plus the known list.
+    let mut zombie_names: Vec<String> = ZOMBIE_ANIMS.iter().map(|n| n.to_string()).collect();
+    zombie_names.extend(rules.attacks.iter().chain(rules.tears).map(|a| a.name.to_string()));
+    for zd in &zones {
+        zombie_names.extend(zd.xanims.iter().filter(|a| a.name.to_ascii_lowercase().starts_with("ai_zombie_")).map(|a| a.name.to_ascii_lowercase()));
+    }
+    zombie_names.sort();
+    zombie_names.dedup();
+    let zombie_anims: Vec<AnimClip> = zombie_names.iter().filter_map(|n| clip(n)).collect();
+    let missing: Vec<&String> = zombie_names.iter().filter(|n| !zombie_anims.iter().any(|c| c.name.eq_ignore_ascii_case(n))).collect();
+    info!("zombie animations: {} loaded{}", zombie_anims.len(), if missing.is_empty() { String::new() } else { format!(", not in the zones: {missing:?}") });
     let view_rig = b.skinned("viewmodel_usa_marine_arms").map(|arms| {
         let mut guns = HashMap::new();
         let mut anims = HashMap::new();
