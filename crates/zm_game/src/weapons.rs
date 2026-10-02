@@ -946,9 +946,11 @@ fn update_viewmodel(
         }
         if let Ok((_, mut ft, mut fl)) = flash.single_mut() {
             let on = gun.flash > 0.0;
-            fl.intensity = if on { 120_000.0 } else { 0.0 };
+            // The game's own flash effect brings its light when effects are
+            // loaded; this stand-in is for the prototype map only.
+            fl.intensity = if on && !crate::fx::live() { 120_000.0 } else { 0.0 };
             ft.translation = Vec3::ZERO;
-            ft.scale = if on { Vec3::splat(0.07 + fastrand::f32() * 0.05) } else { Vec3::ZERO };
+            ft.scale = if on && !crate::fx::live() { Vec3::splat(0.07 + fastrand::f32() * 0.05) } else { Vec3::ZERO };
         }
         return;
     }
@@ -997,7 +999,7 @@ fn update_viewmodel(
     }
     if let Ok((_, mut ft, mut fl)) = flash.single_mut() {
         let on = gun.flash > 0.0;
-        fl.intensity = if on { 120_000.0 } else { 0.0 };
+        fl.intensity = if on && !crate::fx::live() { 120_000.0 } else { 0.0 };
         let def = &defs.0[def_idx];
         let tip = match def.kind {
             Kind::Pistol => -0.22,

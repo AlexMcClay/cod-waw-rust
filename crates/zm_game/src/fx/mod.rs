@@ -40,8 +40,18 @@ const MAX_DECALS: usize = 96;
 /// Brightness of lit particles (smoke, dust) relative to unlit ones: the
 /// game lights them from the light grid; Nacht at night is dark.
 const LIT_AMBIENT: f32 = 0.35;
-/// Point light intensity per square metre of radius (lumens).
-const LIGHT_LUMENS_PER_M2: f32 = 30_000.0;
+/// Bevy point light intensity (lumens) for a game light of colour strength
+/// `c` and radius `r` (metres). The game adds `colour * (1 - d / r) * N.L`;
+/// a Bevy light gives `I / (4 pi^2 d^2) * exposure` on a diffuse surface, so
+/// the two are matched at `d` = a quarter of the radius (0.3..1.5 m; inverse
+/// square is brighter nearer, dimmer further). Real maps use a fixed
+/// exposure ([`crate::nacht::REAL_MAP_EV`]).
+pub fn light_intensity(c: f32, r: f32) -> f32 {
+    let d = (r * 0.25).clamp(0.3, 1.5).min(r * 0.9);
+    let falloff = (1.0 - d / r.max(1e-3)).max(0.0);
+    let inv_exposure = 1.2 * 2f32.powf(crate::nacht::REAL_MAP_EV);
+    4.0 * std::f32::consts::PI * std::f32::consts::PI * d * d * falloff * c * inv_exposure
+}
 
 /// Game point (inches, Z up) to Bevy (metres, Y up).
 pub fn to_bevy(p: Vec3) -> Vec3 {
@@ -979,7 +989,7 @@ fn simulate(
                     }
                     let c = Vec3::new(lk.color[0], lk.color[1], lk.color[2]) * lk.color[3];
                     let range = (lk.size[0] * INCH).max(0.05);
-                    let intensity = LIGHT_LUMENS_PER_M2 * range * range * c.max_element();
+                    let intensity = light_intensity(c.max_element(), range);
                     let m = c.max_element().max(1e-4);
                     let col = LinearRgba::rgb(c.x / m, c.y / m, c.z / m);
                     let tr = Transform::from_translation(to_bevy(pos));
