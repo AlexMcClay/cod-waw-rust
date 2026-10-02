@@ -92,7 +92,9 @@ impl World {
     pub fn rebuild(&mut self, level: &Level) {
         self.player_solids = level.player_colliders();
         self.bullet_solids = level.walls.clone();
-        self.bullet_solids.push(level.crate_box);
+        if level.crate_solid {
+            self.bullet_solids.push(level.crate_box);
+        }
         for (i, d) in level.doors.iter().enumerate() {
             if !self.door_open[i] {
                 self.player_solids.push(d.blocker);

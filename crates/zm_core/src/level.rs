@@ -89,6 +89,9 @@ pub struct Level {
     pub doors: Vec<Door>,
     pub wall_buys: Vec<WallBuy>,
     pub crate_box: Aabb,
+    /// Whether `crate_box` itself blocks (false when the box model has its
+    /// own collision, as on the real maps).
+    pub crate_solid: bool,
     /// Interior floor rectangles per area, indexed by `Area as usize`.
     pub areas: Vec<Aabb>,
     pub player_start: (f32, f32),
@@ -187,6 +190,7 @@ impl Level {
             doors: Vec::new(),
             wall_buys: Vec::new(),
             crate_box: Aabb::new(V3::new(-7.8, 0.0, 14.9), V3::new(-6.2, 0.9, 15.7)),
+            crate_solid: true,
             areas: vec![
                 Aabb::new(V3::new(-10.0, 0.0, -8.0), V3::new(10.0, WALL_H, 8.0)),
                 Aabb::new(V3::new(10.0, 0.0, -6.0), V3::new(20.0, WALL_H, 6.0)),
@@ -270,7 +274,9 @@ impl Level {
     pub fn player_colliders(&self) -> Vec<Aabb> {
         let mut v = self.walls.clone();
         v.extend(self.window_fills.iter().copied());
-        v.push(self.crate_box);
+        if self.crate_solid {
+            v.push(self.crate_box);
+        }
         v
     }
 }
