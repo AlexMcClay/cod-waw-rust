@@ -204,6 +204,7 @@ pub const VIEW_ANIM_SLOTS: &[(usize, &str)] = &[
     (1, "idle"),
     (2, "empty_idle"),
     (3, "fire"),
+    (4, "hold_fire"),
     (5, "last_shot"),
     (6, "rechamber"),
     (7, "melee"),
@@ -700,6 +701,7 @@ const WEAPON_SOUND_FIELDS: &[&str] = &[
     "reloadEmptySoundPlayer",
     "meleeSwipeSoundPlayer",
     "meleeHitSound",
+    "pullbackSoundPlayer",
 ];
 
 /// A model's collision triangles in its own (Bevy) space, if the game
@@ -958,7 +960,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         extra.push(n.to_string());
     }
     for w in &nacht.weapons {
-        for m in [w.view_model, w.hand_model, w.world_model].into_iter().flatten() {
+        for m in [w.view_model, w.hand_model, w.world_model, w.projectile_model].into_iter().flatten() {
             extra.push(nacht.xmodels[m as usize].name.trim_start_matches(',').to_string());
         }
     }

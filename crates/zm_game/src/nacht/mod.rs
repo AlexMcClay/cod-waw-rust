@@ -232,9 +232,12 @@ fn start_load(
         return;
     };
     let bc = crate::waw::bc_supported(device.as_deref());
+    let mut aliases = bank.map(|b| b.wanted_aliases()).unwrap_or_default();
+    aliases.extend(crate::grenades::ALIASES.iter().map(|a| a.to_string()));
     let wanted = build::Wanted {
-        aliases: bank.map(|b| b.wanted_aliases()).unwrap_or_default(),
-        weapon_ids: defs.0.iter().map(|d| d.id).collect(),
+        aliases,
+        // The offhand grenade is loaded like a weapon (viewmodel, anims, sounds).
+        weapon_ids: defs.0.iter().map(|d| d.id).chain([crate::grenades::GRENADE_ID]).collect(),
     };
     let t = AsyncComputeTaskPool::get().spawn(async move { build::build(&install, &iwd, bc, wanted) });
     commands.insert_resource(NachtTask(t));

@@ -381,6 +381,10 @@ pub struct WeaponInfo {
     pub xanims: Vec<String>,
     /// Viewmodel notetrack name -> sound alias it plays.
     pub notetrack_sounds: Vec<(String, String)>,
+    /// The model a thrown/fired projectile uses (`projectileModel`).
+    pub projectile_model: Option<u32>,
+    /// `bounceSound`: an alias per surface type (empty when unset), if any.
+    pub bounce_sounds: Vec<String>,
 }
 
 impl WeaponInfo {

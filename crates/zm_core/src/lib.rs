@@ -7,6 +7,7 @@
 //!                    (the sounds shipped in World at War's `.iwd` archives are MS-ADPCM).
 //! * [`weaponfile`] – parser for the `WEAPONFILE\key\value\...` text format.
 //! * [`weapons`]    – built-in weapon table, optionally overridden from weapon files.
+//! * [`grenade`]    – hand grenade stats, allowance, radius damage and bounces.
 //! * [`rules`]      – round / health / points / drop-rate maths.
 //! * [`geom`]       – tiny 2D/3D maths helpers (AABBs, ray casts, circle push-out).
 //! * [`level`]      – the bunker layout: walls, windows, debris doors, wall buys.
@@ -15,6 +16,7 @@
 //! * [`navgraph`]   – waypoint-graph navigation over a map's path nodes.
 
 pub mod geom;
+pub mod grenade;
 pub mod level;
 pub mod nav;
 pub mod navgraph;
