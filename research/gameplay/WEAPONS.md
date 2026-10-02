@@ -2,8 +2,7 @@
 
 Every gameplay number the game uses for a weapon, where it comes from, and
 how *Undead Rounds* applies it. The tables are generated from the install by
-`gen_weapon_defaults.py` (it also writes the no-install fallback table
-`crates/zm_core/src/weapon_defaults.rs`).
+`gen_weapon_defaults.py`.
 
 ## Sources, in order of authority
 
@@ -32,8 +31,9 @@ damage ranges, so `999999`).
 The game applies them in that order too: the weapon file at startup (so the
 bunker prototype map has them), then, when Nacht's zones are read, the zone
 WeaponDef over it (`audio::apply_zone_weapon_stats`, which logs any weapon
-whose numbers change; none do). Without an install the built-in table (the
-same numbers) is used.
+whose numbers change; none do). Without an install, hand-picked placeholder
+numbers per weapon class are used (`crates/zm_core/src/weapon_defaults.rs`;
+not the game's).
 
 ## Nacht's weapons
 
@@ -184,7 +184,7 @@ magazine in at "Add at"; empty reloads at "Empty add at" (see the note on
 ### Bullet penetration (common.ff `info/bullet_penetration_sp`)
 
 Flesh: small 32 in, medium 96 in, large 128 in (read from common.ff when
-Nacht loads; the same numbers are the built-in fallback). Other surfaces
+Nacht loads; placeholders without an install). Other surfaces
 (bark, brick, wood, metal...) are in the same table but walls are not
 penetrated here.
 

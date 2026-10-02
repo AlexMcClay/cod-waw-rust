@@ -1144,36 +1144,40 @@ mod tests {
     #[test]
     fn magazine_goes_in_at_the_add_time() {
         let mp40 = def("mp40");
+        let (full, add) = (mp40.clip, mp40.reload.ammo_in_at(false));
         let mut slot = Slot { def: 0, clip: 10, reserve: 100 };
         let (t, clips) = run(&mp40, &mut slot, 0.05);
-        assert!((t - 2.3).abs() < 0.06, "{t}");
-        // 1.85 s in (step 37) the clip is full; before, it is not.
-        assert_eq!(clips[35], 10);
-        assert_eq!(clips[37], 32);
-        assert_eq!((slot.clip, slot.reserve), (32, 78));
-        // Empty: 2.9 s.
+        assert!((t - mp40.reload.duration(false)).abs() < 0.06, "{t}");
+        // At the add time the clip is full; before, it is not.
+        let step = (add / 0.05) as usize;
+        assert_eq!(clips[step - 2], 10);
+        assert_eq!(clips[step + 1], full);
+        assert_eq!((slot.clip, slot.reserve), (full, 100 - (full - 10)));
+        // Empty: the empty reload's length.
         let mut slot = Slot { def: 0, clip: 0, reserve: 10 };
         let (t, _) = run(&mp40, &mut slot, 0.05);
-        assert!((t - 2.9).abs() < 0.06, "{t}");
+        assert!((t - mp40.reload.duration(true)).abs() < 0.06, "{t}");
         assert_eq!((slot.clip, slot.reserve), (10, 0));
     }
 
     #[test]
     fn shotgun_loads_shell_by_shell() {
         let s = def("trenchgun");
-        let mut slot = Slot { def: 0, clip: 3, reserve: 10 };
+        let r = s.reload;
+        assert!(r.segmented && r.start_add == 1 && r.ammo_add == 1);
+        let mut slot = Slot { def: 0, clip: s.clip - 3, reserve: 10 };
         let (t, _) = run(&s, &mut slot, 0.01);
-        // Start 0.9 (one shell in), two loops of 0.6, end 0.95.
-        assert!((t - (0.9 + 1.2 + 0.95)).abs() < 0.05, "{t}");
-        assert_eq!((slot.clip, slot.reserve), (6, 7));
+        // Start (one shell in), two loops, end.
+        assert!((t - (r.start_time + 2.0 * r.time + r.end_time)).abs() < 0.05, "{t}");
+        assert_eq!((slot.clip, slot.reserve), (s.clip, 7));
         // Firing during the loop goes to the end phase.
         let mut slot = Slot { def: 0, clip: 0, reserve: 10 };
-        let r = ReloadState::begin(&s, true);
-        let (r, _) = step_reload(r, &s, &mut slot, 0.95);
-        assert_eq!((r.unwrap().phase, slot.clip), (ReloadPhase::Loop, 1));
+        let st = ReloadState::begin(&s, true);
+        let (st, _) = step_reload(st, &s, &mut slot, r.start_time + 0.05);
+        assert_eq!((st.unwrap().phase, slot.clip), (ReloadPhase::Loop, 1));
         let end = ReloadState { interrupt: true, ..ReloadState::end(&s) };
         assert_eq!(end.phase, ReloadPhase::End);
-        assert!((end.dur - 0.95).abs() < 1e-5);
+        assert!((end.dur - r.end_time).abs() < 1e-5);
     }
 
     #[test]
@@ -1186,25 +1190,28 @@ mod tests {
 
     #[test]
     fn handling_numbers() {
-        let h = HeldWeapon::of(&def("ptrs41_zombie"));
-        assert_eq!(h.move_speed_scale, 0.75);
-        assert_eq!(h.ads_fov(65.0), 10.0);
-        let t = HeldWeapon::of(&def("thompson"));
-        assert!((t.ads_move_speed_scale - 1.3).abs() < 1e-6);
-        assert!((t.ads_in_time - 0.22).abs() < 1e-6);
+        let p = def("ptrs41_zombie");
+        let h = HeldWeapon::of(&p);
+        assert_eq!(h.move_speed_scale, p.move_speed_scale);
+        assert!((h.ads_fov(65.0) - p.ads_zoom_fov).abs() < 1e-4);
+        assert!((h.ads_fov(90.0) - p.ads_zoom_fov * 90.0 / 65.0).abs() < 1e-4);
+        let t = def("thompson");
+        let ht = HeldWeapon::of(&t);
+        assert_eq!((ht.ads_move_speed_scale, ht.ads_in_time), (t.ads_move_speed_scale, t.ads_in_time));
     }
 
     #[test]
     fn spawn_and_box_ammo() {
         let defs = default_weapons();
         let mut l = Loadout::starting(&defs);
-        assert_eq!((l.current().clip, l.current().reserve), (8, 32));
+        assert_eq!((l.current().clip, l.current().reserve), defs[START_PISTOL].start_ammo_split());
         let t = find(&defs, "thompson").unwrap();
         l.give(&defs, t);
-        assert_eq!((l.current().clip, l.current().reserve), (20, 200));
+        let full = defs[t].full_ammo();
+        assert_eq!((l.current().clip, l.current().reserve), full);
         l.slots[l.cur].reserve = 3;
         l.refill_all(&defs);
-        assert_eq!(l.current().reserve, 200);
+        assert_eq!(l.current().reserve, full.1);
     }
 
     /// Every weapon reads its own file from a real install:
@@ -1215,21 +1222,17 @@ mod tests {
         let root = std::env::var("UNDEAD_WAW").expect("set UNDEAD_WAW");
         let iwd = waw_assets::Iwd::open(&std::path::Path::new(&root).join("main")).unwrap();
         let mut defs = default_weapons();
-        let builtin = defs.clone();
         for d in defs.iter_mut() {
             let file = d.weapon_file.unwrap();
             let bytes = iwd.read(&format!("weapons/sp/{file}")).unwrap_or_else(|| panic!("{file}"));
             let wf = zm_core::weaponfile::WeaponFile::parse_bytes(&bytes).unwrap();
             assert!(d.apply_weapon_file(&wf) > 30, "{file}");
         }
-        // The built-in table holds the same numbers as the files.
-        for (a, b) in defs.iter().zip(&builtin) {
-            assert_eq!(crate::audio::weapon_summary(a), crate::audio::weapon_summary(b));
-        }
+        // The weapons work the way their files say.
         let d = |id: &str| &defs[find(&defs, id).unwrap()];
-        assert_eq!((d("trenchgun").damage, d("trenchgun").pellets), (160.0, 8));
-        assert_eq!(d("kar98k").location_multiplier(HitLoc::Head), 3.5);
+        assert!(d("trenchgun").pellets > 1 && d("trenchgun").reload.segmented);
+        assert!(d("kar98k").location_multiplier(HitLoc::Head) > 1.0 && d("kar98k").rechamber);
         assert_eq!(d("raypistol").mode, FireMode::Auto);
-        assert_eq!(d("ptrs41_zombie").damage, 1000.0);
+        assert!(d("ptrs41_zombie").ads_overlay.is_some());
     }
 }

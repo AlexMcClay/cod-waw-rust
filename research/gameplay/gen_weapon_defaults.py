@@ -1,11 +1,12 @@
-"""Builds the no-install fallback table `crates/zm_core/src/weapon_defaults.rs`
-and the per-weapon tables of `WEAPONS.md` from the weapon files in a World at
-War install (`main/iw_*.iwd`, `weapons/sp/<name>`; later archives override
+"""Prints the per-weapon tables of `WEAPONS.md` from the weapon files in a
+World at War install (`main/iw_*.iwd`, `weapons/sp/<name>`; later archives override
 earlier ones).
 
     python research/gameplay/gen_weapon_defaults.py [install_dir]
 
-Writes the Rust file in place and prints the Markdown tables of WEAPONS.md.
+Prints the Markdown tables of WEAPONS.md. (The game's numbers are not built
+into the code: `crates/zm_core/src/weapon_defaults.rs` holds hand-picked
+placeholders for running without an install.)
 """
 import glob
 import os
@@ -167,6 +168,4 @@ def md(data):
 
 if __name__ == "__main__":
     data = load()
-    with open(os.path.join(ROOT, "crates", "zm_core", "src", "weapon_defaults.rs"), "w", newline="\n") as fh:
-        fh.write(rust(data))
     sys.stdout.write(md(data))

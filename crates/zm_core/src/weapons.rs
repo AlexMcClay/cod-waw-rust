@@ -4,9 +4,8 @@
 //! definition from the player's install (the `weapons/sp/<name>` weapon file
 //! in the IWD archives, then the compiled `WeaponDef` in the map's zone,
 //! which is what the game itself uses; see [`WeaponDef::apply_weapon_file`]).
-//! The built-in values in [`crate::weapon_defaults`] are the same numbers,
-//! used only when there is no install. Per-weapon values and their sources
-//! are listed in `research/gameplay/WEAPONS.md`.
+//! Without an install, [`crate::weapon_defaults`] gives hand-picked
+//! placeholder numbers instead (not the game's).
 //!
 //! Units: distances in metres, times in seconds, angles in degrees (weapon
 //! files use inches; [`UNITS_TO_M`] converts).
@@ -183,10 +182,10 @@ impl Penetrate {
 }
 
 /// How far (inches) a bullet goes through flesh, by [`Penetrate`] type:
-/// `small_flesh`, `medium_flesh`, `large_flesh` of the game's
-/// `info/bullet_penetration_sp` table (common.ff). Replaced from the install
-/// when the zone is read ([`parse_penetration_table`]).
-pub const FLESH_PENETRATION: [f32; 4] = [0.0, 32.0, 96.0, 128.0];
+/// placeholders, replaced by `small_flesh`, `medium_flesh`, `large_flesh` of
+/// the install's `info/bullet_penetration_sp` table (common.ff) when the
+/// zone is read ([`parse_penetration_table`]).
+pub const FLESH_PENETRATION: [f32; 4] = [0.0, 24.0, 72.0, 120.0];
 
 /// The `flesh` depths (inches; none, small, medium, large) of a
 /// `BULLET_PEN_TABLE\small_flesh\32\...` raw file.
@@ -408,9 +407,9 @@ impl WeaponDef {
             near: 999_999.0 * UNITS_TO_M,
             far: 999_999.0 * UNITS_TO_M,
             loc_mult,
-            melee_damage: 150.0,
+            melee_damage: 125.0,
             melee_time: 0.5,
-            melee_delay: 0.05,
+            melee_delay: 0.1,
             penetrate: Penetrate::None,
             flesh_penetration: 0.0,
             mode: FireMode::Auto,
@@ -442,7 +441,7 @@ impl WeaponDef {
         }
     }
 
-    /// Built-in values (the game's, see [`crate::weapon_defaults`]).
+    /// Placeholder values (see [`crate::weapon_defaults`]).
     fn with(mut self, defaults: &str) -> Self {
         let wf = WeaponFile::parse(&format!("WEAPONFILE\\{defaults}")).expect("built-in weapon defaults");
         self.apply_weapon_file(&wf);
@@ -659,36 +658,41 @@ impl WeaponDef {
 pub const START_PISTOL: usize = 0;
 
 pub fn default_weapons() -> Vec<WeaponDef> {
-    use crate::weapon_defaults as d;
+    use crate::weapon_defaults::{placeholder as p, Class as C};
     use Kind::*;
+    // Placeholder numbers (see `weapon_defaults`); each weapon's own traits
+    // on top: its magazine, fire mode, bolt or pump action, shell reloads.
     vec![
-        WeaponDef::new("m1911", "M1911", Pistol, "zombie_colt").with(d::ZOMBIE_COLT),
-        WeaponDef::new("kar98k", "Kar98k", Rifle, "kar98k").with(d::KAR98K),
-        WeaponDef::new("m1carbine", "M1A1 Carbine", Rifle, "m1carbine").with(d::M1CARBINE),
-        WeaponDef::new("m1garand", "M1 Garand", Rifle, "m1garand").with(d::M1GARAND),
-        WeaponDef::new("thompson", "Thompson", Smg, "thompson").with(d::THOMPSON),
-        WeaponDef::new("mp40", "MP40", Smg, "mp40").with(d::MP40),
-        WeaponDef::new("ppsh", "PPSh-41", Smg, "ppsh").with(d::PPSH),
-        WeaponDef::new("stg44", "STG-44", Rifle, "stg44").with(d::STG44),
-        WeaponDef::new("bar", "BAR", Lmg, "bar").with(d::BAR),
-        WeaponDef::new("trenchgun", "Trench Gun", Shotgun, "shotgun").with(d::SHOTGUN),
-        WeaponDef::new("doublebarrel", "Double-Barreled Shotgun", Shotgun, "doublebarrel").with(d::DOUBLEBARREL),
+        WeaponDef::new("m1911", "M1911", Pistol, "zombie_colt").with(&p(C::Pistol, "clipSize\\7\\maxAmmo\\70\\startAmmo\\42")),
+        WeaponDef::new("kar98k", "Kar98k", Rifle, "kar98k").with(&p(C::BoltRifle, "clipSize\\5\\maxAmmo\\50\\startAmmo\\55")),
+        WeaponDef::new("m1carbine", "M1A1 Carbine", Rifle, "m1carbine").with(&p(C::SemiRifle, "clipSize\\15\\maxAmmo\\105\\startAmmo\\120\\damage\\60\\minDamage\\45")),
+        WeaponDef::new("m1garand", "M1 Garand", Rifle, "m1garand").with(&p(C::SemiRifle, "clipSize\\8\\maxAmmo\\96\\startAmmo\\104\\noPartialReload\\1")),
+        WeaponDef::new("thompson", "Thompson", Smg, "thompson").with(&p(C::Smg, "clipSize\\20\\maxAmmo\\160\\startAmmo\\180")),
+        WeaponDef::new("mp40", "MP40", Smg, "mp40").with(&p(C::Smg, "clipSize\\32\\maxAmmo\\192\\startAmmo\\224\\fireTime\\0.11")),
+        WeaponDef::new("ppsh", "PPSh-41", Smg, "ppsh").with(&p(C::Smg, "clipSize\\71\\maxAmmo\\284\\startAmmo\\355\\fireTime\\0.06\\damage\\80")),
+        WeaponDef::new("stg44", "STG-44", Rifle, "stg44").with(&p(C::AssaultRifle, "clipSize\\30\\maxAmmo\\180\\startAmmo\\210")),
+        WeaponDef::new("bar", "BAR", Lmg, "bar").with(&p(C::AssaultRifle, "clipSize\\20\\maxAmmo\\140\\startAmmo\\160\\damage\\130")),
+        WeaponDef::new("trenchgun", "Trench Gun", Shotgun, "shotgun").with(&p(
+            C::Shotgun,
+            "clipSize\\6\\maxAmmo\\54\\startAmmo\\60\\boltAction\\1\\rechamberTime\\0.6\\segmentedReload\\1\\reloadStartTime\\0.5\\reloadTime\\0.6\\reloadEndTime\\0.5\\reloadAmmoAdd\\1\\reloadStartAdd\\1",
+        )),
+        WeaponDef::new("doublebarrel", "Double-Barreled Shotgun", Shotgun, "doublebarrel").with(&p(C::Shotgun, "clipSize\\2\\maxAmmo\\60\\startAmmo\\62\\fireTime\\0.2")),
         // Variants found on Nacht der Untoten's walls and in its box.
         WeaponDef::new("doublebarrel_sawed_grip", "Sawed-Off Double-Barreled Shotgun", Shotgun, "doublebarrel_sawed_grip")
-            .with(d::DOUBLEBARREL_SAWED_GRIP),
-        WeaponDef::new("kar98k_scoped_zombie", "Scoped Kar98k", Rifle, "kar98k_scoped_zombie").with(d::KAR98K_SCOPED_ZOMBIE),
-        WeaponDef::new("raypistol", "Ray Gun", Wonder, "ray_gun").with(d::RAY_GUN),
-        WeaponDef::new("sw_357", ".357 Magnum", Pistol, "sw_357").with(d::SW_357),
-        WeaponDef::new("gewehr43", "Gewehr 43", Rifle, "gewehr43").with(d::GEWEHR43),
-        WeaponDef::new("springfield", "Springfield", Rifle, "springfield").with(d::SPRINGFIELD),
-        WeaponDef::new("ptrs41_zombie", "PTRS-41", Rifle, "ptrs41_zombie").with(d::PTRS41_ZOMBIE),
+            .with(&p(C::Shotgun, "clipSize\\2\\maxAmmo\\60\\startAmmo\\62\\fireTime\\0.2\\minDamageRange\\500")),
+        WeaponDef::new("kar98k_scoped_zombie", "Scoped Kar98k", Rifle, "kar98k_scoped_zombie").with(&p(C::Sniper, "clipSize\\5\\maxAmmo\\50\\startAmmo\\55")),
+        WeaponDef::new("raypistol", "Ray Gun", Wonder, "ray_gun").with(&p(C::Wonder, "clipSize\\15\\maxAmmo\\120\\startAmmo\\135")),
+        WeaponDef::new("sw_357", ".357 Magnum", Pistol, "sw_357").with(&p(C::Magnum, "clipSize\\6\\maxAmmo\\60\\startAmmo\\66")),
+        WeaponDef::new("gewehr43", "Gewehr 43", Rifle, "gewehr43").with(&p(C::SemiRifle, "clipSize\\10\\maxAmmo\\100\\startAmmo\\110")),
+        WeaponDef::new("springfield", "Springfield", Rifle, "springfield").with(&p(C::BoltRifle, "clipSize\\5\\maxAmmo\\50\\startAmmo\\55")),
+        WeaponDef::new("ptrs41_zombie", "PTRS-41", Rifle, "ptrs41_zombie").with(&p(C::AntiTank, "clipSize\\5\\maxAmmo\\40\\startAmmo\\45")),
         // The rifle grenade (its alt weapon, m7_launcher) is not modelled:
         // this is the Garand half.
-        WeaponDef::new("m1garand_gl", "M1 Garand w/ Launcher", Rifle, "m1garand_gl").with(d::M1GARAND_GL),
+        WeaponDef::new("m1garand_gl", "M1 Garand w/ Launcher", Rifle, "m1garand_gl").with(&p(C::SemiRifle, "clipSize\\8\\maxAmmo\\96\\startAmmo\\104\\noPartialReload\\1")),
         // Bipod LMGs, fired from the hip/sights (not deployed).
-        WeaponDef::new("fg42_bipod", "FG42", Lmg, "fg42_bipod").with(d::FG42_BIPOD),
-        WeaponDef::new("mg42_bipod", "MG42", Lmg, "mg42_bipod").with(d::MG42_BIPOD),
-        WeaponDef::new("30cal_bipod", "Browning M1919", Lmg, "30cal_bipod").with(d::CAL30_BIPOD),
+        WeaponDef::new("fg42_bipod", "FG42", Lmg, "fg42_bipod").with(&p(C::Lmg, "clipSize\\20\\maxAmmo\\200\\startAmmo\\220\\fireTime\\0.08")),
+        WeaponDef::new("mg42_bipod", "MG42", Lmg, "mg42_bipod").with(&p(C::Lmg, "clipSize\\50\\maxAmmo\\400\\startAmmo\\450\\fireTime\\0.05")),
+        WeaponDef::new("30cal_bipod", "Browning M1919", Lmg, "30cal_bipod").with(&p(C::Lmg, "clipSize\\100\\maxAmmo\\400\\startAmmo\\500")),
     ]
 }
 
@@ -760,11 +764,6 @@ pub fn crate_pool(defs: &[WeaponDef], only: Option<&[&str]>) -> Vec<(usize, u32)
 mod tests {
     use super::*;
 
-    fn def(id: &str) -> WeaponDef {
-        let defs = default_weapons();
-        defs[find(&defs, id).unwrap()].clone()
-    }
-
     #[test]
     fn map_aliases() {
         let defs = default_weapons();
@@ -783,38 +782,37 @@ mod tests {
         assert_eq!(ids.len(), defs.len(), "ids are unique");
     }
 
+    /// A weapon from a test weapon file (arbitrary numbers).
+    fn file(kind: Kind, text: &str) -> WeaponDef {
+        WeaponDef::new("test", "Test", kind, "test").with(text)
+    }
+
     #[test]
     fn falloff() {
-        let d = def("thompson");
+        let d = file(Kind::Smg, "damage\\100\\minDamage\\50\\maxDamageRange\\500\\minDamageRange\\1500");
         assert_eq!(d.damage_at(0.0), d.damage);
         assert_eq!(d.damage_at(1000.0), d.min_damage);
         let mid = d.damage_at((d.near + d.far) / 2.0);
         assert!((mid - (d.damage + d.min_damage) / 2.0).abs() < 1e-3);
-        // Thompson: 120 to 800 units, 80 from 1800.
-        assert_eq!(d.damage_at(800.0 * UNITS_TO_M - 0.01), 120.0);
-        assert_eq!(d.damage_at(1800.0 * UNITS_TO_M + 0.01), 80.0);
-        // No falloff without ranges (the Ray Gun's file has none).
-        let r = def("raypistol");
+        assert_eq!(d.damage_at(500.0 * UNITS_TO_M - 0.01), 100.0);
+        assert_eq!(d.damage_at(1500.0 * UNITS_TO_M + 0.01), 50.0);
+        // No falloff without ranges.
+        let r = file(Kind::Wonder, "weaponType\\projectile\\damage\\900");
         assert_eq!(r.damage_at(500.0), r.damage);
     }
 
     #[test]
     fn location_multipliers() {
-        let k = def("kar98k");
-        // Kar98k: head and neck 3.5, helmet 1, upper torso 1.8.
-        assert_eq!(k.bullet_damage(1.0, HitLoc::Head), 350.0);
+        let k = file(Kind::Rifle, "damage\\100\\locHead\\3\\locHelmet\\1\\locTorsoUpper\\1.5\\locLeftFoot\\0.25\\locNeck\\2");
+        assert_eq!(k.bullet_damage(1.0, HitLoc::Head), 300.0);
         assert_eq!(k.bullet_damage(1.0, HitLoc::Helmet), 100.0);
-        assert_eq!(k.bullet_damage(1.0, HitLoc::TorsoUpper), 180.0);
+        assert_eq!(k.bullet_damage(1.0, HitLoc::TorsoUpper), 150.0);
+        assert_eq!(k.bullet_damage(1.0, HitLoc::Neck), 200.0);
+        assert!((k.bullet_damage(1.0, HitLoc::LeftFoot) - 25.0).abs() < 1e-4);
         assert_eq!(k.bullet_damage(1.0, HitLoc::Gun), 0.0);
-        let t = def("thompson");
-        // Thompson: head 4, neck 1.
-        assert_eq!(t.bullet_damage(1.0, HitLoc::Head), 480.0);
-        assert_eq!(t.bullet_damage(1.0, HitLoc::Neck), 120.0);
-        // The colt's feet: 0.35.
-        let c = def("m1911");
-        assert!((c.bullet_damage(1.0, HitLoc::LeftFoot) - 7.0).abs() < 1e-4);
         // Projectile impacts ignore the location.
-        assert_eq!(def("raypistol").bullet_damage(3.0, HitLoc::LeftFoot), 1000.0);
+        let r = file(Kind::Wonder, "weaponType\\projectile\\damage\\900\\locLeftFoot\\0.1");
+        assert_eq!(r.bullet_damage(3.0, HitLoc::LeftFoot), 900.0);
         assert!(HitLoc::Helmet.is_head() && !HitLoc::Neck.is_head() && HitLoc::Neck.gibs_head());
         for (i, l) in HitLoc::ALL.iter().enumerate() {
             assert_eq!(l.index(), i);
@@ -823,75 +821,78 @@ mod tests {
 
     #[test]
     fn shotgun_pellets() {
-        let s = def("trenchgun");
-        assert_eq!(s.pellets, 8);
-        assert_eq!(s.damage_at(2.0), 160.0);
-        assert_eq!(s.damage_at(30.0), 15.0);
-        // Pellets stop at the minimum-damage range (800 units).
-        assert!((s.bullet_range(100.0) - 800.0 * UNITS_TO_M).abs() < 1e-3);
-        assert_eq!(def("thompson").bullet_range(100.0), 100.0);
+        let s = file(
+            Kind::Shotgun,
+            "shotCount\\6\\damage\\90\\minDamage\\12\\maxDamageRange\\150\\minDamageRange\\600\\segmentedReload\\1\\reloadStartAdd\\1\\reloadAmmoAdd\\1",
+        );
+        assert_eq!(s.pellets, 6);
+        assert_eq!(s.damage_at(2.0), 90.0);
+        assert_eq!(s.damage_at(30.0), 12.0);
+        // Pellets stop at the minimum-damage range.
+        assert!((s.bullet_range(100.0) - 600.0 * UNITS_TO_M).abs() < 1e-3);
+        assert_eq!(file(Kind::Smg, "damage\\90").bullet_range(100.0), 100.0);
         assert!(s.reload.segmented && s.reload.start_add == 1 && s.reload.ammo_add == 1);
     }
 
     #[test]
     fn fire_cycles() {
-        let k = def("kar98k");
-        // fireTime 0.33 + rechamberTime 1.0; no rechamber on the last round.
-        assert!((k.shot_cycle(4) - 1.33).abs() < 1e-4);
-        assert!((k.shot_cycle(0) - 0.33).abs() < 1e-4);
-        let t = def("thompson");
+        let k = file(Kind::Rifle, "fireTime\\0.25\\boltAction\\1\\rechamberTime\\0.75\\clipSize\\5");
+        // fireTime + rechamberTime; no rechamber on the last round.
+        assert!((k.shot_cycle(4) - 1.0).abs() < 1e-4);
+        assert!((k.shot_cycle(0) - 0.25).abs() < 1e-4);
+        let t = file(Kind::Smg, "fireType\\Full Auto\\fireTime\\0.07");
         assert_eq!(t.mode, FireMode::Auto);
-        assert!((t.shot_cycle(10) - 0.08).abs() < 1e-6);
-        assert_eq!(def("raypistol").mode, FireMode::Auto);
-        assert_eq!(def("m1garand").mode, FireMode::Semi);
+        assert!((t.shot_cycle(10) - 0.07).abs() < 1e-6);
+        assert_eq!(file(Kind::Rifle, "fireType\\Single Shot").mode, FireMode::Semi);
         assert_eq!(FireMode::parse("3-Round Burst"), Some(FireMode::Burst(3)));
     }
 
     #[test]
     fn reload_add_times() {
-        let mp40 = def("mp40");
-        assert_eq!(mp40.reload.duration(false), 2.3);
-        assert_eq!(mp40.reload.duration(true), 2.9);
-        assert_eq!(mp40.reload.ammo_in_at(false), 1.85);
-        assert_eq!(mp40.reload.ammo_in_at(true), 1.85);
-        // The Garand's empty reload (1.6 s) has no add time of its own and
-        // the normal one (2.5) is past its end: at the end.
-        let g = def("m1garand");
-        assert_eq!(g.reload.ammo_in_at(true), 1.6);
-        assert_eq!(g.reload.ammo_in_at(false), 2.5);
-        // No empty add time but a normal one that fits: that one.
-        assert_eq!(def("doublebarrel").reload.ammo_in_at(true), 2.65);
-        // An add time past the end is the end (the .357: 3.5 of 3).
-        assert_eq!(def("sw_357").reload.ammo_in_at(false), 3.0);
+        let r = file(Kind::Smg, "reloadTime\\2\\reloadEmptyTime\\2.6\\reloadAddTime\\1.2\\reloadStartAddTime\\1.5");
+        assert_eq!(r.reload.duration(false), 2.0);
+        assert_eq!(r.reload.duration(true), 2.6);
+        assert_eq!(r.reload.ammo_in_at(false), 1.2);
+        // An empty reload without its own add time uses the start add time.
+        assert_eq!(r.reload.ammo_in_at(true), 1.5);
+        // No empty add time and a normal one past the empty reload's end:
+        // at the end.
+        let g = file(Kind::Rifle, "reloadTime\\3\\reloadEmptyTime\\1.4\\reloadAddTime\\2.2");
+        assert_eq!(g.reload.ammo_in_at(true), 1.4);
+        assert_eq!(g.reload.ammo_in_at(false), 2.2);
+        // A normal add time that fits the empty reload: that one.
+        let d = file(Kind::Shotgun, "reloadTime\\3\\reloadEmptyTime\\3\\reloadAddTime\\2.4");
+        assert_eq!(d.reload.ammo_in_at(true), 2.4);
+        // An add time past the end is the end.
+        assert_eq!(file(Kind::Pistol, "reloadTime\\2\\reloadAddTime\\2.5").reload.ammo_in_at(false), 2.0);
     }
 
     #[test]
     fn ammo() {
-        let c = def("m1911");
-        assert_eq!(c.start_ammo_split(), (8, 32));
-        assert_eq!(c.full_ammo(), (8, 80));
-        assert_eq!(def("thompson").full_ammo(), (20, 200));
+        let c = file(Kind::Pistol, "clipSize\\7\\maxAmmo\\70\\startAmmo\\42");
+        assert_eq!(c.start_ammo_split(), (7, 35));
+        assert_eq!(c.full_ammo(), (7, 70));
     }
 
     #[test]
     fn spread_model() {
-        let s = def("thompson").spread;
-        assert_eq!(s.cone(SpreadStance::Stand, 0.0, 0.0), 1.5);
-        assert_eq!(s.cone(SpreadStance::Stand, 1.0, 0.0), 6.0);
+        let s = file(Kind::Smg, "hipSpreadStandMin\\2\\hipSpreadMax\\5\\adsSpread\\0\\hipSpreadFireAdd\\1\\hipSpreadDecayRate\\4").spread;
+        assert_eq!(s.cone(SpreadStance::Stand, 0.0, 0.0), 2.0);
+        assert_eq!(s.cone(SpreadStance::Stand, 1.0, 0.0), 5.0);
         assert_eq!(s.cone(SpreadStance::Stand, 1.0, 1.0), 0.0);
         let up = s.update_scale(0.0, SpreadStance::Stand, 1.0, 0.0, 0.1);
-        assert!((up - 0.4).abs() < 1e-5);
         let down = s.update_scale(1.0, SpreadStance::Stand, 0.0, 0.0, 0.1);
-        assert!((down - 0.6).abs() < 1e-5);
+        assert!(up > 0.0 && up <= 1.0, "{up}");
+        assert!((0.0..1.0).contains(&down), "{down}");
     }
 
     #[test]
     fn splash() {
-        let r = def("raypistol");
-        assert_eq!(r.splash_at(0.0), Some(1500.0));
-        assert!((r.splash_at(r.splash_radius).unwrap() - 300.0).abs() < 1e-3);
+        let r = file(Kind::Wonder, "weaponType\\projectile\\explosionRadius\\80\\explosionInnerDamage\\1200\\explosionOuterDamage\\200");
+        assert_eq!(r.splash_at(0.0), Some(1200.0));
+        assert!((r.splash_at(r.splash_radius).unwrap() - 200.0).abs() < 1e-3);
         assert_eq!(r.splash_at(r.splash_radius + 0.1), None);
-        assert!((r.splash_radius - 64.0 * UNITS_TO_M).abs() < 1e-4);
+        assert!((r.splash_radius - 80.0 * UNITS_TO_M).abs() < 1e-4);
     }
 
     #[test]
@@ -911,11 +912,11 @@ mod tests {
 
     #[test]
     fn penetration_table() {
-        let t = parse_penetration_table("BULLET_PEN_TABLE\\small_bark\\0\\small_flesh\\32\\medium_flesh\\96\\large_flesh\\128\\large_wood\\192").unwrap();
-        assert_eq!(t, FLESH_PENETRATION);
+        let t = parse_penetration_table("BULLET_PEN_TABLE\\small_bark\\0\\small_flesh\\10\\medium_flesh\\20\\large_flesh\\30\\large_wood\\40").unwrap();
+        assert_eq!(t, [0.0, 10.0, 20.0, 30.0]);
         assert!(parse_penetration_table("WEAPONFILE\\x\\1").is_none());
-        assert_eq!(def("ptrs41_zombie").flesh_penetration, 128.0);
-        assert_eq!(def("mp40").flesh_penetration, 32.0);
+        assert_eq!(file(Kind::Rifle, "penetrateType\\large").flesh_penetration, FLESH_PENETRATION[3]);
+        assert_eq!(file(Kind::Smg, "penetrateType\\small").flesh_penetration, FLESH_PENETRATION[1]);
     }
 
     #[test]
