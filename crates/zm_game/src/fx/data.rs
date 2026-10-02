@@ -391,12 +391,16 @@ impl Gather<'_> {
         }
         let name = m.name.trim_start_matches(',').to_string();
         if let Some(&i) = self.mat_index.get(&name) {
-            return Some(i);
+            return (i != usize::MAX).then_some(i);
         }
         let image_name = m.color_map().map(|t| zones[mz].image_name(t).to_string());
         let image = image_name.and_then(|n| self.image(&n));
         if image.is_none() {
-            debug!("fx material {name}: no texture in the IWDs");
+            // E.g. IWI format 9 (fxt_light_spot_beam), which we can't decode:
+            // drawing it untextured would show a solid quad.
+            warn!("fx material {name}: texture not readable, its elements are skipped");
+            self.mat_index.insert(name, usize::MAX);
+            return None;
         }
         let techset = m.techset.as_deref().unwrap_or("");
         let blend = Blend::from_techset(techset);

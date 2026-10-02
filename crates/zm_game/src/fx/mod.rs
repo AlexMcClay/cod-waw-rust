@@ -491,6 +491,7 @@ fn handle_events(
                     let row = data::impact_row(w.map_or(6, |w| w.impact_type), false).and_then(|r| lib.data.impacts.get(r))?;
                     row.nonflesh.get(surf as usize).cloned().flatten().or_else(|| row.nonflesh.first().cloned().flatten())
                 });
+                info!("explosion of {weapon}: {} on {}", name.as_deref().unwrap_or("-"), waw_assets::t4::fx::SURFACE_TYPES[surf as usize % 31]);
                 if let Some(def) = name.as_deref().and_then(|n| lib.effect(n)) {
                     let frame = Frame { origin: p, axes: axes_from_forward(Vec3::Z, Some(Vec3::X)) };
                     commands.spawn((FxInstance::new(def.clone(), frame, None, 0.0), Dynamic));
