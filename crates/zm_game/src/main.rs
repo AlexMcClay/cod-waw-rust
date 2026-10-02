@@ -420,6 +420,19 @@ fn autopilot(
         return;
     }
     keys.release(KeyCode::Enter);
+    // Optional: `UNDEAD_TEST_LOOK="x y z yaw pitch"` (game units, degrees)
+    // holds the camera there, for looking at parts of the map.
+    if let Some(v) = std::env::var("UNDEAD_TEST_LOOK").ok().map(|s| s.split_whitespace().filter_map(|x| x.parse::<f32>().ok()).collect::<Vec<_>>()) {
+        if let (Ok((mut pt, mut ctl)), [x, y, z, yaw, pitch]) = (player.single_mut(), v.as_slice()) {
+            let p = Vec3::new(*x, *z, -*y) * 0.0254;
+            ctl.feet_y = p.y - ctl.eye;
+            ctl.vel_y = 0.0;
+            pt.translation = p;
+            ctl.yaw = (yaw - 90.0).to_radians();
+            ctl.pitch = pitch.to_radians();
+        }
+        return;
+    }
     // Optional: stand in front of the box and roll it at 5 s.
     if std::env::var_os("UNDEAD_TEST_BOX").is_some() {
         if let Ok((mut pt, mut ctl)) = player.single_mut() {

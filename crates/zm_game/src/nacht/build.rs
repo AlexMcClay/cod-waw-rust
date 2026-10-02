@@ -52,6 +52,8 @@ pub struct SceneMaterial {
     pub blend: Blend,
     pub unlit: bool,
     pub lightmapped: bool,
+    /// Drawn without back-face culling.
+    pub two_sided: bool,
 }
 
 pub struct SceneMesh {
@@ -372,15 +374,22 @@ impl<'a> Builder<'a> {
             self.mat_index.insert(key, usize::MAX);
             return None;
         }
-        let (blend, unlit, lightmapped) = classify(&techset);
-        let color_name = info.color_map().map(|i| {
-            // The image belongs to whichever zone the material came from.
-            let zi = self.zones.iter().position(|zd| zd.materials.iter().any(|m| std::ptr::eq(m, info))).unwrap_or(z);
-            self.zones[zi].image_name(i).to_string()
-        });
+        let (mut blend, unlit, lightmapped) = classify(&techset);
+        // The material's data belongs to whichever zone it came from.
+        let zi = self.zones.iter().position(|zd| zd.materials.iter().any(|m| std::ptr::eq(m, info))).unwrap_or(z);
+        // Cut-outs: alpha-tested lit states, and the foliage shaders, which
+        // discard by texture alpha themselves (grass, hedges, tree cards).
+        let state = self.zones[zi].lit_state(info);
+        let t = techset.trim_start_matches(',');
+        let foliage = t.contains("foliage") || t.contains("treecanopy") || t.contains("ambient_t");
+        if blend == Blend::Opaque && (foliage || state.is_some_and(|s| s.alpha_test())) {
+            blend = Blend::Mask;
+        }
+        let two_sided = state.is_some_and(|s| s.two_sided()) || blend != Blend::Opaque;
+        let color_name = info.color_map().map(|i| self.zones[zi].image_name(i).to_string());
         let color = color_name.and_then(|n| self.image(&n));
         let m = self.materials.len();
-        self.materials.push(SceneMaterial { color, blend, unlit, lightmapped });
+        self.materials.push(SceneMaterial { color, blend, unlit, lightmapped, two_sided });
         self.mat_index.insert(key, m);
         Some(m)
     }

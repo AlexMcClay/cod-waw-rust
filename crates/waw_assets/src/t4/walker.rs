@@ -767,10 +767,12 @@ impl<'a> Walker<'a> {
             v => self.tex_tables.get(&decode_ptr(v).1).cloned().unwrap_or_default(),
         };
         self.reusable(h.u32(0x68), 16, 32 * h.u8(0x5c) as usize)?;
-        self.reusable(h.u32(0x6c), 4, 8 * h.u8(0x5d) as usize)?;
+        let state_count = h.u8(0x5d) as usize;
+        let state_bits = self.reusable(h.u32(0x6c), 4, 8 * state_count)?.map(|p| (p, state_count));
         self.pop();
         let idx = self.out.materials.len() as u32;
-        self.out.materials.push(MaterialInfo { name: name.clone(), techset, textures, sort_key: h.u8(5) });
+        let state_entry: Vec<u8> = (0..59).map(|i| h.u8(0x20 + i)).collect();
+        self.out.materials.push(MaterialInfo { name: name.clone(), techset, textures, sort_key: h.u8(5), state_bits, state_entry });
         Ok((AssetRef::Material(idx), name))
     }
 

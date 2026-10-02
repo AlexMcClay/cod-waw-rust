@@ -313,8 +313,8 @@ fn poll_load(
                     Blend::Blend => AlphaMode::Blend,
                 },
                 unlit: m.unlit,
-                double_sided: m.blend != Blend::Opaque,
-                cull_mode: if m.blend == Blend::Opaque { Some(bevy::render::render_resource::Face::Back) } else { None },
+                double_sided: m.two_sided,
+                cull_mode: if m.two_sided { None } else { Some(bevy::render::render_resource::Face::Back) },
                 lightmap_exposure: 250.0,
                 depth_bias: if m.blend == Blend::Blend { 2.0 } else { 0.0 },
                 ..default()

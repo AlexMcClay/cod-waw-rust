@@ -140,6 +140,10 @@ pub struct MaterialInfo {
     pub techset: Option<String>,
     pub textures: Vec<TexDef>,
     pub sort_key: u8,
+    /// File position and count of the `GfxStateBits` table (2 x u32 each).
+    pub state_bits: Option<(usize, usize)>,
+    /// Technique type -> index into the state bits table (0xff = none).
+    pub state_entry: Vec<u8>,
 }
 
 impl MaterialInfo {
@@ -378,6 +382,25 @@ impl WeaponInfo {
     }
 }
 
+/// `GfxStateBits.loadBits[0]` of a technique.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RenderState(pub u32);
+
+impl RenderState {
+    /// Alpha test enabled (GT0, LT128 or GE128).
+    pub fn alpha_test(self) -> bool {
+        matches!(self.0 & 0x3800, 0x1000 | 0x2000 | 0x3000)
+    }
+    /// Drawn without face culling.
+    pub fn two_sided(self) -> bool {
+        self.0 & 0xc000 == 0x4000
+    }
+    /// Blends with source alpha (src SRC_ALPHA, dst INV_SRC_ALPHA).
+    pub fn alpha_blend(self) -> bool {
+        self.0 & 0xf == 5 && (self.0 >> 4) & 0xf == 6
+    }
+}
+
 /// A bitmap font (`Font_s`): glyphs in a shared atlas image.
 #[derive(Debug, Clone)]
 pub struct FontInfo {
@@ -466,6 +489,19 @@ impl ZoneData {
     pub fn loaded_sound_bytes(&self, i: u32) -> &[u8] {
         let s = &self.loaded_sounds[i as usize];
         &self.data[s.fpos..s.fpos + s.len]
+    }
+
+    /// The render state (`loadBits[0]`) of the material's main lit
+    /// technique (technique types 8..=42 are the lit variants).
+    pub fn lit_state(&self, m: &MaterialInfo) -> Option<RenderState> {
+        let (p, n) = m.state_bits?;
+        let idx = m.state_entry.get(8..=42)?.iter().copied().find(|&i| i != 0xff).or_else(|| m.state_entry.get(4).copied().filter(|&i| i != 0xff))?;
+        if idx as usize >= n {
+            return None;
+        }
+        let o = p + 8 * idx as usize;
+        let b = self.data.get(o..o + 4)?;
+        Some(RenderState(u32::from_le_bytes([b[0], b[1], b[2], b[3]])))
     }
 
     pub fn font(&self, name: &str) -> Option<&FontInfo> {
