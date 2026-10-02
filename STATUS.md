@@ -45,6 +45,11 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
 - Particle effects from the game's FX assets: muzzle flashes, shell ejects, impacts by surface type,
   blood, grenade explosions, power-up/box/board effects and all 103 placed ambient effects
   (see `research/vfx/WAW_FX.md`).
+- Zombie navigation on the map's AI collision: walkable node links only (18-unit step), one shared
+  route field to the player anywhere on the map (through opened doors), windows picked by route
+  length, smooth stairs. Dev switches: `UNDEAD_TEST_ZOMBIE_PATH`, `UNDEAD_TEST_OPEN_DOORS`,
+  `UNDEAD_TEST_ZOMBIE_SPEED=walk|run|sprint`.
+- Player aim time, zoom, move speed and sprint length come from the held weapon.
 - `build_release.bat` → `undead_rounds\dist\UndeadRounds\UndeadRounds.exe`.
 
 ## Open
@@ -54,7 +59,7 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
 
 ## Next (queued)
 
-- Zombie pathfinding rewrite (in progress): Chase zombies can oscillate between two path nodes.
+- About 20 small outdoor path-node clusters are not linked to the rest (no spawner uses them).
 - Ray Gun self-damage.
 - Not yet from the rules: crawlers from explosive gibs, burning damage, the stuck-zombie cleanup.
 - FX gaps: trails drawn as sprites, no particle collision, IWI format 9 textures (light beams).
