@@ -6,6 +6,7 @@
 
 pub mod install;
 pub mod iwd;
+pub mod look;
 pub mod iwi;
 pub mod mapents;
 pub mod t4;

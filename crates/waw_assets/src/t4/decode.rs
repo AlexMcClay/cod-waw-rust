@@ -40,6 +40,9 @@ pub fn packed_unit_vec(b: [u8; 4]) -> [f32; 3] {
 pub struct Vertex {
     pub pos: [f32; 3],
     pub normal: [f32; 3],
+    pub tangent: [f32; 3],
+    /// Sign of the binormal (bitangent = sign * cross(normal, tangent)).
+    pub binormal_sign: f32,
     pub uv: [f32; 2],
     pub color: [u8; 4],
 }
@@ -56,6 +59,8 @@ pub fn world_vertex(zone: &ZoneData, world: &WorldInfo, i: u32) -> Option<Vertex
         color: [z[base + 16], z[base + 17], z[base + 18], z[base + 19]],
         uv: [f32_at(z, base + 20), f32_at(z, base + 24)],
         normal: packed_unit_vec([z[base + 36], z[base + 37], z[base + 38], z[base + 39]]),
+        tangent: packed_unit_vec([z[base + 40], z[base + 41], z[base + 42], z[base + 43]]),
+        binormal_sign: f32_at(z, base + 12),
     })
 }
 
@@ -106,6 +111,8 @@ pub fn model_surface(zone: &ZoneData, s: &XSurfInfo) -> ModelMesh {
                 color: [z[b + 16], z[b + 17], z[b + 18], z[b + 19]],
                 uv: [half((tc >> 16) as u16), half((tc & 0xffff) as u16)],
                 normal: packed_unit_vec([z[b + 24], z[b + 25], z[b + 26], z[b + 27]]),
+                tangent: packed_unit_vec([z[b + 28], z[b + 29], z[b + 30], z[b + 31]]),
+                binormal_sign: f32_at(z, b + 12),
             });
         }
     }

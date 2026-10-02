@@ -4,7 +4,6 @@
 use crate::audio::{PlayAlias, Sfx};
 use crate::settings::UserSettings;
 use crate::{cursor_locked, GameState, LevelRes, World};
-use bevy::core_pipeline::bloom::Bloom;
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
@@ -137,10 +136,15 @@ pub fn spawn_player(mut commands: Commands, level: Res<LevelRes>, settings: Res<
     let (x, z) = level.0.player_start;
     commands.spawn((
         Camera3d::default(),
-        Camera { hdr: true, ..default() },
+        // LDR like the original (no tonemapping or bloom: the zombie vision
+        // turns glow off); fog and the film grade come from `postfx`.
+        Camera { hdr: false, ..default() },
+        bevy::core_pipeline::tonemapping::Tonemapping::None,
+        Msaa::Off,
+        bevy::core_pipeline::prepass::DepthPrepass,
+        crate::postfx::WawPost::off(1.0),
         Projection::Perspective(PerspectiveProjection { fov: settings.fov.to_radians(), near: 0.03, ..default() }),
         Exposure { ev100: settings.exposure_ev },
-        Bloom::NATURAL,
         DistanceFog {
             color: Color::srgb(0.02, 0.025, 0.04),
             falloff: FogFalloff::Linear { start: 12.0, end: 48.0 },
@@ -399,10 +403,26 @@ fn tweak_settings(keys: Res<ButtonInput<KeyCode>>, mut settings: ResMut<UserSett
     }
 }
 
-fn apply_exposure(settings: Res<UserSettings>, mut cams: Query<&mut Exposure, With<Player>>) {
-    if settings.is_changed() {
-        if let Ok(mut e) = cams.single_mut() {
-            e.ev100 = settings.exposure_ev;
-        }
+/// The brightness setting. On the real maps everything is lit in the
+/// game's own units (exposure fixed at 1) and brightness is a display gamma
+/// in the post pass; the prototype map uses camera exposure.
+fn apply_exposure(
+    settings: Res<UserSettings>,
+    real_map: Option<Res<crate::nacht::NachtActive>>,
+    mut cams: Query<(&mut Exposure, &mut crate::postfx::WawPost), With<Player>>,
+) {
+    let Ok((mut e, mut post)) = cams.single_mut() else { return };
+    let (ev, gamma) = if real_map.is_some() {
+        // Exposure factor 1 / (1.2 * 2^ev) = 1.
+        let brightness = 15.0 - settings.exposure_ev;
+        ((1.0f32 / 1.2).log2(), (1.0 + (brightness - 7.5) * 0.08).clamp(0.4, 2.0))
+    } else {
+        (settings.exposure_ev, 1.0)
+    };
+    if e.ev100 != ev {
+        e.ev100 = ev;
+    }
+    if post.dark_tint.w != gamma {
+        post.set_gamma(gamma);
     }
 }

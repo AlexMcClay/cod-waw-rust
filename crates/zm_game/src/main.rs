@@ -15,6 +15,7 @@ mod interact;
 mod menu;
 mod nacht;
 mod player;
+mod postfx;
 mod powerups;
 mod round;
 mod settings;
@@ -265,6 +266,7 @@ fn main() {
             hud::HudPlugin,
             menu::MenuPlugin,
             nacht::NachtPlugin,
+            postfx::PostFxPlugin,
         ))
         .add_systems(Startup, move |mut next: ResMut<NextState<GameState>>| {
             if start_map.is_some() {

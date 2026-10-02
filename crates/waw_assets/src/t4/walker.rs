@@ -1064,7 +1064,19 @@ impl<'a> Walker<'a> {
             let n = h.u32(8) as usize;
             let arr = self.read(72 * n)?;
             for i in 0..n {
-                self.xstring(arr.elem(i, 72).u32(0x44))?;
+                let l = arr.elem(i, 72);
+                let def_name = self.xstring(l.u32(0x44))?.unwrap_or_default();
+                self.out.primary_lights.push(PrimaryLight {
+                    kind: l.u8(0),
+                    color: l.vec3(0x8),
+                    dir: l.vec3(0x14),
+                    origin: l.vec3(0x20),
+                    radius: l.f32(0x2c),
+                    cos_half_fov_outer: l.f32(0x30),
+                    cos_half_fov_inner: l.f32(0x34),
+                    exponent: l.u8(2),
+                    def_name,
+                });
             }
         }
         self.inline(h.u32(0x24), 4, 8 * h.u32(0x20) as usize)?;
@@ -1178,10 +1190,22 @@ impl<'a> Walker<'a> {
         self.inline(h.u32(0x24), 4, 4 * h.u32(0x20) as usize)?;
         let sky_image = self.asset_idx(T::Image, h.u32(0x28), None)?;
         let sky_box_model = self.xstring(h.u32(0x30))?;
+        let mut sun_light = None;
         if h.u32(0xd8) == FOLLOW {
             self.alloc(4);
             let l = self.read(64)?;
             self.asset(T::LightDef, l.u32(0x3c), l.loc(0x3c))?;
+            sun_light = Some(PrimaryLight {
+                kind: l.u8(0),
+                color: l.vec3(0x4),
+                dir: l.vec3(0x10),
+                origin: l.vec3(0x1c),
+                radius: l.f32(0x28),
+                cos_half_fov_outer: l.f32(0x2c),
+                cos_half_fov_inner: l.f32(0x30),
+                exponent: l.i32(0x34).clamp(0, 255) as u8,
+                def_name: String::new(),
+            });
         }
         if h.u32(0xf8) != 0 {
             self.alloc(4);
@@ -1218,10 +1242,27 @@ impl<'a> Walker<'a> {
         let g = h.sub(0x128, 56);
         let axis = (g.u32(0x14) as usize).min(2);
         let rows = (g.u16(0xe + 2 * axis) as i64 - g.u16(0x8 + 2 * axis) as i64 + 1).max(0) as usize;
-        self.inline(g.u32(0x1c), 2, 2 * rows)?;
-        self.inline(g.u32(0x24), 1, g.u32(0x20) as usize)?;
-        self.inline(g.u32(0x2c), 4, 4 * g.u32(0x28) as usize)?;
-        self.inline(g.u32(0x34), 4, 168 * g.u32(0x30) as usize)?;
+        let row_starts = self.inline(g.u32(0x1c), 2, 2 * rows)?;
+        let raw_rows = self.inline(g.u32(0x24), 1, g.u32(0x20) as usize)?;
+        let entries = self.inline(g.u32(0x2c), 4, 4 * g.u32(0x28) as usize)?;
+        let colors = self.inline(g.u32(0x34), 4, 168 * g.u32(0x30) as usize)?;
+        let light_grid = match (row_starts, raw_rows, entries, colors) {
+            (Some(row_starts), Some(raw_rows), Some(entries), Some(colors)) => Some(LightGridInfo {
+                mins: [g.u16(0x8), g.u16(0xa), g.u16(0xc)],
+                maxs: [g.u16(0xe), g.u16(0x10), g.u16(0x12)],
+                row_axis: axis,
+                col_axis: (g.u32(0x18) as usize).min(2),
+                rows,
+                row_starts,
+                raw_rows,
+                raw_rows_len: g.u32(0x20) as usize,
+                entries,
+                entry_count: g.u32(0x28) as usize,
+                colors,
+                color_count: g.u32(0x30) as usize,
+            }),
+            _ => None,
+        };
         let model_count = h.i32(0x168).max(0) as usize;
         let models_fpos = self.inline(h.u32(0x16c), 4, 56 * model_count)?;
         if h.u32(0x190) != 0 {
@@ -1287,6 +1328,7 @@ impl<'a> Walker<'a> {
                     base_index: s.u32(0xc),
                     material,
                     lightmap: s.u8(0x18),
+                    primary_light: s.u8(0x1a),
                     flags: s.u8(0x1b),
                 });
             }
@@ -1347,6 +1389,8 @@ impl<'a> Walker<'a> {
             mins: h.vec3(0x170),
             maxs: h.vec3(0x17c),
             sun_color: h.vec3(0xdc),
+            sun_light,
+            light_grid,
         });
         Ok((AssetRef::Other(T::GfxWorld), name))
     }
@@ -1610,7 +1654,10 @@ impl<'a> Walker<'a> {
         let h = self.read(12)?;
         self.push(VIRTUAL);
         let name = self.xstring(h.u32(0))?.unwrap_or_default();
-        self.inline(h.u32(8), 1, h.i32(4).max(0) as usize + 1)?;
+        let len = h.i32(4).max(0) as usize;
+        if let Some(p) = self.inline(h.u32(8), 1, len + 1)? {
+            self.out.rawfiles.push((name.clone(), p, len));
+        }
         self.pop();
         Ok((AssetRef::Other(AssetType::RawFile), name))
     }
