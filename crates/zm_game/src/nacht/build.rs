@@ -325,6 +325,11 @@ pub struct NachtScene {
     pub weapon_names: HashMap<String, String>,
     /// Our weapon id -> its third-person (world) model, shown by the box.
     pub weapon_world_models: HashMap<String, String>,
+    /// Our weapon id -> the gameplay numbers of the zone's WeaponDef (what
+    /// the game itself uses), as weapon-file key/value pairs.
+    pub weapon_stats: HashMap<String, Vec<(&'static str, String)>>,
+    /// Flesh penetration depths from common.ff's `info/bullet_penetration_sp`.
+    pub flesh_penetration: Option<[f32; 4]>,
     /// The mystery box as the map builds it.
     pub chest: Option<SceneChest>,
     pub characters: Vec<SceneCharacter>,
@@ -1477,6 +1482,15 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
             localized(&w.display_name).filter(|n| !n.trim().is_empty()).map(|n| (id.to_string(), n))
         })
         .collect();
+    let weapon_stats = wanted
+        .weapon_ids
+        .iter()
+        .filter_map(|&id| {
+            let w = zones.iter().find_map(|z| z.weapon(zone_weapon_name(id)))?;
+            (!w.stats.is_empty()).then(|| (id.to_string(), w.stats.clone()))
+        })
+        .collect();
+    let flesh_penetration = zones.iter().find_map(|z| z.rawfile("info/bullet_penetration_sp")).and_then(|t| zm_core::weapons::parse_penetration_table(&t));
     // One line per weapon, so a weapon the map's zones lack shows up.
     for &id in &wanted.weapon_ids {
         let rig = view_rig.as_ref();
@@ -1515,6 +1529,8 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         weapon_sounds,
         weapon_names,
         weapon_world_models,
+        weapon_stats,
+        flesh_penetration,
         chest,
         characters,
         zombie_anims,

@@ -6,7 +6,8 @@
 //! * [`wav`]        – RIFF/WAVE reader that turns MS-ADPCM / IMA-ADPCM into PCM16
 //!                    (the sounds shipped in World at War's `.iwd` archives are MS-ADPCM).
 //! * [`weaponfile`] – parser for the `WEAPONFILE\key\value\...` text format.
-//! * [`weapons`]    – built-in weapon table, optionally overridden from weapon files.
+//! * [`weapons`]    – weapon table (damage, hit locations, reloads, spread), read from the
+//!                    game's weapon files; [`weapon_defaults`] holds the no-install fallbacks.
 //! * [`grenade`]    – hand grenade stats, allowance, radius damage and bounces.
 //! * [`rules`]      – round / health / points / drop-rate maths.
 //! * [`geom`]       – tiny 2D/3D maths helpers (AABBs, ray casts, circle push-out).
@@ -23,5 +24,6 @@ pub mod navgraph;
 pub mod rules;
 pub mod trimesh;
 pub mod wav;
+pub mod weapon_defaults;
 pub mod weaponfile;
 pub mod weapons;

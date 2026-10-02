@@ -17,6 +17,7 @@
 pub mod anim;
 pub mod decode;
 mod walker;
+pub mod weapondef;
 
 pub use walker::walk;
 
@@ -531,11 +532,20 @@ pub struct WeaponInfo {
     pub projectile_model: Option<u32>,
     /// `bounceSound`: an alias per surface type (empty when unset), if any.
     pub bounce_sounds: Vec<String>,
+    /// Gameplay numbers (damage, timings, ammo, spread, hit-location
+    /// multipliers...) as weapon-file `(key, value)` pairs; see
+    /// [`weapondef::stats`].
+    pub stats: Vec<(&'static str, String)>,
 }
 
 impl WeaponInfo {
     pub fn sound(&self, field: &str) -> Option<&str> {
         self.sounds.iter().find(|(f, _)| *f == field).map(|(_, s)| s.as_str())
+    }
+
+    /// One of [`Self::stats`] by its weapon-file key.
+    pub fn stat(&self, key: &str) -> Option<&str> {
+        self.stats.iter().find(|(f, _)| *f == key).map(|(_, v)| v.as_str())
     }
 }
 
@@ -744,6 +754,28 @@ mod tests {
         assert!((sun.color[0] - 0.3536).abs() < 0.001 && (sun.dir[2] - 0.5).abs() < 0.01, "{sun:?}");
         let lit = w.surfaces.iter().filter(|s| s.primary_light == 1).count();
         assert_eq!(lit, 1066);
+    }
+
+    /// The zone's WeaponDefs carry the same numbers as the IWD weapon files.
+    #[test]
+    #[ignore]
+    fn reads_weapon_stats() {
+        let root = std::env::var("UNDEAD_WAW").expect("set UNDEAD_WAW");
+        let ff = std::fs::read(std::path::Path::new(&root).join("zone/english/nazi_zombie_prototype.ff")).unwrap();
+        let zd = walk(crate::zone::decompress(&ff).unwrap());
+        let k = zd.weapon("kar98k").unwrap();
+        assert_eq!(k.stat("damage"), Some("100"));
+        assert_eq!(k.stat("fireType"), Some("Single Shot"));
+        assert_eq!(k.stat("fireTime"), Some("0.33"));
+        assert_eq!(k.stat("rechamberTime"), Some("1"));
+        assert_eq!(k.stat("locHead"), Some("3.5"));
+        assert_eq!(k.stat("locHelmet"), Some("1"));
+        assert_eq!(k.stat("maxDamageRange"), Some("1200"));
+        let s = zd.weapon("shotgun").unwrap();
+        assert_eq!((s.stat("shotCount"), s.stat("segmentedReload"), s.stat("weaponClass")), (Some("8"), Some("1"), Some("spread")));
+        let r = zd.weapon("ray_gun").unwrap();
+        assert_eq!((r.stat("weaponType"), r.stat("fireType"), r.stat("explosionInnerDamage")), (Some("projectile"), Some("Full Auto"), Some("1500")));
+        assert_eq!(zd.weapon("thompson").unwrap().stat("penetrateType"), Some("medium"));
     }
 
     /// The game's bitmap fonts come from code_post_gfx.ff.

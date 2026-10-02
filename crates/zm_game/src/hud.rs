@@ -630,7 +630,8 @@ fn draw_crosshair(c: &mut Canvas, player: &Query<(&PlayerCtl, &Projection), With
         Projection::Perspective(p) => p.fov,
         _ => 1.2,
     };
-    let spread = loadout.as_ref().map(|l| defs.0[l.current().def].spread).unwrap_or(2.0) * if ctl.moving { 1.6 } else { 1.0 };
+    // The weapon's current cone (the engine's aim-spread model).
+    let spread = if gun.spread > 0.0 { gun.spread } else { loadout.as_ref().map_or(2.0, |l| defs.0[l.current().def].spread.stand.0) };
     let off = spread.to_radians().tan() / (fov * 0.5).tan() * c.h * 0.5 + 4.0 * c.u;
     let firing = gun.since_shot.is_some_and(|s| s < 0.25);
     let a = (if firing { 0.35 } else { 0.8 }) * (1.0 - ctl.ads * 2.0);
