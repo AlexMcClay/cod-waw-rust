@@ -16,6 +16,7 @@
 
 pub mod anim;
 pub mod decode;
+pub mod fx;
 mod walker;
 
 pub use walker::walk;
@@ -40,6 +41,8 @@ pub enum AssetType {
     GfxWorld,
     LightDef,
     Font,
+    MenuList,
+    Menu,
     Localize,
     SndDriverGlobals,
     Weapon,
@@ -70,6 +73,8 @@ impl AssetType {
             17 => GfxWorld,
             18 => LightDef,
             20 => Font,
+            21 => MenuList,
+            22 => Menu,
             25 => SndDriverGlobals,
             23 => Localize,
             24 => Weapon,
@@ -91,6 +96,8 @@ pub enum AssetRef {
     Sound(u32),
     LoadedSound(u32),
     Weapon(u32),
+    /// Index into [`ZoneData::fx`].
+    Fx(u32),
     TechSet(u32),
     Other(AssetType),
     /// An image's pixel-data header (target of -2 pointer slots).
@@ -144,6 +151,10 @@ pub struct MaterialInfo {
     pub state_bits: Option<(usize, usize)>,
     /// Technique type -> index into the state bits table (0xff = none).
     pub state_entry: Vec<u8>,
+    /// `textureAtlasRowCount`, `textureAtlasColumnCount` (effect sprites).
+    pub atlas: (u8, u8),
+    /// One bit per surface type (see [`fx::SURFACE_TYPES`]).
+    pub surface_type_bits: u32,
 }
 
 impl MaterialInfo {
@@ -531,6 +542,8 @@ pub struct WeaponInfo {
     pub projectile_model: Option<u32>,
     /// `bounceSound`: an alias per surface type (empty when unset), if any.
     pub bounce_sounds: Vec<String>,
+    /// Muzzle flashes, shell ejects, projectile effects and impact type.
+    pub fx: fx::WeaponFx,
 }
 
 impl WeaponInfo {
@@ -607,6 +620,9 @@ pub struct ZoneData {
     pub world: Option<WorldInfo>,
     pub map_ents: Option<String>,
     pub localize: Vec<(String, String)>,
+    /// Effects (stubs named `,name` refer to other zones).
+    pub fx: Vec<fx::Effect>,
+    pub impact_fx: Vec<fx::ImpactTable>,
     /// Back-references that could not be resolved (0 for a correct walk).
     pub unresolved: usize,
     /// Final stream position and VIRTUAL block size (for verification).
@@ -697,6 +713,11 @@ impl ZoneData {
             .collect()
     }
 
+    /// An effect defined in this zone (not a cross-zone stub).
+    pub fn effect(&self, name: &str) -> Option<&fx::Effect> {
+        self.fx.iter().find(|f| !f.is_stub() && f.name.eq_ignore_ascii_case(name))
+    }
+
     pub fn localized(&self, key: &str) -> Option<&str> {
         self.localize.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
     }
@@ -763,6 +784,51 @@ mod tests {
         assert_eq!(g[(b'0' - 32) as usize].dx, 13);
         let m = &zd.materials[f.material.unwrap() as usize];
         assert_eq!(m.textures.first().and_then(|t| t.image).map(|i| zd.image_name(i)), Some("gamefonts_pc"));
+    }
+
+    /// Effects, the impact table and weapon effects (common.ff now walks
+    /// past its menus to the end).
+    #[test]
+    #[ignore]
+    fn reads_effects() {
+        let root = std::env::var("UNDEAD_WAW").expect("set UNDEAD_WAW");
+        let read = |name: &str| walk(crate::zone::decompress(&std::fs::read(std::path::Path::new(&root).join(format!("zone/english/{name}.ff"))).unwrap()).unwrap());
+        let nacht = read("nazi_zombie_prototype");
+        assert!(nacht.complete());
+        assert_eq!(nacht.fx.len(), 190);
+        let flash = nacht.effect("weapon/muzzleflashes/fx_kar98k_view").unwrap();
+        assert_eq!((flash.looping, flash.oneshot, flash.elems.len()), (0, 4, 4));
+        let light = &flash.elems[3];
+        assert_eq!(light.elem_type, fx::elem_type::OMNI_LIGHT);
+        assert_eq!((light.life_span_msec.base, light.vis.len(), light.vis[0].base.size[0]), (48, 2, 80.0));
+        // Colours are stored B, G, R, A: an orange flash light.
+        assert_eq!(light.vis[0].base.color, [73, 158, 243, 255]);
+        let smoke = &flash.elems[2];
+        assert_eq!((smoke.vel.len(), smoke.vis.len()), (3, 8));
+        assert!(matches!(smoke.visuals[0], fx::Visual::Material(_)));
+        let kar = nacht.weapon("kar98k").unwrap();
+        assert_eq!(kar.fx.view_flash.as_deref(), Some("weapon/muzzleflashes/fx_kar98k_view"));
+        assert_eq!(kar.fx.view_shell_eject.as_deref(), Some("weapon/shellejects/rifle_view"));
+        assert_eq!(kar.fx.impact_type, 2);
+        let eye = nacht.effect("misc/fx_zombie_eye_single").unwrap();
+        assert_eq!((eye.msec_looping_life, eye.looping), (i32::MAX, 4));
+        assert_eq!(eye.elems[0].spawn, [50, i32::MAX]);
+        assert!(nacht.rawfile("maps/createfx/nazi_zombie_prototype_fx.gsc").unwrap().contains("createOneshotEffect"));
+        // The grenade's bounce sounds are indexed by surface type.
+        let g = nacht.weapon("stielhandgranate").unwrap();
+        for (i, s) in g.bounce_sounds.iter().enumerate() {
+            assert_eq!(s, &format!("grenade_bounce_{}", fx::SURFACE_TYPES[i]));
+        }
+        let common = read("common");
+        assert!(common.complete(), "stopped {:?}", common.stopped);
+        assert_eq!(common.unresolved, 0);
+        assert_eq!((common.fx.len(), common.impact_fx.len()), (132, 1));
+        let table = &common.impact_fx[0].entries;
+        assert_eq!(table.len(), 16);
+        assert_eq!(table[0].nonflesh[21].as_deref(), Some("impacts/large_woodhit"));
+        assert_eq!(table[10].nonflesh[5].as_deref(), Some("explosions/grenadeexp_concrete_1"));
+        assert_eq!(table[1].flesh[3].as_deref(), Some("impacts/flesh_hit_head_fatal_exit"));
+        assert!(common.effect("impacts/large_woodhit").is_some());
     }
 
     #[test]

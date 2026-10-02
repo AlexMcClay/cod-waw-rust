@@ -9,6 +9,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod audio;
+mod fx;
 mod grenades;
 mod hud;
 mod interact;
@@ -267,6 +268,7 @@ fn main() {
             menu::MenuPlugin,
             nacht::NachtPlugin,
             postfx::PostFxPlugin,
+            fx::FxPlugin,
         ))
         .add_systems(Startup, move |mut next: ResMut<NextState<GameState>>| {
             if start_map.is_some() {
