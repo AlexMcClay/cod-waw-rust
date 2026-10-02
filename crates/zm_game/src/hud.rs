@@ -492,7 +492,7 @@ fn draw_round(c: &mut Canvas, anim: &HudAnim) {
         alpha *= if ch < 0.5 { 1.0 - ch * 2.0 } else { (ch - 0.5) * 2.0 };
     }
     // Where the chalk sits: bottom-left, or sliding there during the intro.
-    let home = c.at(H::Left, V::Bottom, -5.0, 0.0);
+    let home = c.at(H::Left, V::Bottom, -3.0, -4.0);
     let mut pos = home;
     if let Some(i) = anim.intro {
         let start = c.at(H::Center, V::Bottom, -5.0, -200.0);
@@ -522,14 +522,14 @@ fn draw_round(c: &mut Canvas, anim: &HudAnim) {
 
 /// The score on its red brush stroke, and the floating point popups.
 fn draw_score(c: &mut Canvas, anim: &HudAnim, points: u32) {
+    // Measured from the PC game at 1080p: the bar spans x -102..-11.
     let anchor = c.at(H::Right, V::Bottom, -103.0, -71.0);
     if let Some(bar) = c.assets.scorebar.clone() {
-        let p = anchor + Vec2::new(-6.0 * c.u, 0.0);
-        c.image(&bar, p, Vec2::new(144.0, 20.0), (H::Left, V::Middle), Color::srgba(0.424, 0.004, 0.0, 0.8));
+        let p = c.at(H::Right, V::Bottom, -102.0, -71.0);
+        c.image(&bar, p, Vec2::new(91.0, 20.0), (H::Left, V::Middle), Color::srgba(0.424, 0.004, 0.0, 0.8));
     }
-    let size = 15.0;
-    let p = anchor + Vec2::new(6.0 * c.u, 0.0);
-    c.text(&points.to_string(), p, size, (H::Left, V::Middle), Color::WHITE, false);
+    let p = c.at(H::Right, V::Bottom, -97.0, -71.0);
+    c.text(&points.to_string(), p, 12.5, (H::Left, V::Middle), Color::WHITE, false);
     for pop in &anim.popups {
         let k = (pop.t / 0.5).min(1.0);
         let p = anchor + Vec2::new(pop.dx, pop.dy) * k * c.u;
@@ -545,10 +545,13 @@ fn draw_weapon(c: &mut Canvas, l: &Loadout, defs: &Defs, names: Option<&crate::n
     let def = &defs.0[slot.def];
     let name = names.and_then(|n| n.0.get(def.id)).cloned().unwrap_or_else(|| def.name.clone());
     let white = Color::srgba(1.0, 1.0, 1.0, 0.75);
-    let p = c.at(H::Right, V::Bottom, -15.0, -40.0);
+    let p = c.at(H::Right, V::Bottom, -43.0, -38.0);
     c.text(&name, p, 14.86, (H::Right, V::Bottom), white, true);
-    let p = c.at(H::Right, V::Bottom, -75.0, 4.0);
-    c.text(&slot.reserve.to_string(), p, 14.86, (H::Left, V::Bottom), white, true);
+    // Reserve, red when it won't fill the clip much more.
+    let low_stock = (slot.reserve as f32) < def.clip as f32 * 1.5;
+    let stock_col = if low_stock { Color::srgba(0.85, 0.12, 0.1, 0.9) } else { white };
+    let p = c.at(H::Right, V::Bottom, -67.0, 2.0);
+    c.text(&slot.reserve.to_string(), p, 14.86, (H::Left, V::Bottom), stock_col, true);
 
     // One icon per round in the clip: bullets in a row growing left,
     // rifle rounds stacked.
@@ -557,12 +560,14 @@ fn draw_weapon(c: &mut Canvas, l: &Loadout, defs: &Defs, names: Option<&crate::n
         Kind::Shotgun => 2,
         _ => 0,
     };
-    if let Some((img, size)) = c.assets.ammo[kind].clone() {
-        let base = c.at(H::Right, V::Bottom, -79.0, -4.0);
+    if let Some((img, texels)) = c.assets.ammo[kind].clone() {
+        // Icons at half their texel size in a row growing left (rifle
+        // rounds lie as dashes), as the PC game draws them.
+        let size = texels * 0.5;
+        let base = c.at(H::Right, V::Bottom, -78.0, -4.0);
         let col = Color::srgba(1.0, 1.0, 1.0, 0.65);
         for i in 0..slot.clip.min(60) {
-            let step = if kind == 1 { Vec2::new(0.0, -(size.y + 1.0)) } else { Vec2::new(-(size.x + 1.0), 0.0) };
-            let p = base + step * i as f32 * c.u;
+            let p = base + Vec2::new(-(size.x + 1.0), 0.0) * i as f32 * c.u;
             c.image(&img, p, size, (H::Right, V::Bottom), col);
         }
     } else {
