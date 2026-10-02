@@ -377,6 +377,11 @@ pub struct WeaponDef {
     pub raise_time: f32,
     pub drop_time: f32,
     pub first_raise_time: f32,
+    /// Full-screen scope drawn when fully aimed, instead of the gun
+    /// (`adsOverlayShader`: a material/image name), and its size in the
+    /// game's 640 x 480 screen (`adsOverlayWidth`/`Height`).
+    pub ads_overlay: Option<String>,
+    pub ads_overlay_size: [f32; 2],
     /// Explosion at the impact point (Ray Gun): radius in metres, damage at
     /// the centre and at the edge.
     pub splash_radius: f32,
@@ -427,6 +432,8 @@ impl WeaponDef {
             raise_time: 0.5,
             drop_time: 0.4,
             first_raise_time: 0.8,
+            ads_overlay: None,
+            ads_overlay_size: [480.0, 480.0],
             splash_radius: 0.0,
             splash_inner: 0.0,
             splash_damage: 0.0,
@@ -614,6 +621,12 @@ impl WeaponDef {
         pos(&mut n, &mut self.raise_time, wf.f32("raiseTime"));
         pos(&mut n, &mut self.drop_time, wf.f32("dropTime"));
         pos(&mut n, &mut self.first_raise_time, wf.f32("firstRaiseTime"));
+        if let Some(o) = wf.get("adsOverlayShader").map(str::trim).filter(|o| !o.is_empty()) {
+            self.ads_overlay = Some(o.to_string());
+            n += 1;
+            pos(&mut n, &mut self.ads_overlay_size[0], wf.f32("adsOverlayWidth"));
+            pos(&mut n, &mut self.ads_overlay_size[1], wf.f32("adsOverlayHeight"));
+        }
 
         if let Some(r) = m("explosionRadius").filter(|r| *r > 0.0) {
             self.splash_radius = r;

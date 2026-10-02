@@ -50,7 +50,11 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
   length, smooth stairs. Dev switches: `UNDEAD_TEST_ZOMBIE_PATH`, `UNDEAD_TEST_OPEN_DOORS`,
   `UNDEAD_TEST_ZOMBIE_SPEED=walk|run|sprint`.
 - Player aim time, zoom, move speed and sprint length come from the held weapon.
-- Test runs (`UNDEAD_CAPTURE`, `UNDEAD_TEST_*`) hand control to the player on their first input.
+- Scoped weapons show their scope overlay (`adsOverlayShader`) instead of the gun when fully aimed.
+- Effect lights go through a pool of 8 (hundreds of particle lights crowded the light-grid volume
+  out of Bevy's clusters: black, flickering blocks on models). Decal sort layers get a depth offset.
+- Test runs (`UNDEAD_CAPTURE`, `UNDEAD_TEST_*`) hand control to the player on their first input;
+  `UNDEAD_TEST_ADS=1` holds aim.
   `UNDEAD_COLLISION_MAP=<file.ppm>` maps what stops the player around the start.
 - `build_release.bat` → `undead_rounds\dist\UndeadRounds\UndeadRounds.exe`.
 
@@ -66,5 +70,4 @@ Goal: rebuild CoD: World at War Zombies in Rust (Bevy), starting with Nacht der 
 - Not yet from the rules: crawlers from explosive gibs, burning damage, the stuck-zombie cleanup.
 - FX gaps: trails drawn as sprites, no particle collision, IWI format 9 textures (light beams),
   distortion (heat haze) elements and character blood decals are not drawn.
-- Reported: occasional (black) flicker while moving; not reproduced in captures yet.
 - Perks/power (Verrückt and later maps), co-op.

@@ -217,6 +217,12 @@ impl HeldWeapon {
     }
 }
 
+/// Whether the weapon's scope overlay covers the view (fully aimed with a
+/// weapon that has one).
+pub fn scope_shown(def: &WeaponDef, ctl: &PlayerCtl) -> bool {
+    def.ads_overlay.is_some() && ctl.ads >= 0.999
+}
+
 /// The first-person rig (arms + gun) spawned for the weapon in hand.
 #[derive(Component)]
 pub struct ViewRigState {
@@ -870,15 +876,19 @@ fn update_viewmodel(
     view_models: Res<crate::nacht::ViewModels>,
     view_rig: Res<crate::nacht::ViewRig>,
     player: Query<&PlayerCtl, With<Player>>,
-    mut vm: Query<(Entity, &mut Transform, &mut ViewModel), (Without<KnifeModel>, Without<MuzzleFlash>)>,
+    mut vm: Query<(Entity, &mut Transform, &mut ViewModel, &mut Visibility), (Without<KnifeModel>, Without<MuzzleFlash>)>,
     models: Query<Entity, With<GunModel>>,
     mut knife: Query<(&mut Transform, &mut Visibility), (With<KnifeModel>, Without<MuzzleFlash>, Without<ViewModel>)>,
     mut flash: Query<(Entity, &mut Transform, &mut PointLight), (With<MuzzleFlash>, Without<KnifeModel>, Without<ViewModel>)>,
 ) {
     let Some(loadout) = loadout else { return };
-    let Ok((root, mut t, mut vm)) = vm.single_mut() else { return };
+    let Ok((root, mut t, mut vm, mut vis)) = vm.single_mut() else { return };
     let Ok(ctl) = player.single() else { return };
     let def_idx = loadout.current().def;
+    // Scoped weapons show their scope overlay instead of the gun once fully
+    // aimed (the HUD draws it).
+    let scoped = scope_shown(&defs.0[def_idx], ctl);
+    vis.set_if_neq(if scoped { Visibility::Hidden } else { Visibility::Inherited });
     if vm.shown != Some(def_idx) || ((view_models.is_changed() || view_rig.is_changed()) && !view_models.0.is_empty()) {
         // Keep the muzzle flash: it may be attached to the old gun's flash tag.
         if let Ok((fe, ..)) = flash.single() {

@@ -62,6 +62,8 @@ struct HudAssets {
     ammo: [Option<(Handle<Image>, Vec2)>; 3],
     low_health: Option<Handle<Image>>,
     grenade: Option<Handle<Image>>,
+    /// Scope overlays by name (`adsOverlayShader`), loaded when first seen.
+    scopes: HashMap<String, Option<Handle<Image>>>,
 }
 
 /// Animation state of the script-driven parts.
@@ -97,10 +99,28 @@ impl Plugin for HudPlugin {
         app.init_resource::<HudAnim>()
             .init_resource::<HudAssets>()
             .add_systems(Startup, (load_hud_assets, spawn_hud))
-            .add_systems(Update, (animate, draw).chain())
+            .add_systems(Update, (load_scopes, animate, draw).chain())
             .add_systems(Update, (help_toggle, hud_visibility))
             .add_systems(OnEnter(GameState::Loading), reset_anim)
             .add_systems(OnEnter(GameState::MainMenu), reset_anim);
+    }
+}
+
+/// Loads the scope overlays of the weapons that have one (their names come
+/// from the weapon files, read after start-up).
+fn load_scopes(
+    waw: Res<Waw>,
+    defs: Res<Defs>,
+    mut wimg: ResMut<WawImages>,
+    mut images: ResMut<Assets<Image>>,
+    device: Option<Res<bevy::render::renderer::RenderDevice>>,
+    mut assets: ResMut<HudAssets>,
+) {
+    for name in defs.0.iter().filter_map(|d| d.ads_overlay.as_deref()) {
+        if !assets.scopes.contains_key(name) {
+            let h = wimg.get(&waw, &mut images, device.as_deref(), name, true, false);
+            assets.scopes.insert(name.to_string(), h);
+        }
     }
 }
 
@@ -412,6 +432,24 @@ fn draw(
     let (w, h) = (win.width(), win.height());
     let mut c = Canvas { w, h, u: h / 480.0, assets: &assets, quads: Vec::new(), texts: Vec::new() };
     let t = time.elapsed_secs();
+
+    // Scope overlay when fully aimed with a scoped weapon (the gun is
+    // hidden): centred at its size in the 640 x 480 screen, black around it.
+    if let (Some(l), Ok((ctl, _))) = (&loadout, player.single()) {
+        let def = &defs.0[l.current().def];
+        if crate::weapons::scope_shown(def, ctl) {
+            let size = Vec2::from(def.ads_overlay_size) * c.u;
+            let r = Rect::from_center_size(Vec2::new(w, h) * 0.5, size);
+            let black = Color::BLACK;
+            c.solid(Rect::new(0.0, 0.0, r.min.x.max(0.0), h), black);
+            c.solid(Rect::new(r.max.x.min(w), 0.0, w, h), black);
+            c.solid(Rect::new(r.min.x, 0.0, r.max.x, r.min.y.max(0.0)), black);
+            c.solid(Rect::new(r.min.x, r.max.y.min(h), r.max.x, h), black);
+            if let Some(img) = def.ads_overlay.as_deref().and_then(|n| assets.scopes.get(n)).cloned().flatten() {
+                c.quads.push(QuadDesc { image: img, rect: r, uv: None, color: Color::WHITE });
+            }
+        }
+    }
 
     // Low-health overlay (under everything): pulses harder the lower the
     // health, flashes on a hit.

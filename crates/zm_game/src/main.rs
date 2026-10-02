@@ -538,6 +538,10 @@ fn autopilot(
         return;
     }
     keys.release(KeyCode::Enter);
+    // Optional: `UNDEAD_TEST_ADS=1` aims down the sights the whole time.
+    if std::env::var_os("UNDEAD_TEST_ADS").is_some() {
+        mouse.press(MouseButton::Right);
+    }
     // Optional: `UNDEAD_TEST_LOOK="x y z yaw pitch"` (game units, degrees)
     // holds the camera there, for looking at parts of the map.
     if let Some(v) = std::env::var("UNDEAD_TEST_LOOK").ok().map(|s| s.split_whitespace().filter_map(|x| x.parse::<f32>().ok()).collect::<Vec<_>>()) {
