@@ -684,9 +684,10 @@ fn rgb9e5(c: [f32; 3]) -> u32 {
 /// with the game's x2 model overbright, converted from gamma to linear.
 /// Empty points borrow from their neighbours so models near walls don't go
 /// black.
-fn irradiance_volume(zone: &ZoneData, world: &t4::WorldInfo) -> Option<(Image, Transform)> {
+fn irradiance_volume(zone: &ZoneData, world: &t4::WorldInfo, lights: &[SceneLight], collision: &TriMesh) -> Option<(Image, Transform)> {
     let grid = world.light_grid.as_ref()?;
     let d = &zone.data;
+    let curves = FalloffCurves::read(zone);
     let (mn, mx) = (grid.mins, grid.maxs);
     // Bevy axes: X = game X, Y = game Z (up), Z = -game Y.
     let (rx, ry, rz) = ((mx[0] - mn[0] + 1) as usize, (mx[2] - mn[2] + 1) as usize, (mx[1] - mn[1] + 1) as usize);
@@ -707,18 +708,37 @@ fn irradiance_volume(zone: &ZoneData, world: &t4::WorldInfo) -> Option<(Image, T
                 }
             }
         }
-        acc.map(|v| (2.0 * v).powf(2.2))
+        // The game's x2 model overbright (gamma; linearised after adding the
+        // primary light).
+        acc.map(|v| 2.0 * v)
     };
     for z in 0..rz {
         for y in 0..ry {
             for x in 0..rx {
                 let g = [mn[0] as i64 + x as i64, mx[1] as i64 - z as i64, mn[2] as i64 + y as i64];
-                let Some(cube) = grid.entry_index(d, g).and_then(|i| grid.entry(d, i)).and_then(|e| grid.cube(d, e)) else { continue };
+                let Some(entry) = grid.entry_index(d, g).and_then(|i| grid.entry(d, i)) else { continue };
+                let Some(cube) = grid.cube(d, entry) else { continue };
                 // Game faces: +X, -X, +Y, -Y, +Z, -Z.
                 let (px, nx) = (face(&cube, 0, true), face(&cube, 0, false));
                 let (py, ny) = (face(&cube, 1, true), face(&cube, 1, false));
                 let (pz, nz) = (face(&cube, 2, true), face(&cube, 2, false));
-                faces[(z * ry + y) * rx + x] = Some([px, nx, pz, nz, ny, py]);
+                // Bevy order: +X, -X, +Y, -Y, +Z, -Z (still gamma, x2 applied).
+                let mut f = [px, nx, pz, nz, ny, py];
+                // The point's primary light, as the game adds it per pixel to
+                // models (with its falloff, cone and visibility).
+                let p = to_bevy([(g[0] - 4096) as f32 * 32.0, (g[1] - 4096) as f32 * 32.0, (g[2] - 2048) as f32 * 64.0]);
+                if let Some(light) = lights.get(entry.primary_light as usize) {
+                    let normals = [Vec3::X, Vec3::NEG_X, Vec3::Y, Vec3::NEG_Y, Vec3::Z, Vec3::NEG_Z];
+                    if let Some((l, color)) = primary_at(light, p, &curves, collision) {
+                        for (face, n) in f.iter_mut().zip(normals) {
+                            let k = n.dot(l).max(0.0);
+                            for c in 0..3 {
+                                face[c] += color[c] * k;
+                            }
+                        }
+                    }
+                }
+                faces[(z * ry + y) * rx + x] = Some(f.map(|c| c.map(|v| v.max(0.0).powf(2.2))));
             }
         }
     }
@@ -787,6 +807,83 @@ fn irradiance_volume(zone: &ZoneData, world: &t4::WorldInfo) -> Option<(Image, T
     let transform = Transform::from_translation(base + size * 0.5 - cell * 0.5).with_scale(size);
     info!("Light grid: {rx}x{ry}x{rz} points as an irradiance volume");
     Some((image, transform))
+}
+
+/// The light falloff curves the game keeps in row 0 of the first lightmap's
+/// secondary page (linear and tungsten), read raw.
+struct FalloffCurves {
+    linear: Vec<[f32; 3]>,
+    tungsten: Vec<[f32; 3]>,
+}
+
+impl FalloffCurves {
+    fn read(zone: &ZoneData) -> FalloffCurves {
+        let row = zone
+            .images
+            .iter()
+            .find(|i| i.name.ends_with("lightmap0_secondary"))
+            .and_then(|i| i.inline.clone())
+            .and_then(|i| zone.data.get(i.fpos..i.fpos + 4 * i.dims[0] as usize).map(|b| b.to_vec()))
+            .unwrap_or_default();
+        let curve = |start: usize, width: usize| -> Vec<[f32; 3]> {
+            (0..width)
+                .map(|i| {
+                    let o = 4 * (start + i);
+                    match row.get(o..o + 4) {
+                        // BGRA bytes.
+                        Some(b) => [b[2] as f32 / 255.0, b[1] as f32 / 255.0, b[0] as f32 / 255.0],
+                        None => [1.0 - i as f32 / (width - 1) as f32; 3],
+                    }
+                })
+                .collect()
+        };
+        FalloffCurves { linear: curve(1, 16), tungsten: curve(19, 32) }
+    }
+
+    fn sample(&self, tungsten: bool, t: f32) -> [f32; 3] {
+        let c = if tungsten { &self.tungsten } else { &self.linear };
+        let x = t.clamp(0.0, 1.0) * (c.len() - 1) as f32;
+        let (i, f) = (x.floor() as usize, x.fract());
+        let (a, b) = (c[i.min(c.len() - 1)], c[(i + 1).min(c.len() - 1)]);
+        [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]
+    }
+}
+
+/// A primary light's direction and colour (gamma, before N.L) at a point,
+/// if it reaches it: the falloff curve, the spot cone, and visibility.
+fn primary_at(l: &SceneLight, p: Vec3, curves: &FalloffCurves, collision: &TriMesh) -> Option<(Vec3, [f32; 3])> {
+    let v = |a: Vec3| V3::new(a.x, a.y, a.z);
+    match l.kind {
+        1 => {
+            // The sun: blocked by anything along its direction.
+            let o = p + l.dir * 0.1;
+            collision.raycast(v(o), v(l.dir), 400.0).is_none().then_some((l.dir, l.color.to_array()))
+        }
+        2 | 3 => {
+            let to = l.position - p;
+            let dist = to.length();
+            let t = dist / l.radius;
+            if t >= 1.0 || dist < 1e-3 {
+                return None;
+            }
+            let dir = to / dist;
+            let mut k = 1.0;
+            if l.kind == 2 {
+                let x = 1.0 / (l.cos_inner - l.cos_outer).max(1e-4);
+                let s = (dir.dot(l.dir) * x - l.cos_outer * x).clamp(0.0, 1.0);
+                if s <= 0.0 {
+                    return None;
+                }
+                k = s.powf(l.exponent.max(1e-4));
+            }
+            if !collision.line_clear(v(p), v(l.position - dir * 0.15)) {
+                return None;
+            }
+            let f = curves.sample(l.falloff == 1, t);
+            Some((dir, [l.color.x * f[0] * k, l.color.y * f[1] * k, l.color.z * f[2] * k]))
+        }
+        _ => None,
+    }
 }
 
 /// The primary lights in Bevy space. Index 1 is the sun as the world draws
@@ -1298,7 +1395,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
 
     let lightmap_pages = (0..world.surfaces.iter().map(|s| s.lightmap as usize + 1).max().unwrap_or(1)).map(|i| lightmap_pages(&nacht, i)).collect();
     let lights = scene_lights(&nacht, world);
-    let irradiance = irradiance_volume(&nacht, world);
+    let irradiance = irradiance_volume(&nacht, world, &lights, &collision);
     let (fog, film) = map_look(&zones, iwd, world);
     let mut view_models = HashMap::new();
     for &id in &wanted.weapon_ids {

@@ -403,9 +403,9 @@ fn tweak_settings(keys: Res<ButtonInput<KeyCode>>, mut settings: ResMut<UserSett
     }
 }
 
-/// The brightness setting. On the real maps everything is lit in the
-/// game's own units (exposure fixed at 1) and brightness is a display gamma
-/// in the post pass; the prototype map uses camera exposure.
+/// The brightness setting. On the real maps the exposure is fixed (the
+/// game's lighting is scaled to it) and brightness is a display gamma in
+/// the post pass; the prototype map uses camera exposure.
 fn apply_exposure(
     settings: Res<UserSettings>,
     real_map: Option<Res<crate::nacht::NachtActive>>,
@@ -415,7 +415,7 @@ fn apply_exposure(
     let (ev, gamma) = if real_map.is_some() {
         // Exposure factor 1 / (1.2 * 2^ev) = 1.
         let brightness = 15.0 - settings.exposure_ev;
-        ((1.0f32 / 1.2).log2(), (1.0 + (brightness - 7.5) * 0.08).clamp(0.4, 2.0))
+        (crate::nacht::REAL_MAP_EV, (1.0 + (brightness - 7.5) * 0.08).clamp(0.4, 2.0))
     } else {
         (settings.exposure_ev, 1.0)
     };
