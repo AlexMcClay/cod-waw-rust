@@ -255,6 +255,12 @@ pub struct AliasSound {
     pub spatial: bool,
     /// Full volume up to `.0` metres, silent from `.1`.
     pub distance: (f32, f32),
+    /// Played together with this one.
+    pub secondary: Option<String>,
+    /// Played after this one.
+    pub chain: Option<String>,
+    pub duration: f32,
+    pub start_delay: f32,
 }
 
 /// Sounds decoded from the install's fastfiles (filled once a zone is read).
@@ -302,11 +308,15 @@ pub struct PlayAlias {
     /// Seconds to wait before playing.
     pub delay: f32,
     pub fallback: Option<Sfx>,
+    /// How deep in a secondary/chain sequence this is (guards loops).
+    pub depth: u8,
+    /// The alias's own start delay has already been waited out.
+    pub started: bool,
 }
 
 impl PlayAlias {
     pub fn local(alias: impl Into<String>) -> Self {
-        PlayAlias { alias: alias.into(), at: None, on: None, volume: 1.0, delay: 0.0, fallback: None }
+        PlayAlias { alias: alias.into(), at: None, on: None, volume: 1.0, delay: 0.0, fallback: None, depth: 0, started: false }
     }
     pub fn at(alias: impl Into<String>, pos: Vec3) -> Self {
         PlayAlias { at: Some(pos), ..Self::local(alias) }
@@ -464,6 +474,7 @@ fn play_sounds(
     bank: Option<Res<SoundBank>>,
     zone: Res<ZoneSounds>,
     settings: Res<UserSettings>,
+    mut alias_out: EventWriter<PlayAlias>,
     mut commands: Commands,
 ) {
     let Some(bank) = bank else { return };
@@ -483,7 +494,7 @@ fn play_sounds(
             zone.has(name).then(|| name.clone())
         };
         if let Some(alias) = weapon_alias.or_else(config_alias) {
-            spawn_alias(&mut commands, pick(&zone.aliases[&alias]), &alias, ev.volume, None, None, false, &settings);
+            alias_out.write(PlayAlias::local(alias).volume(ev.volume));
             continue;
         }
         let list = match bank.sounds.get(&ev.sfx) {
@@ -587,13 +598,27 @@ fn play_aliases(
             due.push(ev.clone());
         }
     }
-    for ev in due {
+    while let Some(ev) = due.pop() {
         if ev.on.is_some_and(|e| alive.get(e).is_err()) {
             continue;
         }
         match zone.aliases.get(&ev.alias).filter(|l| !l.is_empty()) {
             Some(list) => {
-                spawn_alias(&mut commands, pick(list), &ev.alias, ev.volume, ev.at, ev.on, false, &settings);
+                let s = pick(list);
+                if s.start_delay > 0.0 && !ev.started {
+                    pending.0.push(PlayAlias { delay: s.start_delay, started: true, ..ev.clone() });
+                    continue;
+                }
+                spawn_alias(&mut commands, s, &ev.alias, ev.volume, ev.at, ev.on, false, &settings);
+                // Layers play with it, chains after it.
+                if ev.depth < 8 {
+                    if let Some(sec) = &s.secondary {
+                        due.push(PlayAlias { alias: sec.clone(), depth: ev.depth + 1, fallback: None, started: false, ..ev.clone() });
+                    }
+                    if let Some(next) = &s.chain {
+                        pending.0.push(PlayAlias { alias: next.clone(), depth: ev.depth + 1, fallback: None, delay: s.duration, started: false, ..ev.clone() });
+                    }
+                }
             }
             // An empty alias means "only the stand-in, and only without the
             // game's sounds".

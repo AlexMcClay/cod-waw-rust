@@ -365,6 +365,10 @@ fn poll_load(
                     pitch: s.pitch,
                     spatial: s.spatial,
                     distance: s.distance,
+                    secondary: s.secondary,
+                    chain: s.chain,
+                    duration: s.duration,
+                    start_delay: s.start_delay,
                 })
                 .collect();
             (k, variants)

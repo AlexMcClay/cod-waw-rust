@@ -346,6 +346,13 @@ pub struct SoundAlias {
     pub dist_min: f32,
     pub dist_max: f32,
     pub flags: i32,
+    /// Played together with this one (weapon shots layer their action,
+    /// tail and shell sounds this way).
+    pub secondary: Option<String>,
+    /// Played once this one has finished.
+    pub chain: Option<String>,
+    /// Seconds to wait before playing.
+    pub start_delay: f32,
 }
 
 /// One alias list: the variants the game picks between.

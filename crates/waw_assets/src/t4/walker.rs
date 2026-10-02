@@ -908,8 +908,8 @@ impl<'a> Walker<'a> {
                     let a = arr.elem(i, 184);
                     let aname = self.xstring(a.u32(0))?.unwrap_or_default();
                     self.xstring(a.u32(8))?;
-                    self.xstring(a.u32(0xc))?;
-                    self.xstring(a.u32(0x10))?;
+                    let secondary = self.xstring(a.u32(0xc))?.filter(|s| !s.is_empty());
+                    let chain = self.xstring(a.u32(0x10))?.filter(|s| !s.is_empty());
                     let file = self.sound_file(a.u32(0x14))?;
                     out.push(SoundAlias {
                         name: aname,
@@ -921,6 +921,9 @@ impl<'a> Walker<'a> {
                         dist_min: a.f32(0x2c),
                         dist_max: a.f32(0x30),
                         flags: a.i32(0x84),
+                        secondary,
+                        chain,
+                        start_delay: a.u32(0x7c) as f32 / 1000.0,
                     });
                 }
                 self.alias_heads.insert(arr.boff, out.clone());

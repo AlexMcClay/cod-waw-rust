@@ -406,8 +406,9 @@ fn autopilot(
         }
         info!("[autopilot]   zombies {states:?}");
     }
-    // Optional: force a death once to exercise game over + restart.
-    if std::env::var_os("UNDEAD_TEST_DEATH").is_some() && t > 25.0 && t - time.delta_secs() <= 25.0 {
+    // Optional: force a death every 25 s to exercise game over + restart.
+    let period = 25.0;
+    if std::env::var_os("UNDEAD_TEST_DEATH").is_some() && t > period && (t / period).floor() != ((t - time.delta_secs()) / period).floor() {
         health.hp = 0.0;
         next.set(GameState::GameOver);
     }

@@ -738,7 +738,10 @@ fn animate_view_rig(
         let c = if gun.reload_empty { get("reload_empty").or_else(|| get("reload")) } else { get("reload") };
         c.map(|c| (c, 1.0 - left / def.reload_time.max(0.01)))
     } else {
-        let fire = get(if ctl.ads > 0.5 { "ads_fire" } else { "fire" }).or_else(|| get("fire"));
+        // The shot that empties the clip has its own animation (the
+        // Garand's clip flies out).
+        let last = if empty { get("last_shot") } else { None };
+        let fire = last.or_else(|| get(if ctl.ads > 0.5 { "ads_fire" } else { "fire" })).or_else(|| get("fire"));
         let rechamber = get("rechamber").filter(|_| def.rechamber);
         match (gun.since_shot, fire) {
             (Some(s), Some(f)) if s < f.duration => Some((f.clone(), progress(&f, s))),

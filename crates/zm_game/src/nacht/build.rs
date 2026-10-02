@@ -632,6 +632,11 @@ pub struct SceneSound {
     pub spatial: bool,
     /// Full volume up to `.0`, silent beyond `.1` (metres).
     pub distance: (f32, f32),
+    pub secondary: Option<String>,
+    pub chain: Option<String>,
+    /// Length in seconds.
+    pub duration: f32,
+    pub start_delay: f32,
 }
 
 /// The sounds a weapon definition names.
@@ -729,6 +734,13 @@ fn zone_weapon_name(id: &str) -> &str {
     }
 }
 
+/// Length of a 16-bit PCM WAV in seconds.
+fn wav_seconds(wav: &[u8]) -> f32 {
+    let rd = |o: usize| wav.get(o..o + 4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]])).unwrap_or(0);
+    let (channels, rate) = (wav.get(22).copied().unwrap_or(1).max(1) as f32, rd(24).max(1) as f32);
+    wav.len().saturating_sub(44) as f32 / (2.0 * channels * rate)
+}
+
 /// The sound fields and notetrack map of each of our weapons.
 fn weapon_sounds(zones: &[&ZoneData], ids: &[&str]) -> HashMap<String, WeaponSounds> {
     let mut out = HashMap::new();
@@ -741,10 +753,17 @@ fn weapon_sounds(zones: &[&ZoneData], ids: &[&str]) -> HashMap<String, WeaponSou
     out
 }
 
-/// Turns zone sound aliases into playable PCM WAVs with their properties.
+/// Turns zone sound aliases into playable PCM WAVs with their properties,
+/// following secondary and chained aliases.
 fn collect_sounds(zones: &[&ZoneData], iwd: &Iwd, wanted: &[String]) -> HashMap<String, Vec<SceneSound>> {
-    let mut out = HashMap::new();
-    for name in wanted {
+    let mut out: HashMap<String, Vec<SceneSound>> = HashMap::new();
+    let mut todo: Vec<String> = wanted.to_vec();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    while let Some(name) = todo.pop() {
+        if !seen.insert(name.clone()) {
+            continue;
+        }
+        let name = &name;
         let name = name.as_str();
         if out.contains_key(name) {
             continue;
@@ -784,12 +803,18 @@ fn collect_sounds(zones: &[&ZoneData], iwd: &Iwd, wanted: &[String]) -> HashMap<
                 let _ = std::fs::write(format!("{dir}/{name}_{}.wav", variants.len()), w);
             }
             if let Some(wav) = decoded {
+                todo.extend(a.secondary.iter().chain(a.chain.iter()).cloned());
+                let duration = wav_seconds(&wav);
                 variants.push(SceneSound {
                     wav,
                     volume: (a.vol_min, a.vol_max.max(a.vol_min)),
                     pitch: (a.pitch_min.max(0.1), a.pitch_max.max(a.pitch_min).max(0.1)),
                     spatial: a.flags & 0x40 != 0,
                     distance: (a.dist_min * INCH, a.dist_max.max(a.dist_min) * INCH),
+                    secondary: a.secondary.clone(),
+                    chain: a.chain.clone(),
+                    duration,
+                    start_delay: a.start_delay,
                 });
             }
         }
