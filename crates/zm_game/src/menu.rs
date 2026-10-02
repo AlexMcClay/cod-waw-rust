@@ -78,6 +78,18 @@ struct ItemLabel(usize);
 #[derive(Component)]
 struct ItemBar(usize);
 
+/// A slider's clickable track.
+#[derive(Component)]
+struct SliderTrack(Setting);
+
+/// The filled part of a slider.
+#[derive(Component)]
+struct SliderFill(Setting);
+
+/// The number shown next to a slider.
+#[derive(Component)]
+struct SliderValue(Setting);
+
 /// Root of whatever menu page is on screen.
 #[derive(Component)]
 struct MenuLayer;
@@ -121,7 +133,7 @@ impl Plugin for MenuPlugin {
             .add_systems(Update, pause_on_escape.run_if(in_state(GameState::Playing)))
             .add_systems(
                 Update,
-                (rebuild_menu, menu_input, item_visuals)
+                (rebuild_menu, menu_input, slider_drag, item_visuals, slider_visuals)
                     .chain()
                     .run_if(in_state(GameState::MainMenu).or(in_state(GameState::Paused)).or(in_state(GameState::GameOver))),
             )
@@ -149,6 +161,11 @@ fn load_fonts(mut commands: Commands, mut fonts: ResMut<Assets<Font>>) {
 fn enter_page(page: Page) -> impl Fn(ResMut<MenuNav>) {
     move |mut nav: ResMut<MenuNav>| {
         nav.page = page;
+        // Developer aid: `UNDEAD_MENU=options` opens the menu on Options.
+        if page == Page::Main && std::env::var("UNDEAD_MENU").is_ok_and(|m| m == "options") {
+            nav.page = Page::Options;
+            nav.options_from = Page::Main;
+        }
         nav.selected = 0;
         nav.dirty = true;
     }
@@ -197,33 +214,78 @@ fn pause_on_escape(
     }
 }
 
+fn setting_name(s: Setting) -> &'static str {
+    match s {
+        Setting::Sensitivity => "MOUSE SENSITIVITY",
+        Setting::Fov => "FIELD OF VIEW",
+        Setting::Master => "MASTER VOLUME",
+        Setting::Music => "MUSIC VOLUME",
+        Setting::Sfx => "EFFECTS VOLUME",
+        Setting::Brightness => "BRIGHTNESS",
+        Setting::Fullscreen => "FULLSCREEN",
+    }
+}
+
 fn setting_label(s: Setting, u: &UserSettings) -> String {
     match s {
-        Setting::Sensitivity => format!("MOUSE SENSITIVITY   {:.1}", u.sensitivity * 1000.0),
-        Setting::Fov => format!("FIELD OF VIEW   {:.0}", u.fov),
-        Setting::Master => format!("MASTER VOLUME   {:.0}%", u.master_volume * 100.0),
-        Setting::Music => format!("MUSIC VOLUME   {:.0}%", u.music_volume * 100.0),
-        Setting::Sfx => format!("EFFECTS VOLUME   {:.0}%", u.sfx_volume * 100.0),
-        Setting::Brightness => format!("BRIGHTNESS   {:.1}", 15.0 - u.exposure_ev),
         Setting::Fullscreen => format!("FULLSCREEN   {}", if u.fullscreen { "ON" } else { "OFF" }),
+        _ => setting_name(s).to_string(),
+    }
+}
+
+/// A slider's displayed range and keyboard step (in displayed units).
+fn slider_range(s: Setting) -> Option<(f32, f32, f32)> {
+    match s {
+        Setting::Sensitivity => Some((0.4, 20.0, 0.1)),
+        Setting::Fov => Some((55.0, 100.0, 1.0)),
+        Setting::Master | Setting::Music | Setting::Sfx => Some((0.0, 100.0, 5.0)),
+        Setting::Brightness => Some((1.0, 12.0, 0.25)),
+        Setting::Fullscreen => None,
+    }
+}
+
+/// A setting in displayed units (sensitivity x1000, volumes in %,
+/// brightness as the inverse of exposure).
+fn slider_get(s: Setting, u: &UserSettings) -> f32 {
+    match s {
+        Setting::Sensitivity => u.sensitivity * 1000.0,
+        Setting::Fov => u.fov,
+        Setting::Master => u.master_volume * 100.0,
+        Setting::Music => u.music_volume * 100.0,
+        Setting::Sfx => u.sfx_volume * 100.0,
+        Setting::Brightness => 15.0 - u.exposure_ev,
+        Setting::Fullscreen => 0.0,
+    }
+}
+
+fn slider_set(s: Setting, u: &mut UserSettings, v: f32) {
+    let Some((lo, hi, step)) = slider_range(s) else { return };
+    // Snap to the step so values stay tidy.
+    let v = ((v.clamp(lo, hi) / step).round() * step).clamp(lo, hi);
+    match s {
+        Setting::Sensitivity => u.sensitivity = v / 1000.0,
+        Setting::Fov => u.fov = v,
+        Setting::Master => u.master_volume = v / 100.0,
+        Setting::Music => u.music_volume = v / 100.0,
+        Setting::Sfx => u.sfx_volume = v / 100.0,
+        Setting::Brightness => u.exposure_ev = 15.0 - v,
+        Setting::Fullscreen => {}
+    }
+}
+
+fn slider_text(s: Setting, v: f32) -> String {
+    match s {
+        Setting::Sensitivity | Setting::Brightness => format!("{v:.1}"),
+        Setting::Master | Setting::Music | Setting::Sfx => format!("{v:.0}%"),
+        _ => format!("{v:.0}"),
     }
 }
 
 fn adjust(s: Setting, u: &mut UserSettings, dir: f32) {
-    let step = |v: f32, d: f32, lo: f32, hi: f32| (v + d * dir).clamp(lo, hi);
-    match s {
-        Setting::Sensitivity => u.sensitivity = step(u.sensitivity, 0.0002, 0.0004, 0.02),
-        Setting::Fov => u.fov = step(u.fov, 5.0, 55.0, 100.0),
-        Setting::Master => u.master_volume = step(u.master_volume, 0.1, 0.0, 1.0),
-        Setting::Music => u.music_volume = step(u.music_volume, 0.1, 0.0, 1.0),
-        Setting::Sfx => u.sfx_volume = step(u.sfx_volume, 0.1, 0.0, 1.0),
-        Setting::Brightness => u.exposure_ev = step(u.exposure_ev, -0.5, 3.0, 14.0),
-        Setting::Fullscreen => u.fullscreen = !u.fullscreen,
+    match slider_range(s) {
+        Some((_, _, step)) => slider_set(s, u, slider_get(s, u) + step * dir),
+        None => u.fullscreen = !u.fullscreen,
     }
-    // Round away float noise so the labels stay tidy.
-    u.master_volume = (u.master_volume * 10.0).round() / 10.0;
-    u.music_volume = (u.music_volume * 10.0).round() / 10.0;
-    u.sfx_volume = (u.sfx_volume * 10.0).round() / 10.0;
 }
 
 /// (label, action, enabled) for each item of a page.
@@ -395,12 +457,47 @@ fn rebuild_menu(
                     ))
                     .with_children(|b| {
                         b.spawn((Node { width: Val::Px(5.0), height: Val::Px(26.0), ..default() }, BackgroundColor(Color::NONE), ItemBar(i)));
+                        let slider = match action {
+                            Action::Adjust(st) => slider_range(*st).map(|_| *st),
+                            _ => None,
+                        };
+                        let mut label_node = Node::default();
+                        if slider.is_some() {
+                            label_node.width = Val::Px(290.0);
+                        }
                         b.spawn((
                             Text::new(label.clone()),
                             TextFont { font: fonts.body.clone(), font_size: 28.0, ..default() },
                             TextColor(pale),
+                            label_node,
                             ItemLabel(i),
                         ));
+                        if let Some(st) = slider {
+                            // Track (clickable, draggable) with its fill and handle.
+                            b.spawn((
+                                Button,
+                                Node { width: Val::Px(240.0), height: Val::Px(26.0), align_items: AlignItems::Center, ..default() },
+                                bevy::ui::RelativeCursorPosition::default(),
+                                SliderTrack(st),
+                            ))
+                            .with_children(|t| {
+                                t.spawn((Node { width: Val::Percent(100.0), height: Val::Px(6.0), ..default() }, BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.18))))
+                                    .with_children(|bar| {
+                                        bar.spawn((
+                                            Node { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
+                                            BackgroundColor(Color::srgb(0.75, 0.06, 0.03)),
+                                            SliderFill(st),
+                                        ));
+                                    });
+                            });
+                            b.spawn((
+                                Text::new(""),
+                                TextFont { font: fonts.body.clone(), font_size: 24.0, ..default() },
+                                TextColor(Color::srgb(0.85, 0.83, 0.78)),
+                                Node { width: Val::Px(80.0), ..default() },
+                                SliderValue(st),
+                            ));
+                        }
                     });
                 }
             });
@@ -445,7 +542,10 @@ fn menu_input(
             Interaction::Hovered if item.enabled => nav.selected = item.index,
             Interaction::Pressed if item.enabled => {
                 nav.selected = item.index;
-                activate = Some((item.action, 1.0));
+                let is_slider = matches!(item.action, Action::Adjust(st) if slider_range(st).is_some());
+                if !is_slider {
+                    activate = Some((item.action, 1.0));
+                }
             }
             _ => {}
         }
@@ -519,7 +619,10 @@ fn menu_input(
         }
         Action::Adjust(s) => {
             adjust(s, &mut settings, dir);
-            nav.dirty = true;
+            // Sliders update in place (a rebuild would interrupt dragging).
+            if slider_range(s).is_none() {
+                nav.dirty = true;
+            }
         }
     }
 }
@@ -605,5 +708,47 @@ pub struct LoadingStatus;
 fn despawn_loading_screen(mut commands: Commands, q: Query<Entity, With<LoadingLayer>>) {
     for e in &q {
         commands.entity(e).despawn();
+    }
+}
+
+/// Clicking or dragging along a slider's track sets the value.
+fn slider_drag(
+    mouse: Res<ButtonInput<MouseButton>>,
+    mut settings: ResMut<UserSettings>,
+    tracks: Query<(&SliderTrack, &Interaction, &bevy::ui::RelativeCursorPosition)>,
+) {
+    if !mouse.pressed(MouseButton::Left) {
+        return;
+    }
+    for (track, interaction, cursor) in &tracks {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let (Some((lo, hi, _)), Some(pos)) = (slider_range(track.0), cursor.normalized) else { continue };
+        // `normalized` runs 0..1 from the node's left edge.
+        let k = pos.x.clamp(0.0, 1.0);
+        let v = lo + (hi - lo) * k;
+        if (slider_get(track.0, &settings) - v).abs() > f32::EPSILON {
+            slider_set(track.0, &mut settings, v);
+        }
+    }
+}
+
+fn slider_visuals(
+    settings: Res<UserSettings>,
+    mut fills: Query<(&SliderFill, &mut Node)>,
+    mut values: Query<(&SliderValue, &mut Text)>,
+) {
+    for (f, mut node) in &mut fills {
+        if let Some((lo, hi, _)) = slider_range(f.0) {
+            let k = ((slider_get(f.0, &settings) - lo) / (hi - lo)).clamp(0.0, 1.0);
+            node.width = Val::Percent(k * 100.0);
+        }
+    }
+    for (v, mut text) in &mut values {
+        let t = slider_text(v.0, slider_get(v.0, &settings));
+        if text.0 != t {
+            text.0 = t;
+        }
     }
 }
