@@ -17,7 +17,7 @@ use waw_assets::t4::{self, decode, XModelInfo, ZoneData};
 use waw_assets::zombiemap::ZombieMap;
 use waw_assets::{Install, Iwd};
 use zm_core::geom::V3;
-use zm_core::trimesh::{Tri, TriMesh};
+use zm_core::trimesh::{blocks, Tri, TriMesh};
 
 pub const INCH: f32 = 0.0254;
 
@@ -1049,6 +1049,68 @@ fn model_collision(zones: &[&ZoneData], name: &str) -> Option<Vec<[Vec3; 3]>> {
     (!out.is_empty()).then_some(out)
 }
 
+/// What a clipMap brush or terrain triangle with these contents blocks.
+fn clip_blocks(contents: u32) -> u8 {
+    use waw_assets::t4::clipmap::contents as c;
+    let mut b = 0;
+    if contents & c::PLAYER_SOLID != 0 {
+        b |= blocks::PLAYER;
+    }
+    if contents & c::MONSTER_SOLID != 0 {
+        b |= blocks::AI;
+    }
+    b
+}
+
+/// The map's collision as triangles in Bevy space: the static world's
+/// brushes and terrain, and the brushes of scenery brush models (entities
+/// with a `*N` model, placed by their origin and angles). `skip` lists the
+/// brush models gameplay moves or removes (boards, doors, debris).
+/// Triangles only block the player and/or AI ([`clip_blocks`]), never the
+/// plain solid queries.
+pub fn clip_collision(cm: &t4::clipmap::ClipMapInfo, entities: &[mapents::Entity], skip: &std::collections::HashSet<usize>) -> Vec<Tri> {
+    let mut out = Vec::new();
+    let v3 = |p: Vec3| V3::new(p.x, p.y, p.z);
+    let add = |poly: &[Vec3], b: u8, out: &mut Vec<Tri>| {
+        for k in 1..poly.len().saturating_sub(1) {
+            if let Some(t) = Tri::new(v3(poly[0]), v3(poly[k]), v3(poly[k + 1])) {
+                out.push(t.blocking(b));
+            }
+        }
+    };
+    let by_model = cm.model_brushes();
+    let brushes = |list: &[u16], t: &Transform, out: &mut Vec<Tri>| {
+        for &bi in list {
+            let Some(brush) = cm.brushes.get(bi as usize) else { continue };
+            let b = clip_blocks(brush.contents);
+            if b == 0 {
+                continue;
+            }
+            for f in t4::clipmap::brush_polygons(brush) {
+                let poly: Vec<Vec3> = f.points.iter().map(|&p| t.transform_point(to_bevy(p))).collect();
+                add(&poly, b, out);
+            }
+        }
+    };
+    brushes(&by_model[0], &Transform::IDENTITY, &mut out);
+    for e in entities {
+        let Some(n) = e.submodel() else { continue };
+        if n == 0 || skip.contains(&n) || e.classname().starts_with("trigger") {
+            continue;
+        }
+        let Some(list) = by_model.get(n) else { continue };
+        let t = Transform::from_translation(to_bevy(e.origin())).with_rotation(angles_to_quat(e.angles()));
+        brushes(list, &t, &mut out);
+    }
+    for (tri, m) in cm.world_terrain() {
+        let b = clip_blocks(cm.material_contents(m as i64));
+        if b != 0 {
+            add(&tri.map(to_bevy), b, &mut out);
+        }
+    }
+    out
+}
+
 /// The zone's weapon name for one of our weapon ids.
 fn zone_weapon_name(id: &str) -> &str {
     match id {
@@ -1301,7 +1363,11 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
         }
     }
 
-    // Collision: static world triangles that render opaque.
+    // Collision. The map's own collision (clipMap brushes and terrain, with
+    // player and monster clip) is what the player moves against; the
+    // opaque render triangles stay as the plain solid geometry for bullets,
+    // sight and the zombies. Models collide for everyone.
+    let render_blocks = if nacht.clipmap.is_some() { blocks::SOLID } else { blocks::ALL };
     let mut tris = Vec::new();
     for &si in &collide {
         for t in decode::world_triangles(&nacht, world, &world.surfaces[si]) {
@@ -1311,7 +1377,7 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
                 .map(|v| V3::new(v.x, v.y, v.z))
                 .collect();
             if let Some(tri) = Tri::new(p[0], p[1], p[2]) {
-                tris.push(tri);
+                tris.push(tri.blocking(render_blocks));
             }
         }
     }
@@ -1360,10 +1426,15 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
                     .map(|v| V3::new(v.x, v.y, v.z))
                     .collect();
                 if let Some(tri) = Tri::new(p[0], p[1], p[2]) {
-                    tris.push(tri);
+                    tris.push(tri.blocking(render_blocks));
                 }
             }
         }
+    }
+    if let Some(cm) = &nacht.clipmap {
+        let clip = clip_collision(cm, &entities, &gameplay);
+        info!("clipMap {}: {} brushes, {} collision triangles", cm.name, cm.brushes.len(), clip.len());
+        tris.extend(clip);
     }
     let collision = TriMesh::new(tris, 2.0);
 
@@ -1559,6 +1630,40 @@ mod tests {
         assert!(skip_material("wc_tools", "wc/caulk_shadow"));
     }
 
+
+    /// Real data: the player's collision from Nacht's clipMap carries the
+    /// player up the stairs to the help room as a continuous ramp.
+    /// `UNDEAD_WAW=<install> cargo test -p zm_game -- --ignored`.
+    #[test]
+    #[ignore]
+    fn nacht_stairs_climb_smoothly() {
+        let root = std::env::var("UNDEAD_WAW").expect("set UNDEAD_WAW");
+        let ff = std::fs::read(std::path::Path::new(&root).join("zone/english/nazi_zombie_prototype.ff")).unwrap();
+        let zd = t4::walk(waw_assets::zone::decompress(&ff).unwrap());
+        let entities = mapents::parse(zd.map_ents.as_deref().unwrap());
+        let tris = clip_collision(zd.clipmap.as_ref().unwrap(), &entities, &Default::default());
+        assert!(tris.len() > 40_000, "{}", tris.len());
+        let mesh = TriMesh::new(tris, 2.0);
+        // Plain queries don't see clip-only collision.
+        assert!(mesh.ground(to_bevy([180.0, 1060.0, 0.0]).x, to_bevy([180.0, 1060.0, 0.0]).z, 1.0, -1.0, 0.7).is_none());
+        let (r, step) = (15.0 * INCH, 18.0 * INCH);
+        let mut feet = to_bevy([0.0, 0.0, 1.0]).y;
+        let mut max_rise = 0.0f32;
+        let mut x = 180.0;
+        while x > -150.0 {
+            let p = to_bevy([x, 1060.0, 0.0]);
+            let g = mesh.support_sphere_mask(p.x, p.z, r, feet + step, feet - step, 0.7, blocks::PLAYER).expect("ground");
+            // (The top tread is one unit above the upper floor.)
+            assert!(g >= feet - 1.1 * INCH, "dropped at x={x}");
+            max_rise = max_rise.max(g - feet);
+            feet = g;
+            x -= 0.5;
+        }
+        // Up 144 units onto the upper floor; a ray would rise 6 units at
+        // once at every riser, the ball at most ~1.5 per half unit moved.
+        assert!((feet / INCH - 144.0).abs() < 1.5, "{}", feet / INCH);
+        assert!(max_rise / INCH < 1.6, "{}", max_rise / INCH);
+    }
 
     #[test]
     fn coordinate_conversion() {
