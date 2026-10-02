@@ -47,6 +47,8 @@ pub struct WeaponDef {
     pub splash_damage: f32,
     /// Purely cosmetic: viewmodel length and recoil kick.
     pub kick: f32,
+    /// Bolt-action or pump: the rechamber animation plays after each shot.
+    pub rechamber: bool,
     /// File name to look for in `<assets>/iwd/weapons/sp/` (optional).
     pub weapon_file: Option<&'static str>,
 }
@@ -83,6 +85,7 @@ impl WeaponDef {
             splash_radius: 0.0,
             splash_damage: 0.0,
             kick: 1.0,
+            rechamber: matches!(id, "kar98k" | "kar98k_scoped_zombie" | "springfield" | "trenchgun"),
             weapon_file: None,
         }
     }
@@ -130,6 +133,10 @@ impl WeaponDef {
         }
         if let Some(p) = wf.u32("shotCount").filter(|p| *p > 0) {
             self.pellets = p;
+            n += 1;
+        }
+        if let Some(b) = wf.get("boltAction") {
+            self.rechamber = b.trim() == "1";
             n += 1;
         }
         if let Some(ft) = wf.get("fireType") {
@@ -284,6 +291,10 @@ mod tests {
     fn map_aliases() {
         let defs = default_weapons();
         assert_eq!(defs[find(&defs, "shotgun").unwrap()].id, "trenchgun");
+        // Only bolt-action and pump guns cycle after a shot.
+        let rechambers = |id: &str| defs[find(&defs, id).unwrap()].rechamber;
+        assert!(rechambers("kar98k") && rechambers("trenchgun"));
+        assert!(!rechambers("doublebarrel_sawed_grip") && !rechambers("thompson"));
         for id in ["kar98k", "thompson", "bar", "m1carbine", "doublebarrel", "kar98k_scoped_zombie", "doublebarrel_sawed_grip"] {
             assert!(find(&defs, id).is_some(), "{id}");
         }

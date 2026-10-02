@@ -739,7 +739,7 @@ fn animate_view_rig(
         c.map(|c| (c, 1.0 - left / def.reload_time.max(0.01)))
     } else {
         let fire = get(if ctl.ads > 0.5 { "ads_fire" } else { "fire" }).or_else(|| get("fire"));
-        let rechamber = get("rechamber");
+        let rechamber = get("rechamber").filter(|_| def.rechamber);
         match (gun.since_shot, fire) {
             (Some(s), Some(f)) if s < f.duration => Some((f.clone(), progress(&f, s))),
             (Some(s), Some(f)) if rechamber.as_ref().is_some_and(|r| s < f.duration + r.duration) => {
