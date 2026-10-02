@@ -1083,6 +1083,7 @@ pub fn clip_collision(cm: &t4::clipmap::ClipMapInfo, entities: &[mapents::Entity
         }
     };
     let by_model = cm.model_brushes();
+    let terrain = cm.model_terrain();
     let brushes = |list: &[u16], t: &Transform, out: &mut Vec<Tri>| {
         for &bi in list {
             let Some(brush) = cm.brushes.get(bi as usize) else { continue };
@@ -1105,9 +1106,16 @@ pub fn clip_collision(cm: &t4::clipmap::ClipMapInfo, entities: &[mapents::Entity
         let Some(list) = by_model.get(n) else { continue };
         let t = Transform::from_translation(to_bevy(e.origin())).with_rotation(angles_to_quat(e.angles()));
         brushes(list, &t, &mut out);
+        // Its patches too (model space, like its brushes).
+        for (tri, m) in terrain.get(n).into_iter().flatten() {
+            let b = clip_blocks(cm.material_contents(*m as i64));
+            if b != 0 {
+                add(&tri.map(|p| t.transform_point(to_bevy(p))), b, &mut out);
+            }
+        }
     }
-    for (tri, m) in cm.world_terrain() {
-        let b = clip_blocks(cm.material_contents(m as i64));
+    for (tri, m) in &terrain[0] {
+        let b = clip_blocks(cm.material_contents(*m as i64));
         if b != 0 {
             add(&tri.map(to_bevy), b, &mut out);
         }
@@ -1278,6 +1286,12 @@ pub fn build(install: &Install, iwd: &Iwd, bc: bool, wanted: Wanted) -> Result<N
     let mut submodel_bounds = HashMap::new();
     for (n, bm) in world.models.iter().enumerate().skip(1) {
         if bm.surface_count == 0 {
+            // Clip-only models (e.g. the debris clip over the stairs): their
+            // own bounds, so gameplay can block with them and remove them.
+            let (a, b) = (to_bevy(bm.mins), to_bevy(bm.maxs));
+            if bm.mins.iter().zip(&bm.maxs).all(|(lo, hi)| lo < hi) {
+                submodel_bounds.insert(n, (a.min(b), a.max(b)));
+            }
             continue;
         }
         let range = bm.start_surface as usize..(bm.start_surface + bm.surface_count) as usize;

@@ -194,13 +194,36 @@ impl ClipMapInfo {
     }
 
     /// Terrain/patch triangles of the static world: everything under the
-    /// collision leaves' AABB trees, each partition once.
+    /// collision leaves' AABB trees, each partition once, except what the
+    /// brush models own (their triangles are in model space, see
+    /// [`Self::model_terrain`]).
     pub fn world_terrain(&self) -> Vec<([[f32; 3]; 3], u16)> {
+        self.model_terrain().swap_remove(0)
+    }
+
+    /// Terrain/patch triangles of each brush model (`[0]` = the static
+    /// world: partitions no submodel owns). Submodel triangles are in the
+    /// model's own space, placed by its entity like its brushes.
+    pub fn model_terrain(&self) -> Vec<Vec<([[f32; 3]; 3], u16)>> {
+        let mut owned = std::collections::HashSet::new();
+        let mut out = vec![Vec::new(); self.models.len().max(1)];
+        for (m, model) in self.models.iter().enumerate().skip(1) {
+            let parts = self.partitions_of(&[(model.leaf.first_coll_aabb as usize, model.leaf.coll_aabb_count as usize)]);
+            owned.extend(parts.iter().map(|p| p.0));
+            out[m] = self.partition_tris(&parts);
+        }
         let roots: Vec<(usize, usize)> = self.leafs.iter().map(|l| (l.first_coll_aabb as usize, l.coll_aabb_count as usize)).collect();
-        self.terrain_of(&roots)
+        let world: Vec<(usize, u16)> = self.partitions_of(&roots).into_iter().filter(|p| !owned.contains(&p.0)).collect();
+        out[0] = self.partition_tris(&world);
+        out
     }
 
     fn terrain_of(&self, roots: &[(usize, usize)]) -> Vec<([[f32; 3]; 3], u16)> {
+        self.partition_tris(&self.partitions_of(roots))
+    }
+
+    /// Partitions (with their material) under AABB tree ranges, each once.
+    fn partitions_of(&self, roots: &[(usize, usize)]) -> Vec<(usize, u16)> {
         let mut parts: Vec<(usize, u16)> = Vec::new();
         for &(first, count) in roots {
             for i in first..first + count {
@@ -209,8 +232,12 @@ impl ClipMapInfo {
         }
         parts.sort_unstable();
         parts.dedup_by_key(|p| p.0);
+        parts
+    }
+
+    fn partition_tris(&self, parts: &[(usize, u16)]) -> Vec<([[f32; 3]; 3], u16)> {
         let mut out = Vec::new();
-        for (pi, material) in parts {
+        for &(pi, material) in parts {
             let p = self.partitions[pi];
             for k in 0..p.tri_count as usize {
                 let Some(tri) = self.tris.get(p.first_tri.max(0) as usize + k) else { continue };
@@ -441,7 +468,12 @@ mod tests {
 
         // Opaque render triangles lie on solid brushes or terrain.
         let terrain = cm.world_terrain();
-        assert_eq!(terrain.len(), 19482);
+        assert_eq!(terrain.len(), 19480);
+        // Brush models' patches are in model space; they stay out of the
+        // world (one used to stand as an invisible wall at the origin).
+        let models = cm.model_terrain();
+        assert_eq!(models.iter().skip(1).map(Vec::len).sum::<usize>(), 2);
+        assert!(!terrain.iter().any(|(t, _)| t.iter().all(|p| p[0].abs() < 60.0 && p[1].abs() < 3.0 && p[2].abs() < 34.0)));
         let w = zd.world.as_ref().unwrap();
         let tri_near = |p: [f32; 3], t: &[[f32; 3]; 3]| {
             let n = {

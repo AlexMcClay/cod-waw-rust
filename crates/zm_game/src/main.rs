@@ -307,7 +307,7 @@ fn main() {
                 next.set(GameState::Loading);
             }
         })
-        .add_systems(Update, (cursor_grab, debug_capture))
+        .add_systems(Update, (cursor_grab, debug_capture, collision_map))
         .add_systems(Update, log_state)
         .add_systems(PreUpdate, autopilot.after(bevy::input::InputSystem).run_if(autopilot_enabled))
         .run();
@@ -358,6 +358,50 @@ fn install_panic_hook() {
 }
 
 /// True when the developer smoke-test mode (`UNDEAD_CAPTURE`) is active.
+/// Developer aid: `UNDEAD_COLLISION_MAP=<file.ppm>` writes a top-down map
+/// (5 cm pixels, 50 m around the player start, at the start's floor) of what
+/// stops the player once the map has loaded: red = clip-only collision
+/// with nothing visible within 15 cm, grey = blocked by visible geometry, blue = gameplay boxes (windows,
+/// closed doors), black = no floor.
+fn collision_map(world: Res<World>, player: Query<(&Transform, &player::PlayerCtl), With<player::Player>>, mut done: Local<bool>) {
+    use zm_core::trimesh::blocks;
+    if *done {
+        return;
+    }
+    let Some(path) = std::env::var_os("UNDEAD_COLLISION_MAP") else { return };
+    let (Some(mesh), Ok((t, c))) = (world.mesh.as_ref(), player.single()) else { return };
+    *done = true;
+    let (n, px) = (1000usize, 0.05f32);
+    let floor = mesh.ground_mask(t.translation.x, t.translation.z, c.feet_y + 0.5, c.feet_y - 5.0, 0.7, blocks::PLAYER).unwrap_or(c.feet_y);
+    let (x0, z0) = (t.translation.x - n as f32 * px * 0.5, t.translation.z - n as f32 * px * 0.5);
+    let mut img = vec![0u8; n * n * 3];
+    for j in 0..n {
+        for i in 0..n {
+            let (x, z) = (x0 + i as f32 * px, z0 + j as f32 * px);
+            let Some(g) = mesh.ground_mask(x, z, floor + 0.8, floor - 0.8, 0.7, blocks::PLAYER) else { continue };
+            let (y0, y1) = (g + 0.45, g + 1.7);
+            let clip = mesh.push_cylinder_mask(x, z, 0.03, y0, y1, 1, blocks::PLAYER, |_| true).2;
+            let seen = clip && mesh.push_cylinder_mask(x, z, 0.15, y0 - 0.2, y1, 1, blocks::SOLID, |_| true).2;
+            let solid = world.player_solids.iter().any(|b| b.min.y < y1 && b.max.y > y0 && b.min.x <= x && b.max.x >= x && b.min.z <= z && b.max.z >= z);
+            let rgb = if solid {
+                [60, 90, 255]
+            } else if clip && !seen {
+                [255, 40, 40]
+            } else if clip {
+                [150, 150, 150]
+            } else {
+                [40, 40, 40]
+            };
+            img[(j * n + i) * 3..(j * n + i) * 3 + 3].copy_from_slice(&rgb);
+        }
+    }
+    let mut out = format!("P6 {n} {n} 255
+").into_bytes();
+    out.extend(img);
+    let _ = std::fs::write(&path, out);
+    info!("collision map written: origin ({x0:.2}, {z0:.2}) {px} m/px, floor {floor:.2}");
+}
+
 pub fn autopilot_enabled() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var_os("UNDEAD_CAPTURE").is_some())
